@@ -1,0 +1,58 @@
+
+[MASTER]
+load-plugins=pylint_django
+# Ignore test, migration files, and the frontend directory (React)
+ignore-patterns=.*tests\.py,migrations/.*\.py,.*migrations/.*\.py,frontend/.*
+# Use CI settings for Django
+django-settings-module=tour_management.settings
+# Use multiple processes to speed up Pylint
+jobs=0
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring, # Thiếu mô tả module
+    missing-class-docstring, # Thiếu mô tả lớp
+    missing-function-docstring, # Thiếu mô tả hàm
+    too-few-public-methods, # Quá ít phương thức công khai
+    no-member, # Không có thành viên
+    line-too-long, # Dòng quá dài
+    unrecognized-option, # Tùy chọn không được công nhận
+    bad-plugin-value, # Giá trị plugin không hợp lệ
+    wildcard-import, # import wildcard [*]
+    logging-format-interpolation, # Lỗi định dạng logging
+    logging-fstring-interpolation, # Lỗi định dạng f-string trong logging
+    broad-except, # Ngoại lệ rộng
+    import-outside-toplevel, # Import bên ngoài cấp độ cao nhất
+    redefined-outer-name, # Tên bên ngoài được định nghĩa lại
+    unused-variable, # Biến không được sử dụng
+    invalid-name, # Tên không hợp lệ
+    too-many-arguments, # Quá nhiều đối số
+    too-many-return-statements, # Quá nhiều câu lệnh trả về
+    too-many-branches, # Quá nhiều nhánh
+    too-many-statements, # Quá nhiều câu lệnh
+    too-many-locals, # Quá nhiều biến cục bộ
+    consider-using-f-string, # Cân nhắc sử dụng f-string
+    fixme, # Chú ý cần sửa [//TODO, //FIXME]
+    too-many-ancestors, # Quá nhiều tổ tiên
+    too-many-lines, # Quá nhiều dòng trong tệp  
+    wrong-import-order, # Thứ tự import không đúng
+    unused-wildcard-import, # import wildcard không được sử dụng
+    duplicate-code, # Mã trùng lặp
+    unused-argument, # Đối số không được sử dụng
+
+[REPORTS]
+# Set the output format
+output-format=text
+# Include a report with statistics
+reports=yes
+# Evaluate the score threshold for return code
+fail-under=10.0
+
+[REFACTORING]
+# Maximum number of arguments for function / method
+max-args=6
+# Maximum number of return statements in a function / method
+max-returns=7
+
+[FORMAT]
+max-line-length=120

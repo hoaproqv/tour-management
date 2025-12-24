@@ -1,0 +1,92 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  check-react:
+    name: Check React
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+
+      - name: Cache node modules
+        id: node-modules-cache
+        uses: actions/cache@v4
+        with:
+          path: react/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('react/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install frontend dependencies
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
+        run: |
+          cd react
+          npm ci
+
+      - name: Run Prettier (React)
+        run: |
+          cd react
+          npm run format
+
+      - name: Run ESLint (React)
+        run: |
+          cd react
+          npm run lint
+
+  check-python:
+    name: Check Python
+    runs-on: windows-latest
+    needs: check-react
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup virtualenv
+        run: python -m venv .venv
+
+      - name: Cache pip dependencies
+        id: pip-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .venv
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install requirements
+        if: steps.pip-cache.outputs.cache-hit != 'true'
+        run: |
+          .\.venv\Scripts\activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run code style and lint checks
+        env:
+          DJANGO_SETTINGS_MODULE: tour_management.settings
+          SECRET_KEY: "your_secret_key"
+          DATABASE_URL: "sqlite:///db.sqlite3"
+        run: |
+          .\.venv\Scripts\activate
+          python -m autopep8 -ir .
+          python -m isort --atomic .
+          python -m flake8 -v --count --show-source --statistics
+          mkdir logs
+          python -m pylint --rcfile=.pylintrc core/ tour_management/ utils/ common/

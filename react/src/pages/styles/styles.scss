@@ -1,0 +1,75 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Tùy chỉnh thêm cho các trạng thái khác của Button */
+.ant-btn:focus,
+.ant-btn:hover {
+  outline: none;
+  box-shadow: none;
+}
+
+.active {
+  color: white !important;
+  background-color: rgba(255, 255, 255, 0.2);
+  font-weight: 600;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 3px;
+    background-color: #ffc107;
+    border-radius: 2px;
+  }
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.manage-order {
+  :where(.css-dev-only-do-not-override-16dneet).ant-form-item
+    .ant-form-item-label
+    > label.ant-form-item-required::before {
+    position: absolute;
+    right: -1px;
+    top: 2px;
+  }
+
+  .ant-form-item {
+    margin-bottom: 10px !important;
+  }
+
+  .ant-card-body {
+    padding: 16px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .sidebar {
+    max-width: unset !important;
+    ul {
+      display: flex;
+      width: 100%;
+      li {
+        width: 60px !important;
+        text-align: center !important;
+        padding-inline: unset !important;
+        .ant-menu-title-content {
+          width: 0 !important;
+          margin-inline-start: unset !important;
+        }
+      }
+    }
+  }
+}
