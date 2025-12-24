@@ -45,6 +45,12 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 # Application definition
 
 LOCAL_APPS = [
+    "accounts",
+    "fleet",
+    "trips",
+    "passengers",
+    "rounds",
+    "transactions",
     "core",
 ]
 
@@ -218,6 +224,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "accounts.User"
 
 # ASGI application entrypoint
 ASGI_APPLICATION = "tour_management.asgi.application"
