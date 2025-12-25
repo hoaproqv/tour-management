@@ -44,6 +44,12 @@ urlpatterns = [
     path("", IndexPageAPIView.as_view(), name="index_page"),
     path("view/", include("core.urls")),
     path("api/", include(api_patterns)),
+    path("api/", include("accounts.urls")),
+    path("api/", include("fleet.urls")),
+    path("api/", include("trips.urls")),
+    path("api/", include("passengers.urls")),
+    path("api/", include("rounds.urls")),
+    path("api/", include("transactions.urls")),
 ]
 
 # Serve static and media files in development

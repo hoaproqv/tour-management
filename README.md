@@ -51,7 +51,7 @@ python manage.py runserver 0.0.0.0:8000
 
 ## Environment Variables
 
-- `THM_DEBUG` - Debug mode
+- `DJANGO_DEBUG` - Debug mode
 - `REDIS_HOST` - Redis server host
 - `REDIS_PORT` - Redis server port
 - `DB_NAME` - Database name

@@ -17,5 +17,18 @@ python manage.py migrate --noinput
 echo "Collecting static assets..."
 python manage.py collectstatic --noinput
 
-echo "Starting Gunicorn..."
-exec gunicorn tour_management.wsgi:application --bind 0.0.0.0:8000
+HOST=${SERVER_HOST:-0.0.0.0}
+PORT=${SERVER_PORT:-8000}
+
+if [ "${DJANGO_DEBUG}" = "True" ] || [ "${DJANGO_DEBUG}" = "true" ]; then
+  echo "Starting Django dev server on ${HOST}:${PORT}..."
+  exec python manage.py runserver ${HOST}:${PORT}
+else
+  echo "Starting Gunicorn on ${HOST}:${PORT}..."
+  GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
+  GUNICORN_WORKERS=${GUNICORN_WORKERS:-2}
+  exec gunicorn tour_management.wsgi:application \
+    --bind ${HOST}:${PORT} \
+    --workers "$GUNICORN_WORKERS" \
+    --timeout "$GUNICORN_TIMEOUT"
+fi

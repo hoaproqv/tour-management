@@ -18,7 +18,7 @@ services:
       DJANGO_SETTINGS_MODULE: tour_management.settings
       EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     ports:
-      - "8000:8000"
+      - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
     volumes:
       - ./logs:/app/logs
       - ./media:/app/media
@@ -37,7 +37,7 @@ services:
       POSTGRES_USER: "${DB_USER}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
