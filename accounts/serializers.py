@@ -38,4 +38,35 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "email", "name", "tenant", "role", "is_active", "is_staff"]
+        fields = [
+            "id",
+            "username",
+            "email",
+            "name",
+            "tenant",
+            "role",
+            "is_active",
+            "is_staff",
+        ]
+
+
+class TokenPairSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    tokens = TokenPairSerializer()
+    user = UserSerializer()
+
+    class Meta:
+        # Avoid component name collision with inline serializer named "LoginResponse"
+        ref_name = "LoginResponseData"
+
+
+class RefreshTokenSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+
+
+class CsrfSerializer(serializers.Serializer):
+    csrf = serializers.CharField()

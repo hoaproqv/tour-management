@@ -1,10 +1,19 @@
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import permissions, status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import permissions, serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.serializers import LoginSerializer, RegisterSerializer, UserSerializer
+from accounts.serializers import (
+    CsrfSerializer,
+    LoginResponseSerializer,
+    LoginSerializer,
+    RefreshTokenSerializer,
+    RegisterSerializer,
+    TokenPairSerializer,
+    UserSerializer,
+)
 from common.views import BaseAPIView
 
 User = get_user_model()
@@ -13,7 +22,24 @@ User = get_user_model()
 class RegisterView(BaseAPIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+    serializer_class = RegisterSerializer
 
+    @extend_schema(
+        summary="Register new user",
+        description="Create a new user account.",
+        request=RegisterSerializer,
+        responses={
+            201: inline_serializer(
+                name="RegisterResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "data": UserSerializer(),
+                },
+            ),
+            400: {"description": "Validation error"},
+        },
+        tags=["Auth"],
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
@@ -25,7 +51,24 @@ class RegisterView(BaseAPIView):
 class LoginView(BaseAPIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+    serializer_class = LoginSerializer
 
+    @extend_schema(
+        summary="Login",
+        description="Authenticate user and return JWT tokens.",
+        request=LoginSerializer,
+        responses={
+            200: inline_serializer(
+                name="LoginResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "data": LoginResponseSerializer(),
+                },
+            ),
+            400: {"description": "Invalid credentials"},
+        },
+        tags=["Auth"],
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
@@ -37,10 +80,46 @@ class LoginView(BaseAPIView):
 
 
 class MeView(BaseAPIView):
+    serializer_class = UserSerializer
+
+    @extend_schema(
+        summary="Current user",
+        description="Get current authenticated user profile.",
+        responses={
+            200: inline_serializer(
+                name="MeResponse",
+                fields={
+                    "success": serializers.BooleanField(),
+                    "data": UserSerializer(),
+                },
+            )
+        },
+        tags=["Auth"],
+    )
     def get(self, request):
         return self.success(UserSerializer(request.user).data)
 
 
+@extend_schema(
+    summary="Refresh JWT",
+    description="Exchange a refresh token for a new access token.",
+    request=RefreshTokenSerializer,
+    responses={
+        200: inline_serializer(
+            name="RefreshResponse",
+            fields={
+                "success": serializers.BooleanField(),
+                "data": inline_serializer(
+                    name="RefreshData",
+                    fields={"tokens": TokenPairSerializer()},
+                ),
+            },
+        ),
+        400: {"description": "Missing refresh token"},
+        401: {"description": "Invalid refresh token"},
+    },
+    tags=["Auth"],
+)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def refresh_token(request):
@@ -58,6 +137,20 @@ def refresh_token(request):
         )
 
 
+@extend_schema(
+    summary="Get CSRF token",
+    description="Sets CSRF cookie for session based auth.",
+    responses={
+        200: inline_serializer(
+            name="CsrfResponse",
+            fields={
+                "success": serializers.BooleanField(),
+                "data": CsrfSerializer(),
+            },
+        )
+    },
+    tags=["Auth"],
+)
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 @ensure_csrf_cookie

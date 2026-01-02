@@ -1,9 +1,15 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from trips.views import TripBusViewSet, TripViewSet
+from trips.views import (
+    TripBusDetailView,
+    TripBusListCreateView,
+    TripDetailView,
+    TripListCreateView,
+)
 
-router = DefaultRouter()
-router.register(r"trips", TripViewSet, basename="trip")
-router.register(r"trip-buses", TripBusViewSet, basename="tripbus")
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("trips/", TripListCreateView.as_view(), name="trip-list-create"),
+    path("trips/<uuid:pk>/", TripDetailView.as_view(), name="trip-detail"),
+    path("trip-buses/", TripBusListCreateView.as_view(), name="tripbus-list-create"),
+    path("trip-buses/<uuid:pk>/", TripBusDetailView.as_view(), name="tripbus-detail"),
+]

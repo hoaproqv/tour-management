@@ -1,229 +1,99 @@
-import React, { useState } from "react";
+import React from "react";
 
-import { CloseOutlined, EditOutlined, SaveOutlined } from "@ant-design/icons";
-import { Button, Card, Descriptions, Input } from "antd";
+import { Card, Descriptions, Skeleton, Tag } from "antd";
 
-import { useGetAccountInfo, useUpdateUserEmail } from "../../hooks/useAuth";
+import { useGetAccountInfo } from "../../hooks/useAuth";
 
-interface AccountInfo {
-  login: number;
-  name: string;
-  server: string;
-  currency: string;
-  balance: number;
-  equity: number;
-  margin: number;
-  margin_free: number;
-  company: string;
-}
-
-interface User {
-  uuid: string;
-  username: number;
-  name: string;
-  email: string;
-  server: string;
-  created_at: string;
-}
-
-interface AccountData {
-  user: User;
-  account_info: AccountInfo;
-}
+import type { IUser } from "../../utils/types";
 
 export const Account = () => {
-  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const { data: user, isLoading } = useGetAccountInfo();
+  const userData = user as IUser | undefined;
 
-  const {
-    data: accountData,
-  }: {
-    data: AccountData | undefined;
-  } = useGetAccountInfo();
+  const renderValue = (value?: string | number | null) => value ?? "—";
 
-  const { mutate: updateEmail, data: updateEmailData } = useUpdateUserEmail();
-
-  const { user, account_info } = accountData || {};
-
-  const { uuid, username, name, server, email, created_at } = user || {
-    uuid: "",
-    username: "",
-    name: "",
-    server: "",
-    email: "",
-    created_at: "",
-  };
-
-  const { login, balance, equity, margin, margin_free, company, currency } =
-    account_info || {
-      login: 0,
-      balance: 0,
-      equity: 0,
-      margin: 0,
-      margin_free: 0,
-      company: "",
-      currency: "",
-    };
-
-  const [editedEmail, setEditedEmail] = useState("");
-
-  const handleEditEmail = () => {
-    setIsEditingEmail(true);
-    setEditedEmail(updateEmailData?.user.email || email || "");
-  };
-
-  const handleSaveEmail = async () => {
-    updateEmail(editedEmail);
-
-    setIsEditingEmail(false);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditingEmail(false);
-    setEditedEmail(email || "");
-  };
-
-  const formatCurrency = (value: number, currency: string) => {
-    if (!currency) return value.toLocaleString();
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  const statusTag = !userData ? (
+    "—"
+  ) : userData.is_active ? (
+    <Tag color="green">Active</Tag>
+  ) : (
+    <Tag color="red">Inactive</Tag>
+  );
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">
-        Account Information
-      </h1>
-
-      {/* User Information Card */}
-      <Card
-        title="User Profile"
-        className="mb-6 shadow-md"
-        extra={<span className="text-sm text-gray-500">ID: {uuid}</span>}
-      >
-        <Descriptions column={1} bordered>
-          <Descriptions.Item label="Username">{username}</Descriptions.Item>
-          <Descriptions.Item label="Name">{name}</Descriptions.Item>
-          <Descriptions.Item label="Email">
-            {isEditingEmail ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={editedEmail}
-                  onChange={(e) => setEditedEmail(e.target.value)}
-                  className="max-w-xs"
-                />
-                <Button
-                  icon={<SaveOutlined />}
-                  type="primary"
-                  size="small"
-                  onClick={handleSaveEmail}
-                >
-                  Save
-                </Button>
-                <Button
-                  icon={<CloseOutlined />}
-                  size="small"
-                  onClick={handleCancelEdit}
-                >
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span>{updateEmailData?.user.email || email}</span>
-                <Button
-                  icon={<EditOutlined />}
-                  type="link"
-                  size="small"
-                  onClick={handleEditEmail}
-                >
-                  Edit
-                </Button>
-              </div>
-            )}
-          </Descriptions.Item>
-          <Descriptions.Item label="Server">{server}</Descriptions.Item>
-          <Descriptions.Item label="Created At">
-            {formatDate(created_at)}
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
-
-      {/* Account Information Card */}
-      <Card title="Trading Account" className="shadow-md">
-        <Descriptions column={2} bordered>
-          <Descriptions.Item label="Login">
-            <span className="font-semibold">{login}</span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Name">
-            <span className="font-semibold">{name}</span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Server">{server}</Descriptions.Item>
-          <Descriptions.Item label="Currency">
-            <span className="font-semibold text-blue-600">{currency}</span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Balance">
-            <span className="text-lg font-bold text-green-600">
-              {formatCurrency(balance, currency)}
-            </span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Equity">
-            <span className="text-lg font-bold text-blue-600">
-              {formatCurrency(equity, currency)}
-            </span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Margin">
-            <span className="text-lg font-semibold text-orange-600">
-              {formatCurrency(margin, currency)}
-            </span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Free Margin">
-            <span className="text-lg font-semibold text-purple-600">
-              {formatCurrency(margin_free, currency)}
-            </span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Company" span={2}>
-            <span className="font-medium">{company}</span>
-          </Descriptions.Item>
-        </Descriptions>
-
-        {/* Account Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <h3 className="text-sm font-medium text-green-800 mb-1">Balance</h3>
-            <p className="text-xl font-bold text-green-600">
-              {formatCurrency(balance, currency)}
+    <div className="w-full bg-[#f4f7fb] min-h-screen p-6">
+      <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
+              User Center
             </p>
-          </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-medium text-blue-800 mb-1">Equity</h3>
-            <p className="text-xl font-bold text-blue-600">
-              {formatCurrency(equity, currency)}
-            </p>
-          </div>
-          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-            <h3 className="text-sm font-medium text-orange-800 mb-1">Margin</h3>
-            <p className="text-xl font-bold text-orange-600">
-              {formatCurrency(margin, currency)}
-            </p>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <h3 className="text-sm font-medium text-purple-800 mb-1">
-              Free Margin
-            </h3>
-            <p className="text-xl font-bold text-purple-600">
-              {formatCurrency(margin_free, currency)}
+            <h1 className="text-4xl font-bold text-slate-900 mt-3">
+              Hồ sơ tài khoản
+            </h1>
+            <p className="text-slate-500 mt-2">
+              Thông tin chi tiết người dùng trong hệ thống tour management.
             </p>
           </div>
         </div>
-      </Card>
+
+        <Card
+          title={
+            <span className="text-slate-900 font-semibold">
+              Thông tin người dùng
+            </span>
+          }
+          className="mt-8 bg-[#e5f2ff] border border-[#c5dff8] shadow-none"
+          styles={{
+            header: {
+              backgroundColor: "#e5f2ff",
+              borderBottom: "1px solid #c5dff8",
+            },
+            body: { backgroundColor: "white", borderRadius: 12, padding: 24 },
+          }}
+        >
+          {isLoading ? (
+            <Skeleton active paragraph={{ rows: 6 }} />
+          ) : (
+            <Descriptions
+              column={{ xs: 1, sm: 1, md: 2 }}
+              bordered
+              styles={{
+                label: {
+                  width: "32%",
+                  backgroundColor: "#f9fafb",
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                },
+                content: {
+                  backgroundColor: "#fff",
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                },
+              }}
+            >
+              <Descriptions.Item label="Tên đăng nhập">
+                {renderValue(userData?.username)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Họ và tên">
+                {renderValue(userData?.name)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Email">
+                {renderValue(userData?.email)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Tenant">
+                {renderValue(userData?.tenant)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Role">
+                {renderValue(userData?.role)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                {statusTag}
+              </Descriptions.Item>
+            </Descriptions>
+          )}
+        </Card>
+      </div>
     </div>
   );
 };

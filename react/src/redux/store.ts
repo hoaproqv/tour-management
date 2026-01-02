@@ -1,17 +1,19 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, createSlice } from "@reduxjs/toolkit";
 
-const store = configureStore({
-  reducer: {},
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: ["chat/setFilesRedux"],
-        ignoredPaths: ["chat.files"],
-      },
-    }),
+// Minimal placeholder slice to satisfy Redux store requirements until real slices are added.
+const appSlice = createSlice({
+  name: "app",
+  initialState: {},
+  reducers: {},
 });
 
-export type RootState = ReturnType<typeof store.getState>;
+const store = configureStore({
+  reducer: {
+    app: appSlice.reducer,
+  },
+});
+
 export type AppDispatch = typeof store.dispatch;
+export type RootState = ReturnType<typeof store.getState>;
 
 export default store;

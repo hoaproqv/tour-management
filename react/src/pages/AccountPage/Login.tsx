@@ -1,139 +1,142 @@
-import React from "react";
+import React, { useEffect } from "react";
 
-import {
-  CloudServerOutlined,
-  LockOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Card, Form, Input } from "antd";
 import { Link } from "react-router-dom";
 
 import { useLogin } from "../../hooks/useAuth";
 import { ROUTES } from "../../utils/routers";
 
-interface LoginFormData {
-  username: string;
-  password: string;
-  server: string;
-}
+import type { ILoginFormData } from "../../utils/types";
 
 const Login = () => {
-  const [form] = Form.useForm();
-
+  const [form] = Form.useForm<ILoginFormData>();
   const { mutate: mutateLogin, isPending: isLoggingIn } = useLogin();
 
-  const handleLogin = async (values: LoginFormData) => {
-    try {
-      mutateLogin(values);
-    } catch (error) {
-      console.error("Login failed:", error);
+  useEffect(() => {
+    const accessToken = localStorage.getItem("access_token");
+    if (accessToken) {
+      window.location.href = ROUTES.DASHBOARD;
     }
+  }, []);
+
+  const handleLogin = (values: ILoginFormData) => {
+    mutateLogin(values);
   };
 
   return (
-    <div className="h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-primary">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-white">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-sm text-green-100">
-            Enter your credentials to access the trading platform
-          </p>
-        </div>
-
-        {/* Login Form */}
-        <Card className="shadow-lg border-0 rounded-lg bg-white border-none">
-          <Form
-            form={form}
-            name="login"
-            onFinish={handleLogin}
-            size="large"
-            layout="vertical"
-            requiredMark={false}
-          >
-            {/* Username Field */}
-            <Form.Item
-              label={<span className="text-primary font-medium">Username</span>}
-              name="username"
-              rules={[
-                { required: true, message: "Please enter your username" },
-              ]}
-            >
-              <Input
-                prefix={<UserOutlined className="text-primary" />}
-                placeholder="Username"
-                className="bg-white-light border border-primary text-primary-text rounded-md"
-              />
-            </Form.Item>
-
-            {/* Password Field */}
-            <Form.Item
-              label={<span className="text-primary font-medium">Password</span>}
-              name="password"
-              rules={[
-                { required: true, message: "Please enter your password" },
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined className="text-primary" />}
-                placeholder="Password"
-                className="rounded-md bg-white-light border border-primary text-primary-text"
-              />
-            </Form.Item>
-
-            {/* Server Field */}
-            <Form.Item
-              label={<span className="text-primary font-medium">Server</span>}
-              name="server"
-              rules={[
-                { required: true, message: "Please enter server address" },
-              ]}
-            >
-              <Input
-                prefix={<CloudServerOutlined className="text-primary" />}
-                placeholder="Server"
-                className="rounded-md bg-white-light border border-primary text-primary-text"
-              />
-            </Form.Item>
-
-            {/* Submit Button */}
-            <Form.Item className="mb-0">
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={isLoggingIn}
-                className="w-full h-12 text-base font-medium rounded-md bg-primary border border-primary text-white"
-              >
-                {isLoggingIn ? "Signing in..." : "Sign in"}
-              </Button>
-            </Form.Item>
-          </Form>
-
-          {/* Footer Links */}
-          <div className="mt-6 text-center space-y-2">
-            <div className="text-sm">
-              <Link
-                to={ROUTES.FORGET_PASSWORD}
-                className="hover:opacity-80 font-medium text-primary"
-              >
-                Forgot your password?
-              </Link>
+    <div className="min-h-screen bg-gradient-to-br from-sky-600 via-cyan-500 to-sky-700 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white/90 backdrop-blur rounded-2xl shadow-2xl overflow-hidden">
+        <div className="hidden md:flex flex-col justify-between bg-[rgba(28,100,242,0.12)] p-10 border-r border-white/40">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-sky-700 font-semibold">
+              Tour Management
+            </p>
+            <h1 className="text-3xl font-bold text-slate-900 mt-4 leading-tight">
+              Chào mừng bạn quay lại
+            </h1>
+            <p className="mt-4 text-slate-600">
+              Đăng nhập để quản lý chuyến, vòng, và hành khách trong hệ thống
+              tour của bạn.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
+              <p className="text-xs text-slate-500">Quản lý</p>
+              <p className="text-lg font-semibold text-slate-900">
+                Trips &amp; Rounds
+              </p>
             </div>
-            <div className="text-sm text-primary">
-              Don't have an account?{" "}
-              <Link to="#" className="hover:opacity-80 font-medium">
-                Contact administrator
-              </Link>
+            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
+              <p className="text-xs text-slate-500">Hành khách</p>
+              <p className="text-lg font-semibold text-slate-900">
+                Theo dõi realtime
+              </p>
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* Bottom Text */}
-        <div className="text-center">
-          <p className="text-xs text-green-100 opacity-80">
-            By signing in, you agree to our Terms of Service and Privacy Policy
+        <div className="p-8 md:p-10">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-slate-900">Đăng nhập</h2>
+            <p className="text-slate-500 mt-2">
+              Dùng tài khoản đã đăng ký để tiếp tục.
+            </p>
+          </div>
+
+          <Card className="shadow-sm border border-slate-100">
+            <Form
+              form={form}
+              name="login"
+              onFinish={handleLogin}
+              size="large"
+              layout="vertical"
+              requiredMark={false}
+              initialValues={{ username: "", password: "" }}
+            >
+              <Form.Item
+                label={
+                  <span className="text-slate-800 font-medium">
+                    Tên đăng nhập
+                  </span>
+                }
+                name="username"
+                rules={[
+                  { required: true, message: "Vui lòng nhập tên đăng nhập" },
+                ]}
+              >
+                <Input
+                  prefix={<UserOutlined className="text-sky-600" />}
+                  placeholder="Nhập tên đăng nhập"
+                  className="rounded-lg"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label={
+                  <span className="text-slate-800 font-medium">Mật khẩu</span>
+                }
+                name="password"
+                rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined className="text-sky-600" />}
+                  placeholder="Nhập mật khẩu"
+                  className="rounded-lg"
+                />
+              </Form.Item>
+
+              <div className="flex items-center justify-between mb-6 text-sm">
+                <Link
+                  to={ROUTES.FORGET_PASSWORD}
+                  className="text-sky-600 font-medium"
+                >
+                  Quên mật khẩu?
+                </Link>
+                <Link
+                  to={ROUTES.REGISTER}
+                  className="text-slate-600 hover:text-slate-800"
+                >
+                  Chưa có tài khoản?
+                </Link>
+              </div>
+
+              <Form.Item className="mb-0">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isLoggingIn}
+                  className="w-full h-11 rounded-lg bg-sky-600"
+                >
+                  {isLoggingIn ? "Đang đăng nhập..." : "Đăng nhập"}
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+
+          <p className="text-center text-xs text-slate-500 mt-6">
+            Việc bạn tiếp tục đồng nghĩa với việc chấp nhận điều khoản sử dụng
+            của hệ thống.
           </p>
         </div>
       </div>

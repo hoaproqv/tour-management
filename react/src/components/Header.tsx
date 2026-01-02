@@ -1,16 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 import {
-  faChartLine,
-  faCog,
-  faMoon,
-  faQuestionCircle,
-  faSignOutAlt,
-  faSun,
-  faUserCircle,
-} from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Dropdown, Space } from "antd";
+  BellOutlined,
+  ExportOutlined,
+  HomeOutlined,
+  SettingOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import { Avatar, Button, Dropdown, Space, Tooltip } from "antd";
 import { Link } from "react-router-dom";
 
 import { useLogout } from "../hooks/useAuth";
@@ -20,95 +17,94 @@ import { ROUTES } from "../utils/routers";
 import type { MenuProps } from "antd";
 
 function Header() {
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-
   const { mutate: logout } = useLogout();
-
   const account = getAccountFromLocalStorage();
 
   const items: MenuProps["items"] = [
     {
-      key: "help",
+      key: "profile",
       label: (
         <Link to={ROUTES.ACCOUNT}>
-          <FontAwesomeIcon
-            icon={faQuestionCircle}
-            className="text-blue-500 mr-2"
-          />
-          Info
+          <Space>
+            <UserOutlined />
+            Thông tin tài khoản
+          </Space>
         </Link>
       ),
     },
     {
       key: "settings",
       label: (
-        <Link to="#">
-          <FontAwesomeIcon icon={faCog} className="text-gray-500 mr-2" />
-          Settings
-        </Link>
+        <Space>
+          <SettingOutlined />
+          Cài đặt
+        </Space>
       ),
     },
-    {
-      type: "divider",
-    },
+    { type: "divider" },
     {
       key: "logout",
       danger: true,
       label: (
         <div onClick={() => logout()}>
-          <FontAwesomeIcon icon={faSignOutAlt} className="text-red-500 mr-2" />
-          Logout
+          <Space>
+            <ExportOutlined />
+            Đăng xuất
+          </Space>
         </div>
       ),
     },
   ];
 
-  useEffect(() => {
-    document.documentElement.setAttribute("data-bs-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const themeIcon = theme === "dark" ? faSun : faMoon;
-
   return (
-    <div className="fixed top-0 left-0 right-0 w-full h-header-height bg-primary shadow-lg z-50 flex items-center">
-      <div className="w-full flex items-center justify-between px-4">
+    <header className="fixed top-0 left-0 right-0 w-full h-header-height bg-sky-700 shadow-md z-50 flex items-center">
+      <div className="w-full flex items-center justify-between px-5">
         <Link
-          to="/"
-          className="flex items-center gap-2 text-2xl font-bold text-white"
+          to={ROUTES.DASHBOARD}
+          className="flex items-center gap-3 text-white"
         >
-          <FontAwesomeIcon
-            icon={faChartLine}
-            className="text-yellow-400 text-3xl"
-          />
-          <span>Tour Management</span>
+          <div className="bg-white/20 rounded-full h-10 w-10 flex items-center justify-center">
+            <HomeOutlined className="text-xl" />
+          </div>
+          <div>
+            <p className="text-sm leading-tight">Tour Management</p>
+            <p className="text-lg font-semibold leading-tight">Dashboard</p>
+          </div>
         </Link>
 
-        <div className="flex items-center gap-4">
-          <button
-            className="theme-toggle bg-white bg-opacity-10 border border-white border-opacity-20 text-white rounded-lg p-2 transition min-w-[34px]"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            title="Toggle Theme"
-          >
-            <FontAwesomeIcon icon={themeIcon} />
-          </button>
+        <div className="flex items-center gap-3 text-white">
+          <Tooltip title="Thông báo">
+            <Button
+              type="text"
+              className="text-white"
+              icon={<BellOutlined className="text-lg" />}
+            />
+          </Tooltip>
+          <Tooltip title="Cài đặt">
+            <Button
+              type="text"
+              className="text-white"
+              icon={<SettingOutlined className="text-lg" />}
+            />
+          </Tooltip>
 
-          <div className="relative group">
-            <Dropdown menu={{ items }}>
-              <a onClick={(e) => e.preventDefault()}>
-                <Space>
-                  <div className="flex items-center text-white gap-2 cursor-pointer">
-                    <FontAwesomeIcon icon={faUserCircle} className="text-lg" />
-                    {account?.name || "Account"}
-                    <i className="fas fa-caret-down ml-1"></i>
-                  </div>
-                </Space>
-              </a>
-            </Dropdown>
-          </div>
+          <Dropdown menu={{ items }} placement="bottomRight" arrow>
+            <div className="flex items-center gap-2 cursor-pointer">
+              <Avatar
+                size={36}
+                style={{ backgroundColor: "#fff", color: "#0f4bb8" }}
+              >
+                {(account?.name || "User").charAt(0).toUpperCase()}
+              </Avatar>
+              <div className="leading-tight hidden sm:block">
+                <p className="font-semibold">{account?.name || "My Name"}</p>
+                <p className="text-xs text-white/80">Online</p>
+              </div>
+            </div>
+          </Dropdown>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
 

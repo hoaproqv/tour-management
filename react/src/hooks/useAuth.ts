@@ -6,22 +6,39 @@ import {
   getAccountInfo,
   login,
   logout,
+  register,
   updateUserEmail,
 } from "../api/auth";
+import { ROUTES } from "../utils/routers";
 
-import type { ILoginFormData } from "../utils/types";
+import type { ILoginFormData, IRegisterFormData } from "../utils/types";
 
 export const useLogin = () => {
   return useMutation({
     mutationFn: (data: ILoginFormData) => login(data),
-    onSuccess: (data) => {
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("account", JSON.stringify(data.user));
-      window.location.href = "/";
+    onSuccess: () => {
+      message.success("Đăng nhập thành công");
+      window.location.href = ROUTES.DASHBOARD;
     },
-    onError: (error) => {
-      message.error("Login failed. Please check your credentials.");
+    onError: (error: any) => {
+      message.error(
+        error?.message || "Login failed. Please check your credentials.",
+      );
       console.error("Login error:", error);
+    },
+  });
+};
+
+export const useRegister = () => {
+  return useMutation({
+    mutationFn: (data: IRegisterFormData) => register(data),
+    onSuccess: () => {
+      message.success("Đăng ký thành công. Vui lòng đăng nhập.");
+      window.location.href = ROUTES.LOGIN;
+    },
+    onError: (error: any) => {
+      message.error(error?.message || "Đăng ký thất bại. Vui lòng thử lại.");
+      console.error("Register error:", error);
     },
   });
 };
@@ -30,9 +47,7 @@ export const useLogout = () => {
   return useMutation({
     mutationFn: () => logout(),
     onSuccess: () => {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("account");
-      window.location.href = "/view/login";
+      window.location.href = ROUTES.LOGIN;
     },
     onError: (error) => {
       message.error("Logout failed. Please try again.");
@@ -41,10 +56,11 @@ export const useLogout = () => {
   });
 };
 
-export const useGetAccountInfo = () => {
+export const useGetAccountInfo = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ["accountInfo"],
     queryFn: () => getAccountInfo(),
+    enabled: options?.enabled ?? true,
   });
 };
 
@@ -54,8 +70,8 @@ export const useUpdateUserEmail = () => {
     onSuccess: () => {
       message.success("Email updated successfully!");
     },
-    onError: (error) => {
-      message.error("Failed to update email.");
+    onError: (error: any) => {
+      message.error(error?.message || "Failed to update email.");
       console.error("Update email error:", error);
     },
   });
@@ -68,8 +84,8 @@ export const useForgotPassword = () => {
     onSuccess: () => {
       message.success("Password reset email sent successfully!");
     },
-    onError: (error) => {
-      message.error("Failed to send password reset email.");
+    onError: (error: any) => {
+      message.error(error?.message || "Failed to send password reset email.");
       console.error("Forgot password error:", error);
     },
   });

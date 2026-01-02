@@ -1,9 +1,11 @@
 export const ROUTES = {
   DASHBOARD: "/",
   LOGIN: "/view/login",
-  MANAGE_ORDER: "/view/manage-order",
-  HISTORY: "/view/history",
-  FORGET_PASSWORD: "/view/forget_password",
+  REGISTER: "/view/register",
+  TRIP: "/view/trip",
+  ROUND: "/view/round",
+  BUS: "/view/bus",
   ACCOUNT: "/view/account",
+  TRANSACTIONS: "/view/transactions",
   NOT_FOUND: "*",
 };

@@ -129,7 +129,24 @@ export interface IItem {
 }
 
 export interface ILoginFormData {
-  username: string | number;
+  username: string;
   password: string;
-  server: string;
+}
+
+export interface IRegisterFormData {
+  username: string;
+  email: string;
+  name: string;
+  password: string;
+}
+
+export interface IUser {
+  id: string | number;
+  username: string;
+  email: string;
+  name: string;
+  tenant?: string | number | null;
+  role?: string | number | null;
+  is_active?: boolean;
+  is_staff?: boolean;
 }

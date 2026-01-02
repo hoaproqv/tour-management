@@ -1,8 +1,8 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from fleet.views import BusViewSet
+from fleet.views import BusDetailView, BusListCreateView
 
-router = DefaultRouter()
-router.register(r"buses", BusViewSet, basename="bus")
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("buses/", BusListCreateView.as_view(), name="bus-list-create"),
+    path("buses/<uuid:pk>/", BusDetailView.as_view(), name="bus-detail"),
+]

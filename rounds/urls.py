@@ -1,9 +1,17 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from rounds.views import RoundBusViewSet, RoundViewSet
+from rounds.views import (
+    RoundBusDetailView,
+    RoundBusListCreateView,
+    RoundDetailView,
+    RoundListCreateView,
+)
 
-router = DefaultRouter()
-router.register(r"rounds", RoundViewSet, basename="round")
-router.register(r"round-buses", RoundBusViewSet, basename="roundbus")
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("rounds/", RoundListCreateView.as_view(), name="round-list-create"),
+    path("rounds/<uuid:pk>/", RoundDetailView.as_view(), name="round-detail"),
+    path("round-buses/", RoundBusListCreateView.as_view(), name="roundbus-list-create"),
+    path(
+        "round-buses/<uuid:pk>/", RoundBusDetailView.as_view(), name="roundbus-detail"
+    ),
+]

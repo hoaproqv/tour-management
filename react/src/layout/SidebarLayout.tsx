@@ -9,7 +9,9 @@ export default function SidebarLayout() {
     <div className="mt-header-height">
       <div className="flex flex-col md:flex-row pt-header-height bg-[#f2f3f7] min-h-screen">
         <Sidebar />
-        <Outlet />
+        <main className="flex-1 min-w-0 px-4 md:px-6 pb-10">
+          <Outlet />
+        </main>
       </div>
     </div>
   );

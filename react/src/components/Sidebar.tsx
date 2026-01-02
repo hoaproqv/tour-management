@@ -1,52 +1,116 @@
 import React, { useEffect, useState } from "react";
 
 import {
-  faCaretLeft,
-  faChartLine,
-  faHistory,
-  faIndent,
-  faTachometerAlt,
-} from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Button, Menu, type MenuProps } from "antd";
+  CarOutlined,
+  DashboardOutlined,
+  InfoCircleOutlined,
+  CompassOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  TeamOutlined,
+  UserOutlined,
+  UserSwitchOutlined,
+  SearchOutlined,
+  EnvironmentOutlined,
+  WalletOutlined,
+} from "@ant-design/icons";
+import { Button, Input, Menu, type MenuProps } from "antd";
 import { Link, useLocation } from "react-router-dom";
 
 import { ROUTES } from "../utils/routers";
 
+const linkClass = "text-white hover:text-white no-underline";
+
 const menuItems: Required<MenuProps>["items"] = [
   {
-    key: "1",
-    icon: <FontAwesomeIcon icon={faTachometerAlt} />,
+    key: "dashboard",
+    icon: <DashboardOutlined style={{ color: "#fff" }} />,
     label: (
-      <Link
-        to={ROUTES.DASHBOARD}
-        style={{ color: "inherit", textDecoration: "none" }}
-      >
+      <Link to={ROUTES.DASHBOARD} className={linkClass}>
         Dashboard
       </Link>
     ),
   },
   {
-    key: "2",
-    icon: <FontAwesomeIcon icon={faChartLine} />,
+    key: "users",
+    icon: <TeamOutlined style={{ color: "#fff" }} />,
     label: (
-      <Link
-        to={ROUTES.MANAGE_ORDER}
-        style={{ color: "inherit", textDecoration: "none" }}
-      >
-        Order
+      <Link to={ROUTES.ACCOUNT} className={linkClass}>
+        User Management
       </Link>
     ),
   },
   {
-    key: "3",
-    icon: <FontAwesomeIcon icon={faHistory} />,
+    key: "roles",
+    icon: <UserSwitchOutlined style={{ color: "#fff" }} />,
     label: (
-      <Link
-        to={ROUTES.HISTORY}
-        style={{ color: "inherit", textDecoration: "none" }}
-      >
-        History
+      <Link to="#" className={linkClass}>
+        Role Management
+      </Link>
+    ),
+  },
+  {
+    key: "passengers",
+    icon: <UserOutlined style={{ color: "#fff" }} />,
+    label: (
+      <Link to="#" className={linkClass}>
+        Passengers
+      </Link>
+    ),
+  },
+  {
+    key: "trips",
+    icon: <CompassOutlined style={{ color: "#fff" }} />,
+    label: (
+      <Link to={ROUTES.TRIP} className={linkClass}>
+        Trips
+      </Link>
+    ),
+    children: [
+      {
+        key: "trip-home",
+        icon: <CompassOutlined style={{ color: "#fff" }} />,
+        label: (
+          <Link to={ROUTES.TRIP} className={linkClass}>
+            Trip
+          </Link>
+        ),
+      },
+      {
+        key: "rounds",
+        icon: <EnvironmentOutlined style={{ color: "#fff" }} />,
+        label: (
+          <Link to={ROUTES.ROUND} className={linkClass}>
+            Rounds
+          </Link>
+        ),
+      },
+      {
+        key: "bus",
+        icon: <CarOutlined style={{ color: "#fff" }} />,
+        label: (
+          <Link to={ROUTES.BUS} className={linkClass}>
+            Bus
+          </Link>
+        ),
+      },
+    ],
+  },
+  {
+    key: "transactions",
+    icon: <WalletOutlined style={{ color: "#fff" }} />,
+    label: (
+      <Link to={ROUTES.TRANSACTIONS} className={linkClass}>
+        Transaction
+      </Link>
+    ),
+  },
+  {
+    key: "about",
+    icon: <InfoCircleOutlined style={{ color: "#fff" }} />,
+    label: (
+      <Link to="#" className={linkClass}>
+        About us
       </Link>
     ),
   },
@@ -58,20 +122,19 @@ export default function Sidebar() {
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
   const location = useLocation();
-  const path = location.pathname;
-  const selectedKey =
-    path === ROUTES.DASHBOARD
-      ? "1"
-      : path === ROUTES.MANAGE_ORDER
-        ? "2"
-        : path === ROUTES.HISTORY
-          ? "3"
-          : "1";
+
+  const findSelectedKey = () => {
+    if (location.pathname.startsWith(ROUTES.ROUND)) return "trips";
+    if (location.pathname.startsWith(ROUTES.BUS)) return "trips";
+    if (location.pathname.startsWith(ROUTES.TRIP)) return "trips";
+    if (location.pathname.startsWith(ROUTES.TRANSACTIONS))
+      return "transactions";
+    if (location.pathname.startsWith(ROUTES.ACCOUNT)) return "users";
+    return "dashboard";
+  };
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -80,99 +143,83 @@ export default function Sidebar() {
     if (isMobile) setCollapsed(true);
   }, [isMobile]);
 
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => !prev);
-  };
+  const toggleCollapsed = () => setCollapsed((prev) => !prev);
 
   return (
-    <div
-      className="sidebar"
+    <aside
+      className="bg-[#1c2a3a] text-white min-h-screen"
       style={{
-        maxWidth: collapsed ? 87 : 180,
-        minWidth: collapsed ? 87 : 180,
-        width: "100%",
-        backgroundColor: "#16a085",
-        boxShadow: "2px 0 8px rgba(0,0,0,0.1)",
-        transition: "max-width 0.3s cubic-bezier(.4,0,.2,1), box-shadow 0.3s",
-        overflow: "hidden",
-        padding: "8px 0",
+        maxWidth: collapsed ? 90 : 220,
+        minWidth: collapsed ? 90 : 220,
+        transition: "max-width 0.3s ease",
       }}
     >
-      {/* Toggle Button - Ẩn trên mobile */}
-      {!isMobile && (
-        <div
-          className="flex w-full pl-[2px]"
-          style={{ justifyContent: collapsed ? "center" : "flex-end" }}
-        >
-          <Button
-            type="text"
-            onClick={toggleCollapsed}
-            style={{
-              color: "white",
-              border: "none",
-              transition: "background 0.2s, color 0.2s",
-              fontSize: collapsed ? "16px" : "28px",
-            }}
-            className="hover:bg-white hover:bg-opacity-20"
-          >
-            {collapsed ? (
-              <FontAwesomeIcon icon={faIndent} />
-            ) : (
-              <FontAwesomeIcon icon={faCaretLeft} />
-            )}
-          </Button>
-        </div>
-      )}
+      <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
+        {!collapsed && (
+          <span className="text-lg font-semibold">Main Navigation</span>
+        )}
+        <Button type="text" onClick={toggleCollapsed} className="text-white">
+          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+        </Button>
+      </div>
 
-      {/* Menu - chỉ dùng inlineCollapsed để icon vẫn hiển thị khi thu nhỏ */}
+      <div className="px-4 py-3">
+        <Input
+          allowClear
+          placeholder="Tìm kiếm..."
+          prefix={<SearchOutlined className="text-slate-400" />}
+          className="bg-[#243447] border-none text-white placeholder:text-slate-400"
+        />
+      </div>
+
       <Menu
-        defaultSelectedKeys={[selectedKey]}
+        selectedKeys={[findSelectedKey()]}
         mode="inline"
         inlineCollapsed={collapsed}
         items={menuItems}
         style={{
           backgroundColor: "transparent",
-          border: "none",
           color: "white",
+          borderInlineEnd: "none",
         }}
-        theme="dark"
         className="custom-sidebar-menu"
       />
 
-      {/* Global CSS for menu styling */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
-          .custom-sidebar-menu .ant-menu {
-            padding-top:4px;
+          .custom-sidebar-menu .ant-menu-item,
+          .custom-sidebar-menu .ant-menu-submenu-title {
+            margin: 6px 12px;
+            border-radius: 8px;
           }
-          .custom-sidebar-menu .ant-menu-item {
-            color: rgba(255, 255, 255, 0.85) !important;
-            margin: 4px 8px !important;
-            border-radius: 6px !important;
-            transition: background 0.2s, color 0.2s;
+          .custom-sidebar-menu .ant-menu-item-icon,
+          .custom-sidebar-menu .ant-menu-submenu-arrow {
+            color: #fff !important;
           }
-          .custom-sidebar-menu .ant-menu-item:hover {
-            background-color: rgba(255, 255, 255, 0.15) !important;
-            color: white !important;
+          .custom-sidebar-menu .ant-menu-title-content a {
+            color: #fff !important;
           }
           .custom-sidebar-menu .ant-menu-item-selected {
-            background-color: rgba(255, 255, 255, 0.2) !important;
-            color: white !important;
+            background: rgba(255,255,255,0.14) !important;
+            color: #fff !important;
           }
-          .custom-sidebar-menu .ant-menu-item-icon {
-            color: rgba(255, 255, 255, 0.85) !important;
-            transition: color 0.2s;
+          .custom-sidebar-menu .ant-menu-item:hover,
+          .custom-sidebar-menu .ant-menu-submenu-title:hover {
+            background: rgba(255,255,255,0.08) !important;
+            color: #fff !important;
           }
-          .custom-sidebar-menu .ant-menu-item:hover .ant-menu-item-icon {
-            color: white !important;
+          .custom-sidebar-menu .ant-menu-item:hover .ant-menu-title-content a,
+          .custom-sidebar-menu .ant-menu-item-selected .ant-menu-title-content a,
+          .custom-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-title-content a {
+            color: #fff !important;
           }
-          .custom-sidebar-menu .ant-menu-item-selected .ant-menu-item-icon {
-            color: white !important;
+          .custom-sidebar-menu .ant-menu-submenu-arrow {
+            color: rgba(255,255,255,0.6);
           }
         `,
         }}
       />
-    </div>
+    </aside>
   );
 }
