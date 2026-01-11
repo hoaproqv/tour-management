@@ -1,5 +1,3 @@
-import uuid
-
 from django.db import models
 
 
@@ -9,7 +7,7 @@ class Round(models.Model):
         DOING = "doing", "Doing"
         DONE = "done", "Done"
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     trip = models.ForeignKey(
         "trips.Trip",
         on_delete=models.CASCADE,
@@ -17,7 +15,9 @@ class Round(models.Model):
     )
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
-    sequence = models.PositiveIntegerField(help_text="Order of this round within the trip")
+    sequence = models.PositiveIntegerField(
+        help_text="Order of this round within the trip"
+    )
     estimate_time = models.DateTimeField()
     actual_time = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
@@ -37,7 +37,7 @@ class Round(models.Model):
 
 
 class RoundBus(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     trip_bus = models.ForeignKey(
         "trips.TripBus",
         on_delete=models.CASCADE,

@@ -186,4 +186,4 @@ yarn-error.log*
 *.dump
 
 # Key
-firebase_service_account.json
+sample_data.json

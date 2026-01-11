@@ -13,7 +13,9 @@ import RegisterPage from "./pages/AccountPage/Register";
 import BusManagement from "./pages/Bus/BusManagement";
 import DashboardPage from "./pages/Dashboard";
 import NotFoundPage from "./pages/NotFound";
+import PassengerManagement from "./pages/Passengers/PassengerManagement";
 import RoundManagement from "./pages/Rounds/RoundManagement";
+import TransactionManagement from "./pages/Transactions/TransactionManagement";
 import TripManagement from "./pages/Trips/TripManagement";
 import { ROUTES } from "./utils/routers";
 
@@ -33,6 +35,11 @@ function App() {
             <Route path={ROUTES.TRIP} element={<TripManagement />} />
             <Route path={ROUTES.ROUND} element={<RoundManagement />} />
             <Route path={ROUTES.BUS} element={<BusManagement />} />
+            <Route path={ROUTES.PASSENGER} element={<PassengerManagement />} />
+            <Route
+              path={ROUTES.TRANSACTIONS}
+              element={<TransactionManagement />}
+            />
             <Route path={ROUTES.ACCOUNT} element={<Account />} />
             <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
           </Route>

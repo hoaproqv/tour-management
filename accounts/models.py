@@ -1,11 +1,13 @@
-import uuid
-
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models
 
 
 class Tenant(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -19,7 +21,7 @@ class Tenant(models.Model):
 
 
 class Role(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
 
@@ -33,7 +35,9 @@ class Role(models.Model):
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def _create_user(self, username: str, email: str, password: str | None, **extra_fields):
+    def _create_user(
+        self, username: str, email: str, password: str | None, **extra_fields
+    ):
         if not username:
             raise ValueError("The username must be set")
         if not email:
@@ -54,12 +58,16 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_user(self, username: str, email: str, password: str | None = None, **extra_fields):
+    def create_user(
+        self, username: str, email: str, password: str | None = None, **extra_fields
+    ):
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
         return self._create_user(username, email, password, **extra_fields)
 
-    def create_superuser(self, username: str, email: str, password: str | None, **extra_fields):
+    def create_superuser(
+        self, username: str, email: str, password: str | None, **extra_fields
+    ):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
 
@@ -72,8 +80,8 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    username = models.CharField(max_length=150, unique=True, default=uuid.uuid4)
+    id = models.BigAutoField(primary_key=True)
+    username = models.CharField(max_length=150, unique=True)
     tenant = models.ForeignKey(
         Tenant,
         on_delete=models.CASCADE,

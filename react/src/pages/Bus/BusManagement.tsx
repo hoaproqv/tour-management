@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,25 +26,38 @@ const { Title, Text } = Typography;
 
 export default function BusManagement() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [showCreate, setShowCreate] = useState(false);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
 
-  const { data: buses = [], isLoading } = useQuery({
-    queryKey: ["buses"],
-    queryFn: getBuses,
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const {
+    data: busesResponse,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ["buses", page, pageSize, debouncedSearch],
+    queryFn: () => getBuses({ page, limit: pageSize, search: debouncedSearch }),
   });
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return (Array.isArray(buses) ? buses : []).filter((bus) =>
-      term
-        ? bus.registration_number.toLowerCase().includes(term) ||
-          bus.bus_code.toLowerCase().includes(term) ||
-          (bus.description || "").toLowerCase().includes(term)
-        : true,
-    );
-  }, [buses, search]);
+  const buses = busesResponse?.data ?? [];
+  const pagination = busesResponse?.pagination ?? {
+    page,
+    limit: pageSize,
+    total_page: 1,
+    total_items: buses.length,
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: BusPayload) => createBus(payload),
@@ -153,9 +166,19 @@ export default function BusManagement() {
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
           <Table
             rowKey="id"
-            dataSource={filtered}
-            loading={isLoading}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
+            dataSource={buses}
+            loading={isLoading || isFetching}
+            pagination={{
+              current: pagination.page,
+              pageSize: pagination.limit,
+              total: pagination.total_items,
+              showSizeChanger: true,
+              pageSizeOptions: ["5", "10", "20", "50"],
+              onChange: (current, nextPageSize) => {
+                setPage(current);
+                setPageSize(nextPageSize);
+              },
+            }}
             scroll={{ x: true }}
             columns={columns}
             locale={{

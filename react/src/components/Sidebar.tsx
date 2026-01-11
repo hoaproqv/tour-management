@@ -53,7 +53,7 @@ const menuItems: Required<MenuProps>["items"] = [
     key: "passengers",
     icon: <UserOutlined style={{ color: "#fff" }} />,
     label: (
-      <Link to="#" className={linkClass}>
+      <Link to={ROUTES.PASSENGER} className={linkClass}>
         Passengers
       </Link>
     ),
@@ -127,6 +127,7 @@ export default function Sidebar() {
     if (location.pathname.startsWith(ROUTES.ROUND)) return "trips";
     if (location.pathname.startsWith(ROUTES.BUS)) return "trips";
     if (location.pathname.startsWith(ROUTES.TRIP)) return "trips";
+    if (location.pathname.startsWith(ROUTES.PASSENGER)) return "passengers";
     if (location.pathname.startsWith(ROUTES.TRANSACTIONS))
       return "transactions";
     if (location.pathname.startsWith(ROUTES.ACCOUNT)) return "users";

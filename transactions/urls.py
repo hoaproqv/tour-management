@@ -9,7 +9,7 @@ urlpatterns = [
         name="transaction-list-create",
     ),
     path(
-        "transactions/<uuid:pk>/",
+        "transactions/<int:pk>/",
         TransactionDetailView.as_view(),
         name="transaction-detail",
     ),

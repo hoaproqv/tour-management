@@ -49,14 +49,17 @@ export default function RoundManagement() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
 
-  const { data: trips = [] } = useQuery({
+  const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
-    queryFn: getTrips,
+    queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
-  const { data: rounds = [], isLoading } = useQuery({
+  const { data: roundsResponse, isLoading } = useQuery({
     queryKey: ["rounds"],
-    queryFn: getRounds,
+    queryFn: () => getRounds({ page: 1, limit: 1000 }),
   });
+
+  const trips = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
+  const rounds = Array.isArray(roundsResponse?.data) ? roundsResponse.data : [];
 
   const tripMap = useMemo(
     () =>

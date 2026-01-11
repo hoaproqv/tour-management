@@ -1,10 +1,8 @@
-import uuid
-
 from django.db import models
 
 
 class Bus(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     registration_number = models.CharField(max_length=50, unique=True)
     bus_code = models.CharField(max_length=50, unique=True)
     capacity = models.PositiveIntegerField()

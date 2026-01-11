@@ -58,25 +58,32 @@ export default function TripManagement() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
 
-  const { data: trips = [], isLoading: loadingTrips } = useQuery({
+  const { data: tripsResponse, isLoading: loadingTrips } = useQuery({
     queryKey: ["trips"],
-    queryFn: getTrips,
+    queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
 
-  const { data: tripBuses = [], isLoading: loadingTripBuses } = useQuery({
+  const { data: tripBusesResponse, isLoading: loadingTripBuses } = useQuery({
     queryKey: ["trip-buses"],
-    queryFn: getTripBuses,
+    queryFn: () => getTripBuses({ page: 1, limit: 1000 }),
   });
 
-  const { data: rounds = [], isLoading: loadingRounds } = useQuery({
+  const { data: roundsResponse, isLoading: loadingRounds } = useQuery({
     queryKey: ["rounds"],
-    queryFn: getRounds,
+    queryFn: () => getRounds({ page: 1, limit: 1000 }),
   });
 
-  const { data: buses = [] } = useQuery({
-    queryKey: ["buses"],
-    queryFn: getBuses,
+  const { data: busesResponse } = useQuery({
+    queryKey: ["buses", "for-trip"],
+    queryFn: () => getBuses({ page: 1, limit: 1000 }),
   });
+
+  const trips = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
+  const tripBuses = Array.isArray(tripBusesResponse?.data)
+    ? tripBusesResponse.data
+    : [];
+  const rounds = Array.isArray(roundsResponse?.data) ? roundsResponse.data : [];
+  const buses = Array.isArray(busesResponse?.data) ? busesResponse.data : [];
 
   const busMap = useMemo(
     () =>

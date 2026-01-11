@@ -42,13 +42,127 @@ export interface BusItem {
   bus_code: string;
   capacity: number;
   description: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type BusPayload = Omit<BusItem, "id">;
 
-export const getTrips = async (): Promise<Trip[]> => {
-  const res = await fetchData("/trips/");
-  return Array.isArray(res) ? res : [];
+export interface Passenger {
+  id: string;
+  trip: string;
+  original_bus: string | null;
+  name: string;
+  phone: string;
+  seat_number: number | null;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PassengerPayload = Omit<
+  Passenger,
+  "id" | "created_at" | "updated_at"
+>;
+
+export interface RoundBusItem {
+  id: string;
+  trip_bus: string;
+  round: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type RoundBusPayload = Omit<
+  RoundBusItem,
+  "id" | "created_at" | "updated_at"
+>;
+
+export interface TransactionItem {
+  id: string;
+  passenger: string;
+  round_bus: string;
+  check_in: string;
+  check_out: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TransactionPayload = Omit<
+  TransactionItem,
+  "id" | "created_at" | "updated_at"
+>;
+
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total_page: number;
+  total_items: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: PaginationInfo;
+}
+
+export interface PaginatedParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+const buildQueryString = (
+  params: PaginatedParams,
+  defaultLimit: number,
+): { queryString: string; page: number; limit: number; search: string } => {
+  const page = params.page ?? 1;
+  const limit = params.limit ?? defaultLimit;
+  const search = params.search ?? "";
+
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  if (search.trim()) {
+    query.append("search", search.trim());
+  }
+
+  const queryString = query.toString();
+  return { queryString, page, limit, search };
+};
+
+const normalizePaginated = <T>(
+  res: unknown,
+  fallback: { page: number; limit: number },
+): PaginatedResponse<T> => {
+  const data = Array.isArray((res as { data?: unknown })?.data)
+    ? ((res as { data: T[] }).data ?? [])
+    : [];
+
+  const pagination: PaginationInfo = {
+    page:
+      (res as { pagination?: PaginationInfo })?.pagination?.page ??
+      fallback.page,
+    limit:
+      (res as { pagination?: PaginationInfo })?.pagination?.limit ??
+      fallback.limit,
+    total_page:
+      (res as { pagination?: PaginationInfo })?.pagination?.total_page ?? 1,
+    total_items:
+      (res as { pagination?: PaginationInfo })?.pagination?.total_items ??
+      data.length,
+  };
+
+  return { data, pagination };
+};
+
+export const getTrips = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<Trip>> => {
+  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const res = await fetchData(`/trips/${queryString ? `?${queryString}` : ""}`);
+  return normalizePaginated<Trip>(res, { page, limit });
 };
 
 export const createTrip = async (payload: TripPayload) =>
@@ -59,14 +173,24 @@ export const updateTrip = async (id: string, payload: TripPayload) =>
 
 export const deleteTrip = async (id: string) => deleteData(`/trips/${id}/`);
 
-export const getTripBuses = async (): Promise<TripBus[]> => {
-  const res = await fetchData("/trip-buses/");
-  return Array.isArray(res) ? res : [];
+export const getTripBuses = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<TripBus>> => {
+  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const res = await fetchData(
+    `/trip-buses/${queryString ? `?${queryString}` : ""}`,
+  );
+  return normalizePaginated<TripBus>(res, { page, limit });
 };
 
-export const getRounds = async (): Promise<RoundItem[]> => {
-  const res = await fetchData("/rounds/");
-  return Array.isArray(res) ? res : [];
+export const getRounds = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<RoundItem>> => {
+  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const res = await fetchData(
+    `/rounds/${queryString ? `?${queryString}` : ""}`,
+  );
+  return normalizePaginated<RoundItem>(res, { page, limit });
 };
 
 export const createRound = async (payload: RoundPayload) =>
@@ -77,9 +201,12 @@ export const updateRound = async (id: string, payload: RoundPayload) =>
 
 export const deleteRound = async (id: string) => deleteData(`/rounds/${id}/`);
 
-export const getBuses = async (): Promise<BusItem[]> => {
-  const res = await fetchData("/buses/");
-  return Array.isArray(res) ? res : [];
+export const getBuses = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<BusItem>> => {
+  const { queryString, page, limit } = buildQueryString(params, 10);
+  const res = await fetchData(`/buses/${queryString ? `?${queryString}` : ""}`);
+  return normalizePaginated<BusItem>(res, { page, limit });
 };
 
 export const createBus = async (payload: BusPayload) =>
@@ -89,3 +216,62 @@ export const updateBus = async (id: string, payload: BusPayload) =>
   putData(`/buses/${id}/`, payload);
 
 export const deleteBus = async (id: string) => deleteData(`/buses/${id}/`);
+
+export const getPassengers = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<Passenger>> => {
+  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const res = await fetchData(
+    `/passengers/${queryString ? `?${queryString}` : ""}`,
+  );
+  return normalizePaginated<Passenger>(res, { page, limit });
+};
+
+export const createPassenger = async (payload: PassengerPayload) =>
+  postData("/passengers/", payload);
+
+export const updatePassenger = async (id: string, payload: PassengerPayload) =>
+  putData(`/passengers/${id}/`, payload);
+
+export const deletePassenger = async (id: string) =>
+  deleteData(`/passengers/${id}/`);
+
+export const getRoundBuses = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<RoundBusItem>> => {
+  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const res = await fetchData(
+    `/round-buses/${queryString ? `?${queryString}` : ""}`,
+  );
+  return normalizePaginated<RoundBusItem>(res, { page, limit });
+};
+
+export const createRoundBus = async (payload: RoundBusPayload) =>
+  postData("/round-buses/", payload);
+
+export const updateRoundBus = async (id: string, payload: RoundBusPayload) =>
+  putData(`/round-buses/${id}/`, payload);
+
+export const deleteRoundBus = async (id: string) =>
+  deleteData(`/round-buses/${id}/`);
+
+export const getTransactions = async (
+  params: PaginatedParams = {},
+): Promise<PaginatedResponse<TransactionItem>> => {
+  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const res = await fetchData(
+    `/transactions/${queryString ? `?${queryString}` : ""}`,
+  );
+  return normalizePaginated<TransactionItem>(res, { page, limit });
+};
+
+export const createTransaction = async (payload: TransactionPayload) =>
+  postData("/transactions/", payload);
+
+export const updateTransaction = async (
+  id: string,
+  payload: TransactionPayload,
+) => putData(`/transactions/${id}/`, payload);
+
+export const deleteTransaction = async (id: string) =>
+  deleteData(`/transactions/${id}/`);

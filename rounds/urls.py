@@ -9,9 +9,7 @@ from rounds.views import (
 
 urlpatterns = [
     path("rounds/", RoundListCreateView.as_view(), name="round-list-create"),
-    path("rounds/<uuid:pk>/", RoundDetailView.as_view(), name="round-detail"),
+    path("rounds/<int:pk>/", RoundDetailView.as_view(), name="round-detail"),
     path("round-buses/", RoundBusListCreateView.as_view(), name="roundbus-list-create"),
-    path(
-        "round-buses/<uuid:pk>/", RoundBusDetailView.as_view(), name="roundbus-detail"
-    ),
+    path("round-buses/<int:pk>/", RoundBusDetailView.as_view(), name="roundbus-detail"),
 ]

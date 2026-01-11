@@ -5,6 +5,7 @@ export const ROUTES = {
   TRIP: "/view/trip",
   ROUND: "/view/round",
   BUS: "/view/bus",
+  PASSENGER: "/view/passenger",
   ACCOUNT: "/view/account",
   TRANSACTIONS: "/view/transactions",
   NOT_FOUND: "*",

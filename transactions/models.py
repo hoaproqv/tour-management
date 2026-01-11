@@ -1,10 +1,8 @@
-import uuid
-
 from django.db import models
 
 
 class Transaction(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     passenger = models.ForeignKey(
         "passengers.Passenger",
         on_delete=models.CASCADE,

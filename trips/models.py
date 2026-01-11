@@ -1,5 +1,3 @@
-import uuid
-
 from django.conf import settings
 from django.db import models
 
@@ -10,7 +8,7 @@ class Trip(models.Model):
         DOING = "doing", "Doing"
         DONE = "done", "Done"
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     tenant = models.ForeignKey(
         "accounts.Tenant",
         on_delete=models.CASCADE,
@@ -36,7 +34,7 @@ class Trip(models.Model):
 
 
 class TripBus(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.BigAutoField(primary_key=True)
     manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
