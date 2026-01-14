@@ -29,3 +29,32 @@ class Passenger(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class PassengerTransfer(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    passenger = models.OneToOneField(
+        Passenger,
+        on_delete=models.CASCADE,
+        related_name="transfer",
+    )
+    from_trip_bus = models.ForeignKey(
+        "trips.TripBus",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfers_from",
+    )
+    to_trip_bus = models.ForeignKey(
+        "trips.TripBus",
+        on_delete=models.CASCADE,
+        related_name="transfers_to",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.passenger} -> {self.to_trip_bus}"

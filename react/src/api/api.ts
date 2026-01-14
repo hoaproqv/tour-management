@@ -27,6 +27,12 @@ export const putData = async <T>(endpoint: string, data: T) => {
   return response.data;
 };
 
+// Hàm PATCH
+export const patchData = async <T>(endpoint: string, data: T) => {
+  const response = await axiosInstance.patch(endpoint, data);
+  return response.data;
+};
+
 // Hàm DELETE
 export const deleteData = async <T>(endpoint: string, data?: T) => {
   if (data) {

@@ -1,10 +1,11 @@
 import React from "react";
 
-import { DatePicker, Form, Input, Modal, Select, Space } from "antd";
+import { DatePicker, Form, Input, Modal, Select, Space, Button, Divider } from "antd";
 import dayjs from "dayjs";
 
 import type { TenantItem } from "../../../api/tenants";
 import type { BusItem, Trip } from "../../../api/trips";
+import type { IUser } from "../../../utils/types";
 import type { FormInstance } from "antd";
 
 export interface TripFormValues {
@@ -14,7 +15,11 @@ export interface TripFormValues {
   status: Trip["status"];
   start_date: dayjs.Dayjs;
   end_date: dayjs.Dayjs;
-  bus_ids?: Array<string | number>;
+  bus_assignments?: Array<{
+    bus: string | number;
+    manager: string | number;
+    driver: string | number;
+  }>;
 }
 
 interface TripFormModalProps {
@@ -30,6 +35,8 @@ interface TripFormModalProps {
   accountTenant?: string | number;
   editingTrip?: Trip | null;
   statusMeta: Record<Trip["status"], { label: string; color: string }>;
+  drivers: IUser[];
+  fleetLeads: IUser[];
 }
 
 export default function TripFormModal({
@@ -45,7 +52,18 @@ export default function TripFormModal({
   accountTenant,
   editingTrip,
   statusMeta,
+  drivers,
+  fleetLeads,
 }: TripFormModalProps) {
+  const getSelectedIds = (fieldName: "manager" | "driver", currentIndex: number) => {
+    const list = form.getFieldValue("bus_assignments") || [];
+    return new Set(
+      list
+        .map((item: any, idx: number) => (idx === currentIndex ? null : item?.[fieldName]))
+        .filter(Boolean),
+    );
+  };
+
   return (
     <Modal
       open={open}
@@ -87,21 +105,97 @@ export default function TripFormModal({
         <Form.Item label="Mô tả" name="description">
           <Input.TextArea rows={3} placeholder="Mô tả ngắn" />
         </Form.Item>
-        <Form.Item label="Chọn xe bus" name="bus_ids">
-          <Select
-            mode="multiple"
-            loading={loadingBuses}
-            placeholder="Chọn một hoặc nhiều xe"
-            optionFilterProp="label"
-            options={buses.map((bus) => ({
-              value: bus.id,
-              label:
-                bus.registration_number ||
-                bus.bus_code ||
-                `Bus ${bus.id}`,
-            }))}
-          />
-        </Form.Item>
+        <Divider orientation="left" plain>
+          Gán xe, trưởng xe và lái xe (bắt buộc)
+        </Divider>
+        <Form.List name="bus_assignments">
+          {(fields, { add, remove }) => (
+            <div className="space-y-3">
+              {fields.map((field) => {
+                const currentAssignments = form.getFieldValue("bus_assignments") || [];
+                const occupied = new Set(
+                  currentAssignments
+                    .map((item: any, idx: number) => (idx === field.name ? null : item?.bus))
+                    .filter(Boolean),
+                );
+
+                return (
+                  <div
+                    key={field.key}
+                    className="p-3 border border-slate-200 rounded-lg bg-slate-50"
+                  >
+                    <Space style={{ width: "100%" }} wrap>
+                      <Form.Item
+                        {...field}
+                        label="Bus"
+                        name={[field.name, "bus"]}
+                        rules={[{ required: true, message: "Chọn bus" }]}
+                      >
+                        <Select
+                          placeholder="Chọn bus"
+                          loading={loadingBuses}
+                          style={{ minWidth: 180 }}
+                          options={buses.map((bus) => ({
+                            value: bus.id,
+                            label:
+                              bus.registration_number || bus.bus_code || `Bus ${bus.id}`,
+                            disabled: occupied.has(bus.id),
+                          }))}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        {...field}
+                        label="Trưởng xe"
+                        name={[field.name, "manager"]}
+                        rules={[{ required: true, message: "Chọn trưởng xe" }]}
+                      >
+                        <Select
+                          showSearch
+                          placeholder="Chọn trưởng xe"
+                          optionFilterProp="label"
+                          style={{ minWidth: 220 }}
+                          options={fleetLeads.map((user) => ({
+                            value: user.id,
+                            label: `${user.name} (${user.username})`,
+                            disabled: getSelectedIds("manager", field.name).has(user.id),
+                          }))}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        {...field}
+                        label="Lái xe"
+                        name={[field.name, "driver"]}
+                        rules={[{ required: true, message: "Chọn lái xe" }]}
+                      >
+                        <Select
+                          showSearch
+                          placeholder="Chọn lái xe"
+                          optionFilterProp="label"
+                          style={{ minWidth: 220 }}
+                          options={drivers.map((user) => ({
+                            value: user.id,
+                            label: `${user.name} (${user.username})`,
+                            disabled: getSelectedIds("driver", field.name).has(user.id),
+                          }))}
+                        />
+                      </Form.Item>
+
+                      <Button type="link" danger onClick={() => remove(field.name)}>
+                        Xóa
+                      </Button>
+                    </Space>
+                  </div>
+                );
+              })}
+
+              <Button type="dashed" block onClick={() => add()}>
+                Thêm bus
+              </Button>
+            </div>
+          )}
+        </Form.List>
         <Form.Item
           label="Trạng thái"
           name="status"

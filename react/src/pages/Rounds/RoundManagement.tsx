@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,8 +32,13 @@ import {
   type TripBus,
   type Trip,
 } from "../../api/trips";
+import { useGetAccountInfo } from "../../hooks/useAuth";
+import { canManageCatalog } from "../../utils/helper";
 
 import RoundFormModal, { type RoundFormValues } from "./components/RoundFormModal";
+
+import type { IUser } from "../../utils/types";
+
 
 const { Title, Text } = Typography;
 
@@ -56,6 +61,9 @@ export default function RoundManagement() {
   const [editingRound, setEditingRound] = useState<RoundItem | null>(null);
   const [form] = Form.useForm<RoundFormValues>();
   const queryClient = useQueryClient();
+  const { data: accountInfo } = useGetAccountInfo();
+  const currentUser = accountInfo as IUser | undefined;
+  const canManage = canManageCatalog(currentUser);
 
   const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
@@ -192,13 +200,23 @@ export default function RoundManagement() {
     onError: () => message.error("Xóa round thất bại"),
   });
 
+  const { mutate: deleteRoundMutate, status: deleteStatus } = deleteMutation;
+
   const openCreate = () => {
+    if (!canManage) {
+      message.warning("Bạn không có quyền chỉnh sửa round");
+      return;
+    }
     setEditingRound(null);
     form.resetFields();
     setShowCreate(true);
   };
 
-  const openEdit = (round: RoundItem) => {
+  const openEdit = useCallback((round: RoundItem) => {
+    if (!canManage) {
+      message.warning("Bạn không có quyền chỉnh sửa round");
+      return;
+    }
     setEditingRound(round);
     form.setFieldsValue({
       trip: round.trip,
@@ -211,7 +229,7 @@ export default function RoundManagement() {
       bus_ids: round.bus_ids,
     });
     setShowCreate(true);
-  };
+  }, [canManage, form]);
 
   const handleSubmit = () => {
     form
@@ -247,69 +265,80 @@ export default function RoundManagement() {
     setEditingRound(null);
   };
 
-  const columns = [
-    {
-      title: "Trip",
-      dataIndex: "trip",
-      render: (val: string) => tripMap.get(val) || "—",
+  const columns = useMemo(
+    () => {
+      const base = [
+        {
+          title: "Trip",
+          dataIndex: "trip",
+          render: (val: string) => tripMap.get(val) || "—",
+        },
+        {
+          title: "Tên",
+          dataIndex: "name",
+        },
+        {
+          title: "Địa điểm",
+          dataIndex: "location",
+        },
+        {
+          title: "Thứ tự",
+          dataIndex: "sequence",
+        },
+        {
+          title: "Ước tính",
+          dataIndex: "estimate_time",
+          render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
+        },
+        {
+          title: "Thực tế",
+          dataIndex: "actual_time",
+          render: (val: string | null) =>
+            val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
+        },
+        {
+          title: "Trạng thái",
+          dataIndex: "status",
+          render: (val: RoundItem["status"]) => {
+            const meta = statusMeta[val];
+            return <Tag color={meta.color}>{meta.label}</Tag>;
+          },
+        },
+      ];
+
+      if (!canManage) return base;
+
+      return [
+        ...base,
+        {
+          title: "Thao tác",
+          dataIndex: "actions",
+          render: (_: unknown, record: RoundItem) => (
+            <div className="flex gap-2">
+              <Button type="link" onClick={() => openEdit(record)}>
+                Sửa
+              </Button>
+              <Popconfirm
+                title="Xóa round?"
+                onConfirm={() => deleteRoundMutate(record.id)}
+                okText="Xóa"
+                cancelText="Hủy"
+              >
+                <Button
+                  type="link"
+                  danger
+                  loading={deleteStatus === "pending"}
+                >
+                  Xóa
+                </Button>
+              </Popconfirm>
+            </div>
+          ),
+        },
+      ];
     },
-    {
-      title: "Tên",
-      dataIndex: "name",
-    },
-    {
-      title: "Địa điểm",
-      dataIndex: "location",
-    },
-    {
-      title: "Thứ tự",
-      dataIndex: "sequence",
-    },
-    {
-      title: "Ước tính",
-      dataIndex: "estimate_time",
-      render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
-    },
-    {
-      title: "Thực tế",
-      dataIndex: "actual_time",
-      render: (val: string | null) =>
-        val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      render: (val: RoundItem["status"]) => {
-        const meta = statusMeta[val];
-        return <Tag color={meta.color}>{meta.label}</Tag>;
-      },
-    },
-    {
-      title: "Thao tác",
-      dataIndex: "actions",
-      render: (_: unknown, record: RoundItem) => (
-        <div className="flex gap-2">
-          <Button type="link" onClick={() => openEdit(record)}>
-            Sửa
-          </Button>
-          <Popconfirm
-            title="Xóa round?"
-            onConfirm={() => deleteMutation.mutate(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-          >
-            <Button
-              type="link"
-              danger
-              loading={deleteMutation.status === "pending"}
-            >
-              Xóa
-            </Button>
-          </Popconfirm>
-        </div>
-      ),
-    },
-  ];
+    [canManage, deleteRoundMutate, deleteStatus, openEdit, tripMap],
+  );
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
@@ -358,9 +387,11 @@ export default function RoundManagement() {
                 })),
               ]}
             />
-            <Button type="primary" onClick={openCreate}>
-              + New Round
-            </Button>
+            {canManage && (
+              <Button type="primary" onClick={openCreate}>
+                + New Round
+              </Button>
+            )}
           </div>
         </div>
 

@@ -13,6 +13,7 @@ type PassengerTableProps = {
   deleting: boolean;
   tripMap: Map<string, string>;
   tripBusMap: Map<string, TripBus & { label: string }>;
+  canManage: boolean;
   onDelete: (_id: string) => void;
   onEdit: (_passenger: Passenger) => void;
 };
@@ -23,11 +24,12 @@ export default function PassengerTable({
   deleting,
   tripMap,
   tripBusMap,
+  canManage,
   onDelete,
   onEdit,
 }: PassengerTableProps) {
-  const columns: ColumnsType<Passenger> = useMemo(
-    () => [
+  const columns: ColumnsType<Passenger> = useMemo(() => {
+    const base: ColumnsType<Passenger> = [
       {
         title: "Tên",
         dataIndex: "name",
@@ -60,6 +62,12 @@ export default function PassengerTable({
         dataIndex: "created_at",
         render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
       },
+    ];
+
+    if (!canManage) return base;
+
+    return [
+      ...base,
       {
         title: "Thao tác",
         dataIndex: "actions",
@@ -81,9 +89,8 @@ export default function PassengerTable({
           </Space>
         ),
       },
-    ],
-    [deleting, onDelete, onEdit, tripBusMap, tripMap],
-  );
+    ];
+  }, [canManage, deleting, onDelete, onEdit, tripBusMap, tripMap]);
 
   return (
     <Card className="mt-6" styles={{ body: { padding: 0 } }}>

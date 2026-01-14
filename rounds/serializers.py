@@ -144,9 +144,12 @@ class RoundBusSerializer(serializers.ModelSerializer):
             "id",
             "trip_bus",
             "round",
+            "finalized_at",
+            "finalized_by",
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["finalized_by"]
 
     def validate(self, attrs):
         trip_bus = attrs.get("trip_bus") or getattr(self.instance, "trip_bus", None)
@@ -160,3 +163,10 @@ class RoundBusSerializer(serializers.ModelSerializer):
                     {"non_field_errors": "This round is already assigned to the bus."}
                 )
         return attrs
+
+    def update(self, instance, validated_data):
+        if "finalized_at" in validated_data:
+            finalized_at = validated_data.get("finalized_at")
+            user = getattr(self.context.get("request"), "user", None)
+            validated_data["finalized_by"] = user if finalized_at else None
+        return super().update(instance, validated_data)

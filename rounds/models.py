@@ -48,6 +48,14 @@ class RoundBus(models.Model):
         on_delete=models.CASCADE,
         related_name="round_buses",
     )
+    finalized_at = models.DateTimeField(null=True, blank=True)
+    finalized_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="finalized_round_buses",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

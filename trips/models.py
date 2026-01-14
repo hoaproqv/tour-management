@@ -40,6 +40,13 @@ class TripBus(models.Model):
         on_delete=models.CASCADE,
         related_name="managed_buses",
     )
+    driver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="driven_buses",
+        null=True,
+        blank=True,
+    )
     bus = models.ForeignKey(
         "fleet.Bus",
         on_delete=models.CASCADE,

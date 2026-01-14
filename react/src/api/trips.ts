@@ -1,9 +1,10 @@
-import { deleteData, fetchData, postData, putData } from "./api";
+import { deleteData, fetchData, patchData, postData, putData } from "./api";
 
 export interface Trip {
   id: string;
   tenant?: string | number | null;
   bus_ids?: Array<string | number>;
+  trip_buses?: TripBus[];
   name: string;
   start_date: string;
   end_date: string;
@@ -19,11 +20,17 @@ export type TripPayload = {
   description: string;
   tenant_id?: string | number;
   bus_ids?: Array<string | number>;
+  bus_assignments?: Array<{
+    bus: string | number;
+    manager: string | number;
+    driver: string | number;
+  }>;
 };
 
 export interface TripBus {
   id: string;
   manager: string;
+  driver: string | null;
   bus: string;
   trip: string;
   driver_name: string;
@@ -80,6 +87,8 @@ export interface RoundBusItem {
   id: string;
   trip_bus: string;
   round: string;
+  finalized_at?: string | null;
+  finalized_by?: string | number | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +112,22 @@ export type TransactionPayload = Omit<
   TransactionItem,
   "id" | "created_at" | "updated_at"
 >;
+
+export interface PassengerTransfer {
+  id: string;
+  passenger: string;
+  from_trip_bus: string | null;
+  to_trip_bus: string;
+  trip: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PassengerTransferPayload = {
+  passenger: string;
+  from_trip_bus?: string | null;
+  to_trip_bus: string;
+};
 
 export interface PaginationInfo {
   page: number;
@@ -272,6 +297,17 @@ export const updateRoundBus = async (id: string, payload: RoundBusPayload) =>
 export const deleteRoundBus = async (id: string) =>
   deleteData(`/round-buses/${id}/`);
 
+export const finalizeRoundBus = async (
+  id: string,
+  finalized: boolean,
+  finalizedAt?: string,
+) => {
+  const finalized_at = finalized
+    ? finalizedAt || new Date().toISOString()
+    : null;
+  return patchData(`/round-buses/${id}/`, { finalized_at });
+};
+
 export const getTransactions = async (
   params: PaginatedParams = {},
 ): Promise<PaginatedResponse<TransactionItem>> => {
@@ -292,3 +328,28 @@ export const updateTransaction = async (
 
 export const deleteTransaction = async (id: string) =>
   deleteData(`/transactions/${id}/`);
+
+export const getPassengerTransfers = async (
+  params: { trip?: string | number } = {},
+): Promise<PassengerTransfer[]> => {
+  const query = new URLSearchParams();
+  if (params.trip !== undefined && params.trip !== null) {
+    query.append("trip", `${params.trip}`);
+  }
+
+  const res = await fetchData(
+    `/passenger-transfers/${query.toString() ? `?${query.toString()}` : ""}`,
+  );
+  if (Array.isArray(res)) return res as PassengerTransfer[];
+  if (Array.isArray((res as { data?: unknown })?.data)) {
+    return (res as { data: PassengerTransfer[] }).data;
+  }
+  return [];
+};
+
+export const upsertPassengerTransfer = async (
+  payload: PassengerTransferPayload,
+) => postData("/passenger-transfers/", payload);
+
+export const deletePassengerTransfer = async (id: string) =>
+  deleteData(`/passenger-transfers/${id}/`);

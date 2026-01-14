@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -21,8 +21,13 @@ import {
   type BusItem,
   type BusPayload,
 } from "../../api/trips";
+import { useGetAccountInfo } from "../../hooks/useAuth";
+import { canManageCatalog } from "../../utils/helper";
 
 import BusFormModal, { type BusFormValues } from "./components/BusFormModal";
+
+import type { IUser } from "../../utils/types";
+
 
 const { Title, Text } = Typography;
 
@@ -35,6 +40,9 @@ export default function BusManagement() {
   const [editingBus, setEditingBus] = useState<BusItem | null>(null);
   const [form] = Form.useForm<BusFormValues>();
   const queryClient = useQueryClient();
+  const { data: accountInfo } = useGetAccountInfo();
+  const currentUser = accountInfo as IUser | undefined;
+  const canManage = canManageCatalog(currentUser);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -94,22 +102,35 @@ export default function BusManagement() {
     onError: () => message.error("Xóa bus thất bại"),
   });
 
+  const { mutate: deleteBusMutate, status: deleteStatus } = deleteMutation;
+
   const openCreate = () => {
+    if (!canManage) {
+      message.warning("Bạn không có quyền chỉnh sửa bus");
+      return;
+    }
     setEditingBus(null);
     form.resetFields();
     setShowCreate(true);
   };
 
-  const openEdit = (bus: BusItem) => {
-    setEditingBus(bus);
-    form.setFieldsValue({
-      registration_number: bus.registration_number,
-      bus_code: bus.bus_code,
-      capacity: bus.capacity,
-      description: bus.description,
-    });
-    setShowCreate(true);
-  };
+  const openEdit = useCallback(
+    (bus: BusItem) => {
+      if (!canManage) {
+        message.warning("Bạn không có quyền chỉnh sửa bus");
+        return;
+      }
+      setEditingBus(bus);
+      form.setFieldsValue({
+        registration_number: bus.registration_number,
+        bus_code: bus.bus_code,
+        capacity: bus.capacity,
+        description: bus.description,
+      });
+      setShowCreate(true);
+    },
+    [canManage, form],
+  );
 
   const handleSubmit = () => {
     form
@@ -136,50 +157,54 @@ export default function BusManagement() {
     setEditingBus(null);
   };
 
-  const columns = [
-    {
-      title: "Biển số",
-      dataIndex: "registration_number",
-    },
-    {
-      title: "Mã xe",
-      dataIndex: "bus_code",
-    },
-    {
-      title: "Sức chứa",
-      dataIndex: "capacity",
-    },
-    {
-      title: "Mô tả",
-      dataIndex: "description",
-      render: (val: string | null) => val || "—",
-    },
-    {
-      title: "Thao tác",
-      dataIndex: "actions",
-      render: (_: unknown, record: BusItem) => (
-        <div className="flex gap-2">
-          <Button type="link" onClick={() => openEdit(record)}>
-            Sửa
-          </Button>
-          <Popconfirm
-            title="Xóa bus?"
-            onConfirm={() => deleteMutation.mutate(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-          >
-            <Button
-              type="link"
-              danger
-              loading={deleteMutation.status === "pending"}
-            >
-              Xóa
+  const columns = useMemo(() => {
+    const base = [
+      {
+        title: "Biển số",
+        dataIndex: "registration_number",
+      },
+      {
+        title: "Mã xe",
+        dataIndex: "bus_code",
+      },
+      {
+        title: "Sức chứa",
+        dataIndex: "capacity",
+      },
+      {
+        title: "Mô tả",
+        dataIndex: "description",
+        render: (val: string | null) => val || "—",
+      },
+    ];
+
+    if (!canManage) return base;
+
+    return [
+      ...base,
+      {
+        title: "Thao tác",
+        dataIndex: "actions",
+        render: (_: unknown, record: BusItem) => (
+          <div className="flex gap-2">
+            <Button type="link" onClick={() => openEdit(record)}>
+              Sửa
             </Button>
-          </Popconfirm>
-        </div>
-      ),
-    },
-  ];
+            <Popconfirm
+              title="Xóa bus?"
+              onConfirm={() => deleteBusMutate(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+            >
+              <Button type="link" danger loading={deleteStatus === "pending"}>
+                Xóa
+              </Button>
+            </Popconfirm>
+          </div>
+        ),
+      },
+    ];
+  }, [canManage, deleteBusMutate, deleteStatus, openEdit]);
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
@@ -204,9 +229,11 @@ export default function BusManagement() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full md:w-80"
             />
-            <Button type="primary" onClick={openCreate}>
-              + New Bus
-            </Button>
+            {canManage && (
+              <Button type="primary" onClick={openCreate}>
+                + New Bus
+              </Button>
+            )}
           </div>
         </div>
 

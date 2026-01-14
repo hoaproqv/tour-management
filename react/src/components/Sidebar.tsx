@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   CarOutlined,
@@ -9,7 +9,6 @@ import {
   MenuUnfoldOutlined,
   TeamOutlined,
   UserOutlined,
-  UserSwitchOutlined,
   SearchOutlined,
   EnvironmentOutlined,
   WalletOutlined,
@@ -18,11 +17,15 @@ import {
 import { Button, Input, Menu, type MenuProps } from "antd";
 import { Link, useLocation } from "react-router-dom";
 
+import { useGetAccountInfo } from "../hooks/useAuth";
+import { isFleetLead, isDriver } from "../utils/helper";
 import { ROUTES } from "../utils/routers";
+
+import type { IUser } from "../utils/types";
 
 const linkClass = "text-white hover:text-white no-underline";
 
-const menuItems: Required<MenuProps>["items"] = [
+const baseMenuItems: Required<MenuProps>["items"] = [
   {
     key: "dashboard",
     icon: <DashboardOutlined style={{ color: "#fff" }} />,
@@ -38,15 +41,6 @@ const menuItems: Required<MenuProps>["items"] = [
     label: (
       <Link to={ROUTES.ACCOUNT} className={linkClass}>
         User Management
-      </Link>
-    ),
-  },
-  {
-    key: "roles",
-    icon: <UserSwitchOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to="#" className={linkClass}>
-        Role Management
       </Link>
     ),
   },
@@ -127,11 +121,22 @@ const menuItems: Required<MenuProps>["items"] = [
 ];
 
 export default function Sidebar() {
+  const { data: accountInfo } = useGetAccountInfo();
+  const currentUser = accountInfo as IUser | undefined;
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
   const location = useLocation();
+
+  const hideManagement = isFleetLead(currentUser) || isDriver(currentUser);
+
+  const menuItems = useMemo(() => {
+    if (!hideManagement) return baseMenuItems;
+    return baseMenuItems.filter(
+      (item) => item?.key !== "users" && item?.key !== "tenants",
+    );
+  }, [hideManagement]);
 
   const findSelectedKey = () => {
     if (location.pathname.startsWith(ROUTES.ROUND)) return "trips";

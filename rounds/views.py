@@ -1,8 +1,53 @@
+import json
+import logging
+
+import paho.mqtt.publish as publish
+from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 
 from rounds.models import Round, RoundBus
 from rounds.serializers import RoundBusSerializer, RoundSerializer
+
+logger = logging.getLogger(__name__)
+
+
+def publish_round_finalize_to_mqtt(payload: dict):
+    try:
+        if not settings.MQTT_URL:
+            logger.warning("MQTT_URL not configured, skipping round finalize publish")
+            return
+
+        mqtt_url = settings.MQTT_URL.replace("wss://", "").replace("ws://", "")
+        if ":" in mqtt_url:
+            host, port = mqtt_url.rsplit(":", 1)
+            port = int(port)
+        else:
+            host = mqtt_url
+            port = 8883 if settings.MQTT_URL.startswith("wss") else 1883
+
+        auth = None
+        if settings.MQTT_USERNAME and settings.MQTT_PASSWORD:
+            auth = {
+                "username": settings.MQTT_USERNAME,
+                "password": settings.MQTT_PASSWORD,
+            }
+
+        topic = f"round-finalize/{payload.get('round_bus')}"
+
+        publish.single(
+            topic,
+            payload=json.dumps(payload),
+            hostname=host,
+            port=port,
+            auth=auth,
+            tls={} if settings.MQTT_URL.startswith("wss") else None,
+            transport="websockets" if settings.MQTT_URL.startswith("ws") else "tcp",
+        )
+
+        logger.info("Published round finalize to MQTT topic: %s", topic)
+    except Exception as exc:  # pragma: no cover - defensive log
+        logger.error("Failed to publish round finalize to MQTT: %s", exc)
 
 
 class RoundListCreateView(generics.ListCreateAPIView):
@@ -197,3 +242,19 @@ class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        prev_finalized_at = getattr(serializer.instance, "finalized_at", None)
+        obj = serializer.save()
+        if prev_finalized_at != obj.finalized_at:
+            payload = {
+                "round_bus": obj.id,
+                "round": obj.round_id,
+                "trip_bus": obj.trip_bus_id,
+                "trip": getattr(obj.trip_bus, "trip_id", None),
+                "finalized_at": (
+                    obj.finalized_at.isoformat() if obj.finalized_at else None
+                ),
+            }
+            publish_round_finalize_to_mqtt(payload)
+        return obj

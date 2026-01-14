@@ -17,9 +17,14 @@ import {
   type Trip,
   type TripBus,
 } from "../../api/trips";
+import { useGetAccountInfo } from "../../hooks/useAuth";
+import { canManageCatalog } from "../../utils/helper";
+
 
 import PassengerFormModal, { type PassengerFormValues } from "./components/PassengerFormModal";
 import PassengerTable from "./components/PassengerTable";
+
+import type { IUser } from "../../utils/types";
 
 const { Title, Text } = Typography;
 
@@ -30,6 +35,9 @@ export default function PassengerManagement() {
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null);
   const [form] = Form.useForm<PassengerFormValues>();
   const queryClient = useQueryClient();
+  const { data: accountInfo } = useGetAccountInfo();
+  const currentUser = accountInfo as IUser | undefined;
+  const canManage = canManageCatalog(currentUser);
 
   const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
@@ -165,12 +173,20 @@ export default function PassengerManagement() {
   });
 
   const openCreate = () => {
+    if (!canManage) {
+      message.warning("Bạn không có quyền chỉnh sửa passenger");
+      return;
+    }
     setEditingPassenger(null);
     form.resetFields();
     setShowCreate(true);
   };
 
   const openEdit = (passenger: Passenger) => {
+    if (!canManage) {
+      message.warning("Bạn không có quyền chỉnh sửa passenger");
+      return;
+    }
     setEditingPassenger(passenger);
     form.setFieldsValue({
       trip: passenger.trip,
@@ -245,9 +261,11 @@ export default function PassengerManagement() {
                 })),
               ]}
             />
-            <Button type="primary" onClick={openCreate}>
-              + New Passenger
-            </Button>
+            {canManage && (
+              <Button type="primary" onClick={openCreate}>
+                + New Passenger
+              </Button>
+            )}
           </div>
         </div>
         <PassengerTable
@@ -256,6 +274,7 @@ export default function PassengerManagement() {
           deleting={deleteMutation.status === "pending"}
           tripMap={tripMap}
           tripBusMap={tripBusMap}
+          canManage={canManage}
           onDelete={(id) => deleteMutation.mutate(id)}
           onEdit={openEdit}
         />

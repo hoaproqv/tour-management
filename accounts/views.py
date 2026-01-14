@@ -3,19 +3,22 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import Tenant
+from accounts.models import Role, Tenant
 from accounts.serializers import (
     CsrfSerializer,
     LoginResponseSerializer,
     LoginSerializer,
     RefreshTokenSerializer,
     RegisterSerializer,
+    RoleSerializer,
     TenantSerializer,
     TokenPairSerializer,
+    UserCreateSerializer,
     UserSerializer,
+    UserUpdateSerializer,
 )
 from common.views import BaseAPIView
 
@@ -85,6 +88,109 @@ class TenantListCreateView(generics.ListCreateAPIView):
         if getattr(user, "tenant_id", None):
             raise ValidationError("You cannot create a tenant while assigned to one.")
         serializer.save()
+
+
+class RoleListView(generics.ListAPIView):
+    serializer_class = RoleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Role.objects.all().order_by("name")
+
+    @extend_schema(
+        summary="List roles",
+        description="List available roles in the system.",
+        responses={200: RoleSerializer(many=True)},
+        tags=["Roles"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+
+class UserListCreateView(generics.ListCreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return UserCreateSerializer
+        return UserSerializer
+
+    def _is_admin(self, user):
+        role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
+        return user.is_superuser or user.is_staff or role_name == "admin"
+
+    def get_queryset(self):
+        user = self.request.user
+        base_qs = User.objects.select_related("tenant", "role").all()
+        if not self._is_admin(user):
+            if getattr(user, "tenant_id", None):
+                base_qs = base_qs.filter(tenant_id=user.tenant_id)
+            else:
+                return User.objects.none()
+
+        role_param = self.request.query_params.get("role")
+        if role_param:
+            base_qs = base_qs.filter(role__name__iexact=role_param)
+
+        tenant_param = self.request.query_params.get("tenant")
+        if tenant_param:
+            base_qs = base_qs.filter(tenant_id=tenant_param)
+
+        return base_qs
+
+    def perform_create(self, serializer):
+        if not self._is_admin(self.request.user):
+            raise PermissionDenied("Only admin accounts can create users.")
+        serializer.save()
+
+    @extend_schema(
+        summary="List users",
+        description="List users scoped to the current tenant unless admin.",
+        responses={200: UserSerializer(many=True)},
+        tags=["Users"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Create user",
+        description="Create a new user (admin only).",
+        request=UserCreateSerializer,
+        responses={201: UserSerializer},
+        tags=["Users"],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method in ["PUT", "PATCH"]:
+            return UserUpdateSerializer
+        return UserSerializer
+
+    def _is_admin(self, user):
+        role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
+        return user.is_superuser or user.is_staff or role_name == "admin"
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = User.objects.select_related("tenant", "role").all()
+        if self._is_admin(user):
+            return qs
+        return User.objects.none()
+
+    def perform_update(self, serializer):
+        if not self._is_admin(self.request.user):
+            raise PermissionDenied("Only admin accounts can update users.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if not self._is_admin(self.request.user):
+            raise PermissionDenied("Only admin accounts can delete users.")
+        instance.delete()
 
 
 class TenantDetailView(generics.RetrieveUpdateDestroyAPIView):

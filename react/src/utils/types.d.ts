@@ -145,8 +145,31 @@ export interface IUser {
   username: string;
   email: string;
   name: string;
+  phone?: string;
   tenant?: string | number | null;
   role?: string | number | null;
+  tenant_name?: string | null;
+  role_name?: string | null;
   is_active?: boolean;
   is_staff?: boolean;
+  is_superuser?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface IRoleItem {
+  id: number | string;
+  name: string;
+  description?: string;
+}
+
+export interface IUserPayload {
+  username: string;
+  name: string;
+  email: string;
+  phone?: string;
+  password: string;
+  tenant: number | string;
+  role: number | string;
+  is_active?: boolean;
 }

@@ -11,7 +11,9 @@ class TripListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Trip.objects.select_related("tenant").prefetch_related("trip_buses")
+        qs = Trip.objects.select_related("tenant").prefetch_related(
+            "trip_buses__manager", "trip_buses__driver"
+        )
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
@@ -60,7 +62,9 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Trip.objects.select_related("tenant").prefetch_related("trip_buses")
+        qs = Trip.objects.select_related("tenant").prefetch_related(
+            "trip_buses__manager", "trip_buses__driver"
+        )
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
@@ -111,7 +115,7 @@ class TripBusListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = TripBus.objects.select_related("trip", "bus", "manager")
+        qs = TripBus.objects.select_related("trip", "bus", "manager", "driver")
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
@@ -146,7 +150,7 @@ class TripBusDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = TripBus.objects.select_related("trip", "bus", "manager")
+        qs = TripBus.objects.select_related("trip", "bus", "manager", "driver")
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
