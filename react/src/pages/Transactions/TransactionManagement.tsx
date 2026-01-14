@@ -165,6 +165,11 @@ export default function TransactionManagement() {
     [tripsResponse],
   );
 
+  const activeTrip = useMemo(
+    () => trips.find((t) => t.id === activeTripId),
+    [trips, activeTripId],
+  );
+
   const passengers = useMemo(
     () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
     [passengersResponse],
@@ -420,18 +425,26 @@ export default function TransactionManagement() {
     return `${round.sequence ? `#${round.sequence} ` : ""}${round.name}`;
   }, [openRoundId, tripRoundsSorted]);
 
+  const tripLockedForAttendance = useMemo(
+    () => (activeTrip ? activeTrip.status !== "doing" : true),
+    [activeTrip],
+  );
+
   const roundLockedBySequence = useMemo(() => {
+    if (tripLockedForAttendance) return true;
     if (!activeRoundId) return false;
     if (!openRoundId) return true; // all rounds done -> lock edits
     return activeRoundId !== openRoundId;
-  }, [activeRoundId, openRoundId]);
+  }, [activeRoundId, openRoundId, tripLockedForAttendance]);
 
   const roundAlreadyFinalized = useMemo(
     () => (activeRoundId ? isRoundFullyFinalized(activeRoundId) : false),
     [activeRoundId, isRoundFullyFinalized],
   );
 
-  const canModifyRound = Boolean(openRoundId && activeRoundId === openRoundId && !roundAlreadyFinalized);
+  const canModifyRound = Boolean(
+    !tripLockedForAttendance && openRoundId && activeRoundId === openRoundId && !roundAlreadyFinalized,
+  );
 
   const roundBusIdFor = React.useCallback(
     (roundId: string | undefined, tripBusId: string | undefined) => {
@@ -444,6 +457,7 @@ export default function TransactionManagement() {
   const getRoundVisualStatus = React.useCallback(
     (roundId: string, index: number): RoundVisualStatus => {
       if (isRoundFullyFinalized(roundId)) return "past";
+      if (tripLockedForAttendance) return "upcoming";
       if (openRoundId && roundId === openRoundId) return "current";
 
       const openIndex = openRoundId
@@ -457,7 +471,7 @@ export default function TransactionManagement() {
 
       return "upcoming";
     },
-    [isRoundFullyFinalized, openRoundId, tripRoundsSorted],
+    [isRoundFullyFinalized, openRoundId, tripLockedForAttendance, tripRoundsSorted],
   );
 
   const tripScopedTripBuses = useMemo(
@@ -955,6 +969,10 @@ export default function TransactionManagement() {
   };
 
   const handleCheckIn = (passengerId: string, roundBusId?: string) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
     if (!roundBusId) {
       message.warning("Chưa cấu hình round-bus cho vòng này");
       return;
@@ -967,6 +985,10 @@ export default function TransactionManagement() {
   };
 
   const handleCheckOut = (txn: TransactionItem | undefined) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
     if (!txn) return;
     if (!canOperateRoundBus(txn.round_bus)) {
       message.warning("Bạn không được phép thao tác với xe này");
@@ -980,6 +1002,10 @@ export default function TransactionManagement() {
     fromTxn: TransactionItem | undefined,
     targetRoundBusId?: string,
   ) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
     if (!targetRoundBusId) {
       message.warning("Chưa cấu hình round-bus cho vòng này");
       return;
@@ -999,6 +1025,10 @@ export default function TransactionManagement() {
   };
 
   const handleFinalize = (roundBusId?: string) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
     if (!roundBusId) {
       message.warning("Chưa cấu hình round-bus cho vòng này");
       return;
@@ -1013,6 +1043,10 @@ export default function TransactionManagement() {
   };
 
   const handleCrossCheckPerform = (passengerId: string) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
     if (!activeRoundId || !crossCheck.busId) return;
     const targetRoundBusId = roundBusIdFor(activeRoundId, crossCheck.busId);
     if (!targetRoundBusId) {
@@ -1028,6 +1062,10 @@ export default function TransactionManagement() {
   };
 
   const handleCrossCheckUndo = (passengerId: string, sourceTripBusId: string) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
     if (!activeRoundId) return;
     const sourceRoundBusId = roundBusIdFor(activeRoundId, sourceTripBusId);
     if (!sourceRoundBusId) {
@@ -1065,76 +1103,81 @@ export default function TransactionManagement() {
     refreshing ||
     transactionsLoading;
 
-  const busTabs = tripScopedTripBuses.map((tb) => {
-    const label = tripBusLabelMap.get(tb.id) || "Bus";
-    const roundBusId = activeRoundId
-      ? roundBusByKey.get(`${activeRoundId}-${tb.id}`)?.id
-      : undefined;
-    const rows = rowsForBus(tb.id);
-    const presentCount = rows.filter((r) => r.status === "checkedInHere").length;
-    const othersCount = rows.length - presentCount;
-    const busReadOnly = !canOperateTripBus(tb.id);
-    const busFinalized = roundBusId
-      ? Boolean(finalizedRoundBuses[activeTripId || ""]?.[roundBusId])
-      : false;
+  const busTabs = tripScopedTripBuses
+    .map((tb) => {
+      const label = tripBusLabelMap.get(tb.id) || "Bus";
+      const roundBusId = activeRoundId
+        ? roundBusByKey.get(`${activeRoundId}-${tb.id}`)?.id
+        : undefined;
 
-    const blockReason = busReadOnly
-      ? "Chỉ xem"
-      : busFinalized
-        ? "Đã chốt điểm danh"
-        : roundLockedBySequence
-          ? "Chưa hoàn tất round trước"
-          : !openRoundId
-            ? "Tất cả round đã hoàn thành"
-            : undefined;
+      // Hide tabs that have no round-bus configured for the active round
+      if (!roundBusId) return null;
 
-    const canModifyAttendance = Boolean(!busReadOnly && roundBusId && canModifyRound && !busFinalized);
+      const rows = rowsForBus(tb.id);
+      const presentCount = rows.filter((r) => r.status === "checkedInHere").length;
+      const othersCount = rows.length - presentCount;
+      const busReadOnly = tripLockedForAttendance || !canOperateTripBus(tb.id);
+      const busFinalized = Boolean(finalizedRoundBuses[activeTripId || ""]?.[roundBusId]);
 
-    return {
-      key: tb.id,
-      label: (
-        <Space size={4}>
-          <span>{label}</span>
-          <Badge
-            count={presentCount}
-            size="small"
-            style={{ backgroundColor: "#16a34a" }}
-            title="Đang trên xe"
+      const blockReason = busReadOnly
+        ? tripLockedForAttendance
+          ? "Chuyến đi chưa bắt đầu"
+          : "Chỉ xem"
+        : busFinalized
+          ? "Đã chốt điểm danh"
+          : roundLockedBySequence
+            ? "Chưa hoàn tất round trước"
+            : !openRoundId
+              ? "Tất cả round đã hoàn thành"
+              : undefined;
+
+      const canModifyAttendance = Boolean(!busReadOnly && roundBusId && canModifyRound && !busFinalized);
+
+      return {
+        key: tb.id,
+        label: (
+          <Space size={4}>
+            <span>{label}</span>
+            <Badge
+              count={presentCount}
+              size="small"
+              style={{ backgroundColor: "#16a34a" }}
+              title="Đang trên xe"
+            />
+            <Badge
+              count={othersCount}
+              size="small"
+              style={{ backgroundColor: "#3b82f6" }}
+              title="Chưa lên / đã xuống / đang ở xe khác"
+            />
+            {busFinalized && <Tag color="green">Đã chốt</Tag>}
+          </Space>
+        ),
+        children: (
+          <BusPane
+            roundBusId={roundBusId}
+            rows={rows}
+            loading={loading}
+            busFinalized={busFinalized}
+            blockReason={blockReason}
+            readOnlyBus={busReadOnly}
+            canModifyAttendance={canModifyAttendance}
+            statusTag={statusTag}
+            onOpenCrossCheck={() =>
+              busReadOnly
+                ? undefined
+                : setCrossCheck({ busId: tb.id, sourceBusId: undefined, passengerId: undefined })
+            }
+            onFinalize={handleFinalize}
+            onCheckIn={handleCheckIn}
+            onCheckOut={handleCheckOut}
+            onSwitchBus={handleSwitchBus}
+            busy={mutationBusy}
           />
-          <Badge
-            count={othersCount}
-            size="small"
-            style={{ backgroundColor: "#3b82f6" }}
-            title="Chưa lên / đã xuống / đang ở xe khác"
-          />
-          {!roundBusId && <Tag color="orange">Chưa có round-bus</Tag>}
-          {busFinalized && <Tag color="green">Đã chốt</Tag>}
-        </Space>
-      ),
-      children: (
-        <BusPane
-          roundBusId={roundBusId}
-          rows={rows}
-          loading={loading}
-          busFinalized={busFinalized}
-          blockReason={blockReason}
-          readOnlyBus={busReadOnly}
-          canModifyAttendance={canModifyAttendance}
-          statusTag={statusTag}
-          onOpenCrossCheck={() =>
-            busReadOnly
-              ? undefined
-              : setCrossCheck({ busId: tb.id, sourceBusId: undefined, passengerId: undefined })
-          }
-          onFinalize={handleFinalize}
-          onCheckIn={handleCheckIn}
-          onCheckOut={handleCheckOut}
-          onSwitchBus={handleSwitchBus}
-          busy={mutationBusy}
-        />
-      ),
-    };
-  });
+        ),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
@@ -1150,6 +1193,11 @@ export default function TransactionManagement() {
             <Text type="secondary">
               Chọn trip, duyệt round theo checkpoint, chuyển tab xe và điểm danh không cần mở modal.
             </Text>
+            {tripLockedForAttendance && (
+              <div className="mt-2">
+                <Tag color="default">Trip đang ở trạng thái planned – chỉ xem sơ đồ round, chưa thể điểm danh.</Tag>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full md:w-auto">
             <Select
@@ -1182,7 +1230,13 @@ export default function TransactionManagement() {
               </div>
             )}
             {busTabs.length === 0 ? (
-              <Empty description="Chưa có xe cho trip này" />
+              <Empty
+                description={
+                  tripScopedTripBuses.length === 0
+                    ? "Chưa có xe cho trip này"
+                    : "Chưa cấu hình round-bus cho round này"
+                }
+              />
             ) : (
               <Tabs
                 items={busTabs}

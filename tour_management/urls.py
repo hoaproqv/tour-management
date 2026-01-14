@@ -21,12 +21,18 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from core.dashboard import DashboardOverviewAPIView
 from core.health import health_check
 from core.views import IndexPageAPIView
 from tour_management.csrf import get_csrf_token
 
 api_patterns = [
     path("csrf", get_csrf_token),
+    path(
+        "dashboard/overview/",
+        DashboardOverviewAPIView.as_view(),
+        name="dashboard-overview",
+    ),
 ]
 
 urlpatterns = [

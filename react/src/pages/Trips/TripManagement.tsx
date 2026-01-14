@@ -261,10 +261,15 @@ export default function TripManagement() {
           message.warning("Vui lòng thêm ít nhất 1 bus kèm trưởng xe và lái xe");
           return;
         }
+        if (editingTrip && !values.status) {
+          message.warning("Chọn trạng thái trip khi chỉnh sửa");
+          return;
+        }
+        const status = editingTrip ? values.status || editingTrip.status : "planned";
         const payload: TripPayload = {
           name: values.name,
           description: values.description || "",
-          status: values.status,
+          status,
           start_date: values.start_date.format("YYYY-MM-DD"),
           end_date: values.end_date.format("YYYY-MM-DD"),
           tenant_id: Number(values.tenant_id),

@@ -12,7 +12,7 @@ export interface TripFormValues {
   name: string;
   tenant_id: string | number;
   description?: string;
-  status: Trip["status"];
+  status?: Trip["status"];
   start_date: dayjs.Dayjs;
   end_date: dayjs.Dayjs;
   bus_assignments?: Array<{
@@ -55,6 +55,8 @@ export default function TripFormModal({
   drivers,
   fleetLeads,
 }: TripFormModalProps) {
+  const isEditing = Boolean(editingTrip);
+
   const getSelectedIds = (fieldName: "manager" | "driver", currentIndex: number) => {
     const list = form.getFieldValue("bus_assignments") || [];
     return new Set(
@@ -199,13 +201,16 @@ export default function TripFormModal({
         <Form.Item
           label="Trạng thái"
           name="status"
-          rules={[{ required: true }]}
+          rules={isEditing ? [{ required: true }] : []}
+          hidden={!isEditing}
         >
           <Select
-            options={Object.entries(statusMeta).map(([value, meta]) => ({
-              value,
-              label: meta.label,
-            }))}
+            options={Object.entries(statusMeta)
+              .filter(([value]) => value === "planned" || value === "doing")
+              .map(([value, meta]) => ({
+                value,
+                label: meta.label,
+              }))}
           />
         </Form.Item>
         <Space size="middle" style={{ width: "100%" }}>

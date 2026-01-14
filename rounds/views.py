@@ -3,6 +3,7 @@ import logging
 
 import paho.mqtt.publish as publish
 from django.conf import settings
+from django.db.models import Count, Max, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 
@@ -48,6 +49,70 @@ def publish_round_finalize_to_mqtt(payload: dict):
         logger.info("Published round finalize to MQTT topic: %s", topic)
     except Exception as exc:  # pragma: no cover - defensive log
         logger.error("Failed to publish round finalize to MQTT: %s", exc)
+
+
+def sync_round_progress(round_obj: Round, *, prev_status: str | None = None) -> Round:
+    """Ensure round timing/status reflect finalized buses, and start the next round when this one completes."""
+
+    aggregates = round_obj.round_buses.aggregate(
+        total=Count("id"),
+        finalized=Count("id", filter=Q(finalized_at__isnull=False)),
+        latest_finalized=Max("finalized_at"),
+    )
+
+    total = aggregates.get("total") or 0
+    finalized = aggregates.get("finalized") or 0
+    latest_finalized = aggregates.get("latest_finalized")
+
+    updates: dict = {}
+
+    status_changed_to_done = False
+
+    if total and finalized == total and latest_finalized:
+        # All buses closed: mark the round done and persist the real completion time.
+        if round_obj.actual_time != latest_finalized:
+            updates["actual_time"] = latest_finalized
+        if round_obj.status != Round.Status.DONE:
+            updates["status"] = Round.Status.DONE
+            status_changed_to_done = prev_status != Round.Status.DONE
+    else:
+        # Not yet fully finalized: reflect in-progress or planned state and clear any stale time.
+        next_status = Round.Status.DOING if finalized else Round.Status.PLANNED
+        if round_obj.status != next_status:
+            updates["status"] = next_status
+        if round_obj.actual_time is not None:
+            updates["actual_time"] = None
+
+    if updates:
+        Round.objects.filter(pk=round_obj.pk).update(**updates)
+        for field, value in updates.items():
+            setattr(round_obj, field, value)
+
+    if status_changed_to_done:
+        # If no other round is in-progress for this trip, move the next planned round into doing.
+        has_doing = (
+            Round.objects.filter(
+                trip=round_obj.trip,
+                status=Round.Status.DOING,
+            )
+            .exclude(pk=round_obj.pk)
+            .exists()
+        )
+
+        if not has_doing:
+            next_round = (
+                Round.objects.filter(
+                    trip=round_obj.trip,
+                    sequence__gt=round_obj.sequence,
+                )
+                .order_by("sequence")
+                .first()
+            )
+            if next_round and next_round.status == Round.Status.PLANNED:
+                Round.objects.filter(pk=next_round.pk).update(status=Round.Status.DOING)
+                next_round.status = Round.Status.DOING
+
+    return round_obj
 
 
 class RoundListCreateView(generics.ListCreateAPIView):
@@ -192,6 +257,10 @@ class RoundBusListCreateView(generics.ListCreateAPIView):
             response.data = {"success": True, "data": response.data}
         return response
 
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        sync_round_progress(obj.round, prev_status=obj.round.status)
+
 
 class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoundBusSerializer
@@ -245,7 +314,10 @@ class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_update(self, serializer):
         prev_finalized_at = getattr(serializer.instance, "finalized_at", None)
+        round_obj = serializer.instance.round
+        prev_round_status = getattr(round_obj, "status", None)
         obj = serializer.save()
+        sync_round_progress(obj.round, prev_status=prev_round_status)
         if prev_finalized_at != obj.finalized_at:
             payload = {
                 "round_bus": obj.id,
@@ -258,3 +330,9 @@ class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
             }
             publish_round_finalize_to_mqtt(payload)
         return obj
+
+    def perform_destroy(self, instance):
+        round_obj = instance.round
+        prev_round_status = getattr(round_obj, "status", None)
+        super().perform_destroy(instance)
+        sync_round_progress(round_obj, prev_status=prev_round_status)
