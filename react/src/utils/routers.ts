@@ -7,6 +7,7 @@ export const ROUTES = {
   BUS: "/view/bus",
   PASSENGER: "/view/passenger",
   ACCOUNT: "/view/account",
+  TENANT: "/view/tenant",
   TRANSACTIONS: "/view/transactions",
   NOT_FOUND: "*",
 };

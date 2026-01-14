@@ -21,9 +21,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . ./
 COPY --from=frontend /app/react/builded /app/react/builded
-
-RUN chmod +x docker/entrypoint.sh
+# Normalize line endings and stage entrypoint outside the bind mount path
+RUN sed -i 's/\r$//' docker/entrypoint.sh \
+    && cp docker/entrypoint.sh /entrypoint.sh \
+    && chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/docker/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]

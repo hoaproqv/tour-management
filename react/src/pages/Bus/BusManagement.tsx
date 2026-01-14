@@ -7,7 +7,6 @@ import {
   Empty,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Table,
   Typography,
@@ -18,9 +17,12 @@ import {
   createBus,
   deleteBus,
   getBuses,
+  updateBus,
   type BusItem,
   type BusPayload,
 } from "../../api/trips";
+
+import BusFormModal, { type BusFormValues } from "./components/BusFormModal";
 
 const { Title, Text } = Typography;
 
@@ -30,7 +32,8 @@ export default function BusManagement() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showCreate, setShowCreate] = useState(false);
-  const [form] = Form.useForm();
+  const [editingBus, setEditingBus] = useState<BusItem | null>(null);
+  const [form] = Form.useForm<BusFormValues>();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -70,6 +73,18 @@ export default function BusManagement() {
     onError: () => message.error("Tạo bus thất bại"),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string; payload: BusPayload }) =>
+      updateBus(data.id, data.payload),
+    onSuccess: async () => {
+      message.success("Cập nhật bus thành công");
+      setEditingBus(null);
+      form.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+    },
+    onError: () => message.error("Cập nhật bus thất bại"),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteBus(id),
     onSuccess: async () => {
@@ -79,7 +94,24 @@ export default function BusManagement() {
     onError: () => message.error("Xóa bus thất bại"),
   });
 
-  const handleCreate = () => {
+  const openCreate = () => {
+    setEditingBus(null);
+    form.resetFields();
+    setShowCreate(true);
+  };
+
+  const openEdit = (bus: BusItem) => {
+    setEditingBus(bus);
+    form.setFieldsValue({
+      registration_number: bus.registration_number,
+      bus_code: bus.bus_code,
+      capacity: bus.capacity,
+      description: bus.description,
+    });
+    setShowCreate(true);
+  };
+
+  const handleSubmit = () => {
     form
       .validateFields()
       .then((values) => {
@@ -89,9 +121,19 @@ export default function BusManagement() {
           capacity: Number(values.capacity),
           description: values.description || "",
         };
-        createMutation.mutate(payload);
+        if (editingBus) {
+          updateMutation.mutate({ id: editingBus.id, payload });
+        } else {
+          createMutation.mutate(payload);
+        }
+        handleCancel();
       })
       .catch(() => undefined);
+  };
+
+  const handleCancel = () => {
+    setShowCreate(false);
+    setEditingBus(null);
   };
 
   const columns = [
@@ -116,20 +158,25 @@ export default function BusManagement() {
       title: "Thao tác",
       dataIndex: "actions",
       render: (_: unknown, record: BusItem) => (
-        <Popconfirm
-          title="Xóa bus?"
-          onConfirm={() => deleteMutation.mutate(record.id)}
-          okText="Xóa"
-          cancelText="Hủy"
-        >
-          <Button
-            type="link"
-            danger
-            loading={deleteMutation.status === "pending"}
-          >
-            Xóa
+        <div className="flex gap-2">
+          <Button type="link" onClick={() => openEdit(record)}>
+            Sửa
           </Button>
-        </Popconfirm>
+          <Popconfirm
+            title="Xóa bus?"
+            onConfirm={() => deleteMutation.mutate(record.id)}
+            okText="Xóa"
+            cancelText="Hủy"
+          >
+            <Button
+              type="link"
+              danger
+              loading={deleteMutation.status === "pending"}
+            >
+              Xóa
+            </Button>
+          </Popconfirm>
+        </div>
       ),
     },
   ];
@@ -157,7 +204,7 @@ export default function BusManagement() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full md:w-80"
             />
-            <Button type="primary" onClick={() => setShowCreate(true)}>
+            <Button type="primary" onClick={openCreate}>
               + New Bus
             </Button>
           </div>
@@ -192,46 +239,17 @@ export default function BusManagement() {
         </Card>
       </div>
 
-      <Modal
+      <BusFormModal
         open={showCreate}
-        onCancel={() => setShowCreate(false)}
-        onOk={handleCreate}
-        confirmLoading={createMutation.status === "pending"}
-        title="Tạo bus mới"
-        okText="Tạo"
-        cancelText="Hủy"
-        destroyOnHidden
-      >
-        <Form layout="vertical" form={form} initialValues={{ capacity: 40 }}>
-          <Form.Item
-            label="Biển số"
-            name="registration_number"
-            rules={[{ required: true, message: "Nhập biển số" }]}
-          >
-            <Input placeholder="51B-12345" />
-          </Form.Item>
-          <Form.Item
-            label="Mã xe"
-            name="bus_code"
-            rules={[{ required: true, message: "Nhập mã xe" }]}
-          >
-            <Input placeholder="BUS-01" />
-          </Form.Item>
-          <Form.Item
-            label="Sức chứa"
-            name="capacity"
-            rules={[{ required: true, message: "Nhập sức chứa" }]}
-          >
-            <Input type="number" min={1} />
-          </Form.Item>
-          <Form.Item label="Mô tả" name="description">
-            <Input.TextArea
-              rows={3}
-              placeholder="Ghi chú, loại xe, tài xế..."
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+        onCancel={handleCancel}
+        onSubmit={handleSubmit}
+        confirmLoading={
+          createMutation.status === "pending" ||
+          updateMutation.status === "pending"
+        }
+        form={form}
+        editingBus={editingBus}
+      />
     </div>
   );
 }

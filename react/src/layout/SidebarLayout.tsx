@@ -7,7 +7,7 @@ import Sidebar from "../components/Sidebar";
 export default function SidebarLayout() {
   return (
     <div className="mt-header-height">
-      <div className="flex flex-col md:flex-row pt-header-height bg-[#f2f3f7] min-h-screen">
+      <div className="flex flex-row pt-header-height bg-[#f2f3f7] min-h-screen">
         <Sidebar />
         <main className="flex-1 min-w-0 px-4 md:px-6 pb-10">
           <Outlet />

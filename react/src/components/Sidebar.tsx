@@ -13,6 +13,7 @@ import {
   SearchOutlined,
   EnvironmentOutlined,
   WalletOutlined,
+  ApartmentOutlined,
 } from "@ant-design/icons";
 import { Button, Input, Menu, type MenuProps } from "antd";
 import { Link, useLocation } from "react-router-dom";
@@ -46,6 +47,15 @@ const menuItems: Required<MenuProps>["items"] = [
     label: (
       <Link to="#" className={linkClass}>
         Role Management
+      </Link>
+    ),
+  },
+  {
+    key: "tenants",
+    icon: <ApartmentOutlined style={{ color: "#fff" }} />,
+    label: (
+      <Link to={ROUTES.TENANT} className={linkClass}>
+        Tenants
       </Link>
     ),
   },
@@ -127,6 +137,7 @@ export default function Sidebar() {
     if (location.pathname.startsWith(ROUTES.ROUND)) return "trips";
     if (location.pathname.startsWith(ROUTES.BUS)) return "trips";
     if (location.pathname.startsWith(ROUTES.TRIP)) return "trips";
+    if (location.pathname.startsWith(ROUTES.TENANT)) return "tenants";
     if (location.pathname.startsWith(ROUTES.PASSENGER)) return "passengers";
     if (location.pathname.startsWith(ROUTES.TRANSACTIONS))
       return "transactions";

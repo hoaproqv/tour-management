@@ -1,21 +1,7 @@
 import React, { useMemo, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Button,
-  Card,
-  Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Select,
-  Table,
-  Typography,
-  message,
-} from "antd";
-import dayjs from "dayjs";
+import { Button, Form, Input, Select, Typography, message } from "antd";
 
 import {
   createPassenger,
@@ -24,6 +10,7 @@ import {
   getPassengers,
   getTripBuses,
   getTrips,
+  updatePassenger,
   type BusItem,
   type Passenger,
   type PassengerPayload,
@@ -31,21 +18,25 @@ import {
   type TripBus,
 } from "../../api/trips";
 
+import PassengerFormModal, { type PassengerFormValues } from "./components/PassengerFormModal";
+import PassengerTable from "./components/PassengerTable";
+
 const { Title, Text } = Typography;
 
 export default function PassengerManagement() {
   const [search, setSearch] = useState("");
   const [tripFilter, setTripFilter] = useState<string | "all">("all");
   const [showCreate, setShowCreate] = useState(false);
-  const [form] = Form.useForm();
+  const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null);
+  const [form] = Form.useForm<PassengerFormValues>();
   const queryClient = useQueryClient();
 
   const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
-  const { data: tripBusesResponse } = useQuery({
-    queryKey: ["trip-buses"],
+  const { data: tripBusesAllResponse } = useQuery({
+    queryKey: ["trip-buses", "all"],
     queryFn: () => getTripBuses({ page: 1, limit: 1000 }),
   });
   const { data: busesResponse } = useQuery({
@@ -57,16 +48,37 @@ export default function PassengerManagement() {
     queryFn: () => getPassengers({ page: 1, limit: 1000 }),
   });
 
-  const trips = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
-  const tripBuses = Array.isArray(tripBusesResponse?.data)
-    ? tripBusesResponse.data
-    : [];
-  const buses = Array.isArray(busesResponse?.data) ? busesResponse.data : [];
-  const passengers = Array.isArray(passengersResponse?.data)
-    ? passengersResponse.data
-    : [];
+  const trips = useMemo(
+    () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
+    [tripsResponse],
+  );
 
-  const selectedTrip = Form.useWatch("trip", form);
+  const tripBuses = useMemo(
+    () =>
+      Array.isArray(tripBusesAllResponse?.data)
+        ? tripBusesAllResponse.data
+        : [],
+    [tripBusesAllResponse],
+  );
+
+  const buses = useMemo(
+    () => (Array.isArray(busesResponse?.data) ? busesResponse.data : []),
+    [busesResponse],
+  );
+
+  const passengers = useMemo(
+    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    [passengersResponse],
+  );
+
+  const busOptions = useMemo(
+    () =>
+      (Array.isArray(buses) ? buses : []).map((b: BusItem) => ({
+        value: b.id,
+        label: b.registration_number || b.bus_code,
+      })),
+    [buses],
+  );
 
   const tripMap = useMemo(
     () =>
@@ -120,9 +132,27 @@ export default function PassengerManagement() {
       message.success("Tạo passenger thành công");
       setShowCreate(false);
       form.resetFields();
-      await queryClient.invalidateQueries({ queryKey: ["passengers"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["passengers"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+      ]);
     },
     onError: () => message.error("Tạo passenger thất bại"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string; payload: PassengerPayload }) =>
+      updatePassenger(data.id, data.payload),
+    onSuccess: async () => {
+      message.success("Cập nhật passenger thành công");
+      setEditingPassenger(null);
+      form.resetFields();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["passengers"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+      ]);
+    },
+    onError: () => message.error("Cập nhật passenger thất bại"),
   });
 
   const deleteMutation = useMutation({
@@ -134,91 +164,51 @@ export default function PassengerManagement() {
     onError: () => message.error("Xóa passenger thất bại"),
   });
 
-  const handleCreate = () => {
+  const openCreate = () => {
+    setEditingPassenger(null);
+    form.resetFields();
+    setShowCreate(true);
+  };
+
+  const openEdit = (passenger: Passenger) => {
+    setEditingPassenger(passenger);
+    form.setFieldsValue({
+      trip: passenger.trip,
+      original_bus_bus_id: passenger.original_bus || undefined,
+      name: passenger.name,
+      phone: passenger.phone,
+      note: passenger.note,
+    });
+    setShowCreate(true);
+  };
+
+  const handleSubmit = () => {
     form
       .validateFields()
-      .then((values) => {
+      .then(() => {
+        const values = form.getFieldsValue(true) as PassengerFormValues;
+
         const payload: PassengerPayload = {
           trip: values.trip,
-          original_bus: values.original_bus || null,
+          original_bus_bus_id: values.original_bus_bus_id || null,
           name: values.name,
           phone: values.phone || "",
-          seat_number: values.seat_number ?? null,
           note: values.note || "",
         };
-        createMutation.mutate(payload);
+        if (editingPassenger) {
+          updateMutation.mutate({ id: editingPassenger.id, payload });
+        } else {
+          createMutation.mutate(payload);
+        }
+        handleCancel();
       })
       .catch(() => undefined);
   };
 
-  const columns = [
-    {
-      title: "Tên",
-      dataIndex: "name",
-    },
-    {
-      title: "Điện thoại",
-      dataIndex: "phone",
-      render: (val: string) => val || "—",
-    },
-    {
-      title: "Trip",
-      dataIndex: "trip",
-      render: (val: string) => tripMap.get(val) || "—",
-    },
-    {
-      title: "Xe gốc",
-      dataIndex: "original_bus",
-      render: (val: string | null) =>
-        val ? tripBusMap.get(val)?.label || "—" : "—",
-    },
-    {
-      title: "Ghế",
-      dataIndex: "seat_number",
-      render: (val: number | null) => (val ? val : "—"),
-    },
-    {
-      title: "Ghi chú",
-      dataIndex: "note",
-      render: (val: string) => val || "—",
-    },
-    {
-      title: "Tạo lúc",
-      dataIndex: "created_at",
-      render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
-    },
-    {
-      title: "Thao tác",
-      dataIndex: "actions",
-      render: (_: unknown, record: Passenger) => (
-        <Popconfirm
-          title="Xóa passenger?"
-          onConfirm={() => deleteMutation.mutate(record.id)}
-          okText="Xóa"
-          cancelText="Hủy"
-        >
-          <Button
-            type="link"
-            danger
-            loading={deleteMutation.status === "pending"}
-          >
-            Xóa
-          </Button>
-        </Popconfirm>
-      ),
-    },
-  ];
-
-  const tripBusOptions = useMemo(() => {
-    const list = Array.isArray(tripBuses) ? tripBuses : [];
-    const filtered = selectedTrip
-      ? list.filter((tb) => tb.trip === selectedTrip)
-      : list;
-    return filtered.map((tb) => ({
-      value: tb.id,
-      label: tripBusMap.get(tb.id)?.label || "Bus",
-    }));
-  }, [tripBuses, tripBusMap, selectedTrip]);
+  const handleCancel = () => {
+    setShowCreate(false);
+    setEditingPassenger(null);
+  };
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
@@ -255,86 +245,35 @@ export default function PassengerManagement() {
                 })),
               ]}
             />
-            <Button type="primary" onClick={() => setShowCreate(true)}>
+            <Button type="primary" onClick={openCreate}>
               + New Passenger
             </Button>
           </div>
         </div>
-
-        <Card className="mt-6" styles={{ body: { padding: 0 } }}>
-          <Table
-            rowKey="id"
-            dataSource={filteredPassengers}
-            loading={isLoading}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            scroll={{ x: true }}
-            columns={columns}
-            locale={{
-              emptyText: isLoading ? (
-                <span>Đang tải...</span>
-              ) : (
-                <Empty description="Chưa có dữ liệu" />
-              ),
-            }}
-          />
-        </Card>
+        <PassengerTable
+          data={filteredPassengers}
+          isLoading={isLoading}
+          deleting={deleteMutation.status === "pending"}
+          tripMap={tripMap}
+          tripBusMap={tripBusMap}
+          onDelete={(id) => deleteMutation.mutate(id)}
+          onEdit={openEdit}
+        />
       </div>
 
-      <Modal
+      <PassengerFormModal
         open={showCreate}
-        onCancel={() => setShowCreate(false)}
-        onOk={handleCreate}
-        confirmLoading={createMutation.status === "pending"}
-        title="Tạo passenger mới"
-        okText="Tạo"
-        cancelText="Hủy"
-        destroyOnHidden
-      >
-        <Form
-          layout="vertical"
-          form={form}
-          data-ms-editor="false"
-          autoComplete="off"
-        >
-          <Form.Item
-            label="Thuộc Trip"
-            name="trip"
-            rules={[{ required: true, message: "Chọn trip" }]}
-          >
-            <Select
-              placeholder="Chọn trip"
-              options={(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-                value: t.id,
-                label: t.name,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item label="Xe gốc" name="original_bus">
-            <Select
-              allowClear
-              placeholder="Chọn xe gốc"
-              options={tripBusOptions}
-              loading={!tripBuses}
-            />
-          </Form.Item>
-          <Form.Item
-            label="Tên"
-            name="name"
-            rules={[{ required: true, message: "Nhập tên" }]}
-          >
-            <Input placeholder="Họ và tên" />
-          </Form.Item>
-          <Form.Item label="Điện thoại" name="phone">
-            <Input placeholder="Số điện thoại" />
-          </Form.Item>
-          <Form.Item label="Số ghế" name="seat_number">
-            <InputNumber min={1} className="w-full" placeholder="Số ghế" />
-          </Form.Item>
-          <Form.Item label="Ghi chú" name="note">
-            <Input.TextArea rows={3} placeholder="Ghi chú" />
-          </Form.Item>
-        </Form>
-      </Modal>
+        onCancel={handleCancel}
+        onSubmit={handleSubmit}
+        confirmLoading={
+          createMutation.status === "pending" ||
+          updateMutation.status === "pending"
+        }
+        form={form}
+        trips={trips}
+        busOptions={busOptions}
+        editingPassenger={editingPassenger}
+      />
     </div>
   );
 }

@@ -56,7 +56,7 @@ const Dashboard: React.FC = () => {
             <Card
               key={metric.title}
               className="bg-[#e5f2ff] border border-[#c5dff8] hover:shadow-md transition-shadow"
-              bodyStyle={{ padding: "24px" }}
+              styles={{ body: { padding: "24px" } }}
             >
               {isLoading ? (
                 <Skeleton active paragraph={{ rows: 1 }} title={false} />

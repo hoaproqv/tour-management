@@ -1,6 +1,8 @@
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 
+from accounts.models import Tenant
+
 User = get_user_model()
 
 
@@ -48,6 +50,12 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
         ]
+
+
+class TenantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tenant
+        fields = ["id", "name", "description", "created_at", "updated_at"]
 
 
 class TokenPairSerializer(serializers.Serializer):

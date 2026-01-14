@@ -1,5 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
+from rest_framework.exceptions import ValidationError
 
 from trips.models import Trip, TripBus
 from trips.serializers import TripBusSerializer, TripSerializer
@@ -10,7 +11,7 @@ class TripListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Trip.objects.select_related("tenant")
+        qs = Trip.objects.select_related("tenant").prefetch_related("trip_buses")
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
@@ -19,9 +20,19 @@ class TripListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
-        tenant = getattr(user, "tenant", None)
+        user_tenant = getattr(user, "tenant", None)
+        requested_tenant = serializer.validated_data.get("tenant")
+
+        # Prevent tenant spoofing for tenant-bound users
+        if user_tenant and requested_tenant and user_tenant != requested_tenant:
+            raise ValidationError("You cannot assign a different tenant")
+
+        tenant = user_tenant or requested_tenant
         if tenant is None:
-            raise ValueError("User has no tenant assigned")
+            raise ValidationError(
+                "A tenant is required to create a trip. Provide tenant_id or assign a tenant to the user."
+            )
+
         serializer.save(tenant=tenant)
 
     @extend_schema(
@@ -49,7 +60,7 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Trip.objects.select_related("tenant")
+        qs = Trip.objects.select_related("tenant").prefetch_related("trip_buses")
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
@@ -105,6 +116,9 @@ class TripBusListCreateView(generics.ListCreateAPIView):
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
             qs = qs.filter(trip__tenant_id=tenant_id)
+        trip_param = self.request.query_params.get("trip")
+        if trip_param:
+            qs = qs.filter(trip_id=trip_param)
         return qs
 
     @extend_schema(

@@ -17,6 +17,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: tour_management.settings
       EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+      DB_HOST: db
     ports:
       - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
     volumes:
@@ -24,30 +25,6 @@ services:
       - ./logs:/app/logs
       - ./media:/app/media
       - static_volume:/app/staticfiles
-    networks:
-      - tour_net
-
-  frontend:
-    build:
-      context: .
-      target: frontend
-    container_name: tour_frontend
-    restart: unless-stopped
-    working_dir: /app/react
-    env_file:
-      - .env
-    environment:
-      HOST: 0.0.0.0
-      PORT: 3000
-    command: >-
-      sh -c "if [ \"$DJANGO_DEBUG\" = \"True\" ]; then npm run dev -- --host 0.0.0.0 --port 3000; else npm start; fi"
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./react:/app/react
-      - /app/react/node_modules
-    depends_on:
-      - backend
     networks:
       - tour_net
 

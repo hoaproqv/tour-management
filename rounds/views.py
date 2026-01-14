@@ -10,7 +10,11 @@ class RoundListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Round.objects.select_related("trip")
+        qs = Round.objects.select_related("trip").prefetch_related(
+            "round_buses",
+            "round_buses__trip_bus",
+            "round_buses__trip_bus__bus",
+        )
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
@@ -51,7 +55,11 @@ class RoundDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Round.objects.select_related("trip")
+        qs = Round.objects.select_related("trip").prefetch_related(
+            "round_buses",
+            "round_buses__trip_bus",
+            "round_buses__trip_bus__bus",
+        )
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:

@@ -2,6 +2,8 @@ import { deleteData, fetchData, postData, putData } from "./api";
 
 export interface Trip {
   id: string;
+  tenant?: string | number | null;
+  bus_ids?: Array<string | number>;
   name: string;
   start_date: string;
   end_date: string;
@@ -9,7 +11,15 @@ export interface Trip {
   description: string;
 }
 
-export type TripPayload = Omit<Trip, "id">;
+export type TripPayload = {
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: "planned" | "doing" | "done";
+  description: string;
+  tenant_id?: string | number;
+  bus_ids?: Array<string | number>;
+};
 
 export interface TripBus {
   id: string;
@@ -32,6 +42,7 @@ export interface RoundItem {
   estimate_time: string;
   actual_time: string | null;
   status: "planned" | "doing" | "done";
+  bus_ids: Array<string | number>;
 }
 
 export type RoundPayload = Omit<RoundItem, "id">;
@@ -52,9 +63,9 @@ export interface Passenger {
   id: string;
   trip: string;
   original_bus: string | null;
+  original_bus_bus_id?: string | number | null;
   name: string;
   phone: string;
-  seat_number: number | null;
   note: string;
   created_at: string;
   updated_at: string;
@@ -62,7 +73,7 @@ export interface Passenger {
 
 export type PassengerPayload = Omit<
   Passenger,
-  "id" | "created_at" | "updated_at"
+  "id" | "created_at" | "updated_at" | "original_bus"
 >;
 
 export interface RoundBusItem {
@@ -109,6 +120,7 @@ export interface PaginatedParams {
   page?: number;
   limit?: number;
   search?: string;
+  trip?: string | number;
 }
 
 const buildQueryString = (
@@ -118,6 +130,7 @@ const buildQueryString = (
   const page = params.page ?? 1;
   const limit = params.limit ?? defaultLimit;
   const search = params.search ?? "";
+  const trip = params.trip;
 
   const query = new URLSearchParams({
     page: String(page),
@@ -126,6 +139,10 @@ const buildQueryString = (
 
   if (search.trim()) {
     query.append("search", search.trim());
+  }
+
+  if (trip !== undefined && trip !== null && `${trip}`.trim()) {
+    query.append("trip", `${trip}`.trim());
   }
 
   const queryString = query.toString();

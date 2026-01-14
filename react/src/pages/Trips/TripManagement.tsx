@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   Card,
-  DatePicker,
   Empty,
   Form,
   Input,
@@ -16,19 +15,25 @@ import {
   Typography,
   message,
 } from "antd";
+import dayjs from "dayjs";
 
+import { getTenants } from "../../api/tenants";
 import {
   createTrip,
   getBuses,
   getRounds,
   getTripBuses,
   getTrips,
+  updateTrip,
   type BusItem,
   type RoundItem,
   type Trip,
   type TripBus,
   type TripPayload,
 } from "../../api/trips";
+import { useGetAccountInfo } from "../../hooks/useAuth";
+
+import TripFormModal, { type TripFormValues } from "./components/TripFormModal";
 
 const { Title, Text } = Typography;
 
@@ -55,12 +60,20 @@ export default function TripManagement() {
     mode: "rounds" | "buses";
   } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form] = Form.useForm();
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [form] = Form.useForm<TripFormValues>();
   const queryClient = useQueryClient();
+
+  const { data: accountInfo } = useGetAccountInfo();
 
   const { data: tripsResponse, isLoading: loadingTrips } = useQuery({
     queryKey: ["trips"],
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
+  });
+
+  const { data: tenantsResponse, isLoading: loadingTenants } = useQuery({
+    queryKey: ["tenants"],
+    queryFn: () => getTenants({ page: 1, limit: 1000 }),
   });
 
   const { data: tripBusesResponse, isLoading: loadingTripBuses } = useQuery({
@@ -78,12 +91,38 @@ export default function TripManagement() {
     queryFn: () => getBuses({ page: 1, limit: 1000 }),
   });
 
-  const trips = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
-  const tripBuses = Array.isArray(tripBusesResponse?.data)
-    ? tripBusesResponse.data
-    : [];
-  const rounds = Array.isArray(roundsResponse?.data) ? roundsResponse.data : [];
-  const buses = Array.isArray(busesResponse?.data) ? busesResponse.data : [];
+  const trips = useMemo(
+    () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
+    [tripsResponse],
+  );
+
+  const tripBuses = useMemo(
+    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    [tripBusesResponse],
+  );
+
+  const tenants = useMemo(
+    () => (Array.isArray(tenantsResponse?.data) ? tenantsResponse.data : []),
+    [tenantsResponse],
+  );
+
+  useEffect(() => {
+    if (accountInfo?.tenant) {
+      form.setFieldsValue({ tenant_id: accountInfo.tenant });
+    } else if (!form.getFieldValue("tenant_id") && tenants.length > 0) {
+      form.setFieldsValue({ tenant_id: tenants[0].id });
+    }
+  }, [accountInfo, tenants, form]);
+
+  const rounds = useMemo(
+    () => (Array.isArray(roundsResponse?.data) ? roundsResponse.data : []),
+    [roundsResponse],
+  );
+
+  const buses = useMemo(
+    () => (Array.isArray(busesResponse?.data) ? busesResponse.data : []),
+    [busesResponse],
+  );
 
   const busMap = useMemo(
     () =>
@@ -124,7 +163,8 @@ export default function TripManagement() {
     });
   }, [enrichedTrips, search, statusFilter]);
 
-  const loading = loadingTrips || loadingTripBuses || loadingRounds;
+  const loading =
+    loadingTrips || loadingTripBuses || loadingRounds || loadingTenants;
 
   const createTripMutation = useMutation({
     mutationFn: (payload: TripPayload) => createTrip(payload),
@@ -132,14 +172,57 @@ export default function TripManagement() {
       message.success("Tạo trip thành công");
       setShowCreate(false);
       form.resetFields();
-      await queryClient.invalidateQueries({ queryKey: ["trips"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["trips"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+      ]);
     },
     onError: () => {
       message.error("Tạo trip thất bại");
     },
   });
 
-  const handleCreate = () => {
+  const updateTripMutation = useMutation({
+    mutationFn: (data: { id: string; payload: TripPayload }) =>
+      updateTrip(data.id, data.payload),
+    onSuccess: async () => {
+      message.success("Cập nhật trip thành công");
+      setEditingTrip(null);
+      form.resetFields();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["trips"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+      ]);
+    },
+    onError: () => {
+      message.error("Cập nhật trip thất bại");
+    },
+  });
+
+  const openCreate = () => {
+    setEditingTrip(null);
+    form.resetFields();
+    setShowCreate(true);
+  };
+
+  const openEdit = (trip: Trip) => {
+    setEditingTrip(trip);
+    const busIdsForTrip = tripBuses
+      .filter((tb) => tb.trip === trip.id)
+      .map((tb) => tb.bus);
+    form.setFieldsValue({
+      name: trip.name,
+      tenant_id: trip.tenant || tenants[0]?.id,
+      description: trip.description,
+      status: trip.status,
+      start_date: dayjs(trip.start_date),
+      end_date: dayjs(trip.end_date),
+      bus_ids: busIdsForTrip,
+    });
+    setShowCreate(true);
+  };
+
+  const handleSubmit = () => {
     form
       .validateFields()
       .then((values) => {
@@ -149,10 +232,22 @@ export default function TripManagement() {
           status: values.status,
           start_date: values.start_date.format("YYYY-MM-DD"),
           end_date: values.end_date.format("YYYY-MM-DD"),
+          tenant_id: Number(values.tenant_id),
+          bus_ids: (values.bus_ids || []).map((id) => Number(id)),
         };
-        createTripMutation.mutate(payload);
+        if (editingTrip) {
+          updateTripMutation.mutate({ id: editingTrip.id, payload });
+        } else {
+          createTripMutation.mutate(payload);
+        }
+        handleCancel();
       })
       .catch(() => undefined);
+  };
+
+  const handleCancel = () => {
+    setShowCreate(false);
+    setEditingTrip(null);
   };
 
   return (
@@ -190,7 +285,7 @@ export default function TripManagement() {
                 })),
               ]}
             />
-            <Button type="primary" onClick={() => setShowCreate(true)}>
+            <Button type="primary" onClick={openCreate}>
               + New Trip
             </Button>
           </div>
@@ -252,6 +347,9 @@ export default function TripManagement() {
                 dataIndex: "actions",
                 render: (_: unknown, record: EnrichedTrip) => (
                   <Space>
+                    <Button type="link" onClick={() => openEdit(record)}>
+                      Sửa
+                    </Button>
                     <Button
                       type="link"
                       onClick={() =>
@@ -351,63 +449,22 @@ export default function TripManagement() {
         )}
       </Modal>
 
-      <Modal
+      <TripFormModal
         open={showCreate}
-        onCancel={() => setShowCreate(false)}
-        onOk={handleCreate}
-        confirmLoading={createTripMutation.status === "pending"}
-        title="Tạo trip mới"
-        okText="Tạo"
-        cancelText="Hủy"
-        destroyOnHidden
-      >
-        <Form
-          layout="vertical"
-          form={form}
-          initialValues={{ status: "planned" }}
-        >
-          <Form.Item
-            label="Tên trip"
-            name="name"
-            rules={[{ required: true, message: "Nhập tên trip" }]}
-          >
-            <Input placeholder="Ví dụ: Bách Khoa – Sân bay Nội Bài" />
-          </Form.Item>
-          <Form.Item label="Mô tả" name="description">
-            <Input.TextArea rows={3} placeholder="Mô tả ngắn" />
-          </Form.Item>
-          <Form.Item
-            label="Trạng thái"
-            name="status"
-            rules={[{ required: true }]}
-          >
-            <Select
-              options={Object.entries(statusMeta).map(([value, meta]) => ({
-                value,
-                label: meta.label,
-              }))}
-            />
-          </Form.Item>
-          <Space size="middle" style={{ width: "100%" }}>
-            <Form.Item
-              label="Ngày bắt đầu"
-              name="start_date"
-              rules={[{ required: true, message: "Chọn ngày bắt đầu" }]}
-              style={{ flex: 1 }}
-            >
-              <DatePicker className="w-full" format="YYYY-MM-DD" />
-            </Form.Item>
-            <Form.Item
-              label="Ngày kết thúc"
-              name="end_date"
-              rules={[{ required: true, message: "Chọn ngày kết thúc" }]}
-              style={{ flex: 1 }}
-            >
-              <DatePicker className="w-full" format="YYYY-MM-DD" />
-            </Form.Item>
-          </Space>
-        </Form>
-      </Modal>
+        onCancel={handleCancel}
+        onSubmit={handleSubmit}
+        confirmLoading={
+          createTripMutation.status === "pending" ||
+          updateTripMutation.status === "pending"
+        }
+        form={form}
+        tenants={tenants}
+        loadingTenants={loadingTenants}
+        buses={buses}
+        loadingBuses={!busesResponse}
+        editingTrip={editingTrip}
+        statusMeta={statusMeta}
+      />
     </div>
   );
 }

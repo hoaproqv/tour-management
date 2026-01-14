@@ -362,3 +362,9 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL", default="noreply@tour-management.local"
 )
+
+# MQTT configuration (used by services needing broker access)
+MQTT_URL = os.getenv("MQTT_URL", "")
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
+MQTT_TRANSACTIONS_TOPIC = os.getenv("MQTT_TRANSACTIONS_TOPIC", "transactions/#")

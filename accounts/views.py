@@ -1,16 +1,19 @@
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema, inline_serializer
-from rest_framework import permissions, serializers, status
+from rest_framework import generics, permissions, serializers, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from accounts.models import Tenant
 from accounts.serializers import (
     CsrfSerializer,
     LoginResponseSerializer,
     LoginSerializer,
     RefreshTokenSerializer,
     RegisterSerializer,
+    TenantSerializer,
     TokenPairSerializer,
     UserSerializer,
 )
@@ -46,6 +49,91 @@ class RegisterView(BaseAPIView):
             return self.error("Invalid data", errors=serializer.errors)
         user = serializer.save()
         return self.success(UserSerializer(user).data, status.HTTP_201_CREATED)
+
+
+class TenantListCreateView(generics.ListCreateAPIView):
+    serializer_class = TenantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if getattr(user, "tenant_id", None):
+            return Tenant.objects.filter(id=user.tenant_id)
+        return Tenant.objects.all()
+
+    @extend_schema(
+        summary="List tenants",
+        description="List tenants. If the user belongs to a tenant, only that tenant is returned.",
+        responses={200: TenantSerializer},
+        tags=["Tenants"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Create tenant",
+        description="Create a new tenant",
+        request=TenantSerializer,
+        responses={201: TenantSerializer, 400: {"description": "Validation error"}},
+        tags=["Tenants"],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if getattr(user, "tenant_id", None):
+            raise ValidationError("You cannot create a tenant while assigned to one.")
+        serializer.save()
+
+
+class TenantDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = TenantSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if getattr(user, "tenant_id", None):
+            return Tenant.objects.filter(id=user.tenant_id)
+        return Tenant.objects.all()
+
+    @extend_schema(
+        summary="Retrieve tenant",
+        description="Get tenant by ID (scoped to user's tenant if assigned).",
+        responses={200: TenantSerializer, 404: {"description": "Not found"}},
+        tags=["Tenants"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Update tenant",
+        description="Update tenant information.",
+        request=TenantSerializer,
+        responses={200: TenantSerializer, 400: {"description": "Validation error"}},
+        tags=["Tenants"],
+    )
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Partial update tenant",
+        description="Partially update tenant information.",
+        request=TenantSerializer,
+        responses={200: TenantSerializer, 400: {"description": "Validation error"}},
+        tags=["Tenants"],
+    )
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Delete tenant",
+        description="Delete tenant by ID.",
+        responses={204: None, 404: {"description": "Not found"}},
+        tags=["Tenants"],
+    )
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
 
 
 class LoginView(BaseAPIView):

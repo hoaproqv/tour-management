@@ -4,11 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   Card,
-  DatePicker,
   Empty,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Select,
   Table,
@@ -21,12 +19,21 @@ import dayjs from "dayjs";
 import {
   createRound,
   deleteRound,
+  getBuses,
+  getPassengers,
   getRounds,
+  getTripBuses,
   getTrips,
+  updateRound,
+  type BusItem,
+  type Passenger,
   type RoundItem,
   type RoundPayload,
+  type TripBus,
   type Trip,
 } from "../../api/trips";
+
+import RoundFormModal, { type RoundFormValues } from "./components/RoundFormModal";
 
 const { Title, Text } = Typography;
 
@@ -46,20 +53,55 @@ export default function RoundManagement() {
     "all",
   );
   const [showCreate, setShowCreate] = useState(false);
-  const [form] = Form.useForm();
+  const [editingRound, setEditingRound] = useState<RoundItem | null>(null);
+  const [form] = Form.useForm<RoundFormValues>();
   const queryClient = useQueryClient();
 
   const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
+  const { data: tripBusesResponse } = useQuery({
+    queryKey: ["trip-buses", "for-rounds"],
+    queryFn: () => getTripBuses({ page: 1, limit: 1000 }),
+  });
+  const { data: busesResponse } = useQuery({
+    queryKey: ["buses", "for-rounds"],
+    queryFn: () => getBuses({ page: 1, limit: 1000 }),
+  });
+  const { data: passengersResponse } = useQuery({
+    queryKey: ["passengers", "for-rounds"],
+    queryFn: () => getPassengers({ page: 1, limit: 1000 }),
+  });
   const { data: roundsResponse, isLoading } = useQuery({
     queryKey: ["rounds"],
     queryFn: () => getRounds({ page: 1, limit: 1000 }),
   });
 
-  const trips = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
-  const rounds = Array.isArray(roundsResponse?.data) ? roundsResponse.data : [];
+  const trips = useMemo(
+    () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
+    [tripsResponse],
+  );
+
+  const rounds = useMemo(
+    () => (Array.isArray(roundsResponse?.data) ? roundsResponse.data : []),
+    [roundsResponse],
+  );
+
+  const tripBuses = useMemo(
+    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    [tripBusesResponse],
+  );
+
+  const buses = useMemo(
+    () => (Array.isArray(busesResponse?.data) ? busesResponse.data : []),
+    [busesResponse],
+  );
+
+  const passengers = useMemo(
+    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    [passengersResponse],
+  );
 
   const tripMap = useMemo(
     () =>
@@ -68,6 +110,35 @@ export default function RoundManagement() {
       ),
     [trips],
   );
+
+  const tripDefaultBusMap = useMemo(() => {
+    const grouped = new Map<string, Array<string | number>>();
+    tripBuses.forEach((tb: TripBus) => {
+      const list = grouped.get(tb.trip) ?? [];
+      list.push(tb.bus);
+      grouped.set(tb.trip, list);
+    });
+    return grouped;
+  }, [tripBuses]);
+
+  const busOptions = useMemo(
+    () =>
+      (Array.isArray(buses) ? buses : []).map((b: BusItem) => ({
+        value: b.id,
+        label: b.registration_number || b.bus_code || `Bus ${b.id}`,
+      })),
+    [buses],
+  );
+
+  const tripPassengersMap = useMemo(() => {
+    const grouped = new Map<string, Passenger[]>();
+    passengers.forEach((p: Passenger) => {
+      const list = grouped.get(p.trip) ?? [];
+      list.push(p);
+      grouped.set(p.trip, list);
+    });
+    return grouped;
+  }, [passengers]);
 
   const filteredRounds = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -89,9 +160,27 @@ export default function RoundManagement() {
       message.success("Tạo round thành công");
       setShowCreate(false);
       form.resetFields();
-      await queryClient.invalidateQueries({ queryKey: ["rounds"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rounds"] }),
+        queryClient.invalidateQueries({ queryKey: ["round-buses"] }),
+      ]);
     },
     onError: () => message.error("Tạo round thất bại"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string; payload: RoundPayload }) =>
+      updateRound(data.id, data.payload),
+    onSuccess: async () => {
+      message.success("Cập nhật round thành công");
+      setEditingRound(null);
+      form.resetFields();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["rounds"] }),
+        queryClient.invalidateQueries({ queryKey: ["round-buses"] }),
+      ]);
+    },
+    onError: () => message.error("Cập nhật round thất bại"),
   });
 
   const deleteMutation = useMutation({
@@ -103,7 +192,28 @@ export default function RoundManagement() {
     onError: () => message.error("Xóa round thất bại"),
   });
 
-  const handleCreate = () => {
+  const openCreate = () => {
+    setEditingRound(null);
+    form.resetFields();
+    setShowCreate(true);
+  };
+
+  const openEdit = (round: RoundItem) => {
+    setEditingRound(round);
+    form.setFieldsValue({
+      trip: round.trip,
+      name: round.name,
+      location: round.location,
+      sequence: round.sequence,
+      estimate_time: dayjs(round.estimate_time),
+      actual_time: round.actual_time ? dayjs(round.actual_time) : null,
+      status: round.status,
+      bus_ids: round.bus_ids,
+    });
+    setShowCreate(true);
+  };
+
+  const handleSubmit = () => {
     form
       .validateFields()
       .then((values) => {
@@ -117,10 +227,24 @@ export default function RoundManagement() {
             ? values.actual_time.format("YYYY-MM-DDTHH:mm:ss")
             : null,
           status: values.status,
+          bus_ids:
+            values.bus_ids && values.bus_ids.length
+              ? values.bus_ids.map((id) => Number(id))
+              : tripDefaultBusMap.get(values.trip) || [],
         };
-        createMutation.mutate(payload);
+        if (editingRound) {
+          updateMutation.mutate({ id: editingRound.id, payload });
+        } else {
+          createMutation.mutate(payload);
+        }
+        handleCancel();
       })
       .catch(() => undefined);
+  };
+
+  const handleCancel = () => {
+    setShowCreate(false);
+    setEditingRound(null);
   };
 
   const columns = [
@@ -164,20 +288,25 @@ export default function RoundManagement() {
       title: "Thao tác",
       dataIndex: "actions",
       render: (_: unknown, record: RoundItem) => (
-        <Popconfirm
-          title="Xóa round?"
-          onConfirm={() => deleteMutation.mutate(record.id)}
-          okText="Xóa"
-          cancelText="Hủy"
-        >
-          <Button
-            type="link"
-            danger
-            loading={deleteMutation.status === "pending"}
-          >
-            Xóa
+        <div className="flex gap-2">
+          <Button type="link" onClick={() => openEdit(record)}>
+            Sửa
           </Button>
-        </Popconfirm>
+          <Popconfirm
+            title="Xóa round?"
+            onConfirm={() => deleteMutation.mutate(record.id)}
+            okText="Xóa"
+            cancelText="Hủy"
+          >
+            <Button
+              type="link"
+              danger
+              loading={deleteMutation.status === "pending"}
+            >
+              Xóa
+            </Button>
+          </Popconfirm>
+        </div>
       ),
     },
   ];
@@ -229,7 +358,7 @@ export default function RoundManagement() {
                 })),
               ]}
             />
-            <Button type="primary" onClick={() => setShowCreate(true)}>
+            <Button type="primary" onClick={openCreate}>
               + New Round
             </Button>
           </div>
@@ -254,79 +383,22 @@ export default function RoundManagement() {
         </Card>
       </div>
 
-      <Modal
+      <RoundFormModal
         open={showCreate}
-        onCancel={() => setShowCreate(false)}
-        onOk={handleCreate}
-        confirmLoading={createMutation.status === "pending"}
-        title="Tạo round mới"
-        okText="Tạo"
-        cancelText="Hủy"
-        destroyOnHidden
-      >
-        <Form
-          layout="vertical"
-          form={form}
-          initialValues={{ status: "planned" }}
-        >
-          <Form.Item
-            label="Thuộc Trip"
-            name="trip"
-            rules={[{ required: true, message: "Chọn trip" }]}
-          >
-            <Select
-              placeholder="Chọn trip"
-              options={(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-                value: t.id,
-                label: t.name,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item
-            label="Tên round"
-            name="name"
-            rules={[{ required: true, message: "Nhập tên round" }]}
-          >
-            <Input placeholder="Ví dụ: Tập huấn tại Cam Ranh" />
-          </Form.Item>
-          <Form.Item
-            label="Địa điểm"
-            name="location"
-            rules={[{ required: true, message: "Nhập địa điểm" }]}
-          >
-            <Input placeholder="Địa điểm" />
-          </Form.Item>
-          <Form.Item
-            label="Thứ tự"
-            name="sequence"
-            rules={[{ required: true, message: "Nhập thứ tự" }]}
-          >
-            <Input type="number" min={1} />
-          </Form.Item>
-          <Form.Item
-            label="Thời gian dự kiến"
-            name="estimate_time"
-            rules={[{ required: true, message: "Chọn thời gian dự kiến" }]}
-          >
-            <DatePicker showTime className="w-full" format="YYYY-MM-DD HH:mm" />
-          </Form.Item>
-          <Form.Item label="Thời gian thực tế" name="actual_time">
-            <DatePicker showTime className="w-full" format="YYYY-MM-DD HH:mm" />
-          </Form.Item>
-          <Form.Item
-            label="Trạng thái"
-            name="status"
-            rules={[{ required: true }]}
-          >
-            <Select
-              options={Object.entries(statusMeta).map(([value, meta]) => ({
-                value,
-                label: meta.label,
-              }))}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+        onCancel={handleCancel}
+        onSubmit={handleSubmit}
+        confirmLoading={
+          createMutation.status === "pending" ||
+          updateMutation.status === "pending"
+        }
+        form={form}
+        trips={trips}
+        busOptions={busOptions}
+        tripDefaultBusMap={tripDefaultBusMap}
+        tripPassengersMap={tripPassengersMap}
+        editingRound={editingRound}
+        statusMeta={statusMeta}
+      />
     </div>
   );
 }

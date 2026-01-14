@@ -15,6 +15,7 @@ import DashboardPage from "./pages/Dashboard";
 import NotFoundPage from "./pages/NotFound";
 import PassengerManagement from "./pages/Passengers/PassengerManagement";
 import RoundManagement from "./pages/Rounds/RoundManagement";
+import TenantManagement from "./pages/Tenants/TenantManagement";
 import TransactionManagement from "./pages/Transactions/TransactionManagement";
 import TripManagement from "./pages/Trips/TripManagement";
 import { ROUTES } from "./utils/routers";
@@ -40,6 +41,7 @@ function App() {
               path={ROUTES.TRANSACTIONS}
               element={<TransactionManagement />}
             />
+            <Route path={ROUTES.TENANT} element={<TenantManagement />} />
             <Route path={ROUTES.ACCOUNT} element={<Account />} />
             <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
           </Route>
