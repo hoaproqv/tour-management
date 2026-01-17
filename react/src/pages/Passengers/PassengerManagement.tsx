@@ -20,8 +20,9 @@ import {
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { canManageCatalog } from "../../utils/helper";
 
-
-import PassengerFormModal, { type PassengerFormValues } from "./components/PassengerFormModal";
+import PassengerFormModal, {
+  type PassengerFormValues,
+} from "./components/PassengerFormModal";
 import PassengerTable from "./components/PassengerTable";
 
 import type { IUser } from "../../utils/types";
@@ -32,7 +33,9 @@ export default function PassengerManagement() {
   const [search, setSearch] = useState("");
   const [tripFilter, setTripFilter] = useState<string | "all">("all");
   const [showCreate, setShowCreate] = useState(false);
-  const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null);
+  const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(
+    null,
+  );
   const [form] = Form.useForm<PassengerFormValues>();
   const queryClient = useQueryClient();
   const { data: accountInfo } = useGetAccountInfo();
@@ -75,7 +78,8 @@ export default function PassengerManagement() {
   );
 
   const passengers = useMemo(
-    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    () =>
+      Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
     [passengersResponse],
   );
 
@@ -187,10 +191,12 @@ export default function PassengerManagement() {
       message.warning("Bạn không có quyền chỉnh sửa passenger");
       return;
     }
+    const tripBus = tripBusMap.get(passenger.original_bus ?? "");
+    const busId = tripBus?.bus ?? passenger.original_bus ?? undefined;
     setEditingPassenger(passenger);
     form.setFieldsValue({
       trip: passenger.trip,
-      original_bus_bus_id: passenger.original_bus || undefined,
+      original_bus_bus_id: busId,
       name: passenger.name,
       phone: passenger.phone,
       note: passenger.note,

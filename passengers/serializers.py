@@ -8,12 +8,11 @@ from trips.models import TripBus
 
 
 class PassengerSerializer(serializers.ModelSerializer):
-    original_bus_bus_id = serializers.PrimaryKeyRelatedField(
-        queryset=Bus.objects.all(),
+    original_bus_bus_id = serializers.IntegerField(
         write_only=True,
         required=False,
         allow_null=True,
-        help_text="Bus id to set as original bus; will auto-create trip bus if needed.",
+        help_text="Bus id or trip bus id; will auto-create trip bus if needed.",
     )
 
     class Meta:
@@ -52,6 +51,31 @@ class PassengerSerializer(serializers.ModelSerializer):
             )
         return None
 
+    def _coerce_bus_or_trip_bus(self, trip, original_bus, raw_id):
+        if raw_id is None:
+            return self._resolve_trip_bus(trip, original_bus, None)
+
+        trip_bus = (
+            TripBus.objects.select_related("bus", "trip").filter(pk=raw_id).first()
+        )
+        bus = None
+
+        if trip_bus and trip and trip_bus.trip_id == trip.id:
+            return trip_bus
+
+        if trip_bus:
+            bus = trip_bus.bus
+        else:
+            bus = Bus.objects.filter(pk=raw_id).first()
+
+        if raw_id is not None and not trip_bus and not bus:
+            raise ValidationError({"original_bus_bus_id": "Bus or trip bus not found"})
+
+        if trip and original_bus and original_bus.trip_id != trip.id:
+            original_bus = None
+
+        return self._resolve_trip_bus(trip, original_bus, bus)
+
     def _ensure_round_buses(self, trip, trip_bus):
         """Ensure round-bus rows exist for the given trip bus."""
         if not trip or not trip_bus:
@@ -61,20 +85,20 @@ class PassengerSerializer(serializers.ModelSerializer):
             RoundBus.objects.get_or_create(round_id=round_id, trip_bus=trip_bus)
 
     def create(self, validated_data):
-        bus = validated_data.pop("original_bus_bus_id", None)
+        bus_or_trip_bus_id = validated_data.pop("original_bus_bus_id", None)
         original_bus = validated_data.get("original_bus")
         trip = validated_data.get("trip")
-        trip_bus = self._resolve_trip_bus(trip, original_bus, bus)
+        trip_bus = self._coerce_bus_or_trip_bus(trip, original_bus, bus_or_trip_bus_id)
         validated_data["original_bus"] = trip_bus
         obj = super().create(validated_data)
         self._ensure_round_buses(trip, trip_bus)
         return obj
 
     def update(self, instance, validated_data):
-        bus = validated_data.pop("original_bus_bus_id", None)
+        bus_or_trip_bus_id = validated_data.pop("original_bus_bus_id", None)
         original_bus = validated_data.get("original_bus", instance.original_bus)
         trip = validated_data.get("trip", instance.trip)
-        trip_bus = self._resolve_trip_bus(trip, original_bus, bus)
+        trip_bus = self._coerce_bus_or_trip_bus(trip, original_bus, bus_or_trip_bus_id)
         validated_data["original_bus"] = trip_bus
         obj = super().update(instance, validated_data)
         self._ensure_round_buses(trip, trip_bus)
