@@ -1,6 +1,8 @@
 from django.urls import path
 
 from passengers.views import (
+    PassengerAssignmentDetailView,
+    PassengerAssignmentListCreateView,
     PassengerDetailView,
     PassengerListCreateView,
     PassengerTransferDetailView,
@@ -23,5 +25,15 @@ urlpatterns = [
         "passenger-transfers/<int:pk>/",
         PassengerTransferDetailView.as_view(),
         name="passenger-transfer-detail",
+    ),
+    path(
+        "passenger-assignments/",
+        PassengerAssignmentListCreateView.as_view(),
+        name="passenger-assignment-list-create",
+    ),
+    path(
+        "passenger-assignments/<int:pk>/",
+        PassengerAssignmentDetailView.as_view(),
+        name="passenger-assignment-detail",
     ),
 ]

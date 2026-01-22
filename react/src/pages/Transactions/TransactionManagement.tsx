@@ -178,7 +178,8 @@ export default function TransactionManagement() {
   const passengerHomeBusMap = useMemo(() => {
     const map = new Map<string, string | null>();
     passengers.forEach((p) => {
-      map.set(p.id, p.original_bus ?? null);
+      const assignedBus = (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
+      map.set(p.id, assignedBus);
     });
     return map;
   }, [passengers]);
@@ -879,14 +880,16 @@ export default function TransactionManagement() {
 
     return tripPassengers
       .filter((p) => {
-          const overrideBus = transferMap[p.id];
-        const homeBusId = overrideBus ?? p.original_bus ?? null;
-        if (homeBusId) return homeBusId === tripBusId || p.original_bus === tripBusId;
-        return !p.original_bus || p.original_bus === tripBusId;
+        const overrideBus = transferMap[p.id];
+        const baseAssigned = (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
+        const homeBusId = overrideBus ?? baseAssigned ?? null;
+        if (homeBusId) return homeBusId === tripBusId || baseAssigned === tripBusId;
+        return !baseAssigned || baseAssigned === tripBusId;
       })
       .map((p) => {
         const overrideBus = transferMap[p.id];
-        const homeBusId = overrideBus ?? p.original_bus ?? null;
+        const baseAssigned = (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
+        const homeBusId = overrideBus ?? baseAssigned ?? null;
         const txn = transactionByPassenger.get(p.id);
         const txnBusId = txn ? roundBusToTripBus.get(txn.round_bus) : undefined;
         let status: RowStatus = "pending";
@@ -901,19 +904,19 @@ export default function TransactionManagement() {
         }
 
         const transferredAway =
-          Boolean(p.original_bus) &&
-          p.original_bus === tripBusId &&
+          Boolean(baseAssigned) &&
+          baseAssigned === tripBusId &&
           !!overrideBus &&
           overrideBus !== tripBusId;
 
         const transferredHere =
           !!overrideBus &&
           overrideBus === tripBusId &&
-          !!p.original_bus &&
-          p.original_bus !== tripBusId;
+          !!baseAssigned &&
+          baseAssigned !== tripBusId;
 
         const isOwnedByBus =
-          (homeBusId ? homeBusId === tripBusId : !p.original_bus || p.original_bus === tripBusId) &&
+          (homeBusId ? homeBusId === tripBusId : !baseAssigned || baseAssigned === tripBusId) &&
           !transferredAway;
 
         return {
@@ -922,7 +925,7 @@ export default function TransactionManagement() {
           transaction: txn,
           txnBusId,
           status,
-          assignedBusId: p.original_bus,
+          assignedBusId: baseAssigned,
           homeBusId,
           isOwnedByBus,
           transferredAway,
@@ -951,10 +954,13 @@ export default function TransactionManagement() {
       );
     }
 
-    if (row.transferredHere && row.passenger.original_bus) {
+    if (row.transferredHere && (row.passenger as { assigned_trip_bus?: string | null }).assigned_trip_bus) {
       tags.push(
         <Tag color="magenta">
-          Nhận từ {tripBusLabelMap.get(row.passenger.original_bus) || "xe khác"}
+          Nhận từ
+          {tripBusLabelMap.get(
+            (row.passenger as { assigned_trip_bus?: string | null }).assigned_trip_bus || "",
+          ) || "xe khác"}
         </Tag>,
       );
     }

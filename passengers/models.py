@@ -8,13 +8,6 @@ class Passenger(models.Model):
         on_delete=models.CASCADE,
         related_name="passengers",
     )
-    original_bus = models.ForeignKey(
-        "trips.TripBus",
-        on_delete=models.SET_NULL,
-        related_name="original_passengers",
-        null=True,
-        blank=True,
-    )
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=30, blank=True)
     note = models.TextField(blank=True)
@@ -29,6 +22,42 @@ class Passenger(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class PassengerBusAssignment(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    passenger = models.ForeignKey(
+        Passenger,
+        on_delete=models.CASCADE,
+        related_name="bus_assignments",
+    )
+    trip = models.ForeignKey(
+        "trips.Trip",
+        on_delete=models.CASCADE,
+        related_name="passenger_assignments",
+    )
+    trip_bus = models.ForeignKey(
+        "trips.TripBus",
+        on_delete=models.CASCADE,
+        related_name="passenger_assignments",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["trip", "trip_bus", "passenger"]
+        indexes = [
+            models.Index(fields=["trip", "trip_bus"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["passenger", "trip"],
+                name="unique_passenger_per_trip_assignment",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.passenger} -> {self.trip_bus}"
 
 
 class PassengerTransfer(models.Model):

@@ -9,7 +9,7 @@ import type { FormInstance } from "antd/es/form";
 
 export type PassengerFormValues = Pick<
   PassengerPayload,
-  "trip" | "original_bus_bus_id" | "name" | "phone" | "note"
+  "trip" | "name" | "phone" | "note"
 >;
 
 type PassengerFormModalProps = {
@@ -19,7 +19,6 @@ type PassengerFormModalProps = {
   confirmLoading: boolean;
   form: FormInstance<PassengerFormValues>;
   trips: Trip[];
-  busOptions: { value: string | number; label: string }[];
   editingPassenger?: Passenger | null;
 };
 
@@ -30,7 +29,6 @@ export default function PassengerFormModal({
   confirmLoading,
   form,
   trips,
-  busOptions,
   editingPassenger,
 }: PassengerFormModalProps) {
   return (
@@ -57,9 +55,6 @@ export default function PassengerFormModal({
               label: t.name,
             }))}
           />
-        </Form.Item>
-        <Form.Item label="Xe gốc" name="original_bus_bus_id">
-          <Select allowClear placeholder="Chọn xe gốc" options={busOptions} />
         </Form.Item>
         <Form.Item
           label="Tên"

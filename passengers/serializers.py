@@ -1,108 +1,32 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from fleet.models import Bus
-from passengers.models import Passenger, PassengerTransfer
-from rounds.models import Round, RoundBus
-from trips.models import TripBus
+from passengers.models import Passenger, PassengerBusAssignment, PassengerTransfer
 
 
 class PassengerSerializer(serializers.ModelSerializer):
-    original_bus_bus_id = serializers.IntegerField(
-        write_only=True,
-        required=False,
-        allow_null=True,
-        help_text="Bus id or trip bus id; will auto-create trip bus if needed.",
-    )
+    assigned_trip_bus = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Passenger
         fields = [
             "id",
             "trip",
-            "original_bus",
-            "original_bus_bus_id",
+            "assigned_trip_bus",
             "name",
             "phone",
             "note",
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["assigned_trip_bus", "created_at", "updated_at"]
 
-    def _resolve_trip_bus(self, trip, original_bus, bus):
-        if original_bus:
-            return original_bus
-        if bus:
-            existing = TripBus.objects.filter(trip=trip, bus=bus).first()
-            if existing:
-                return existing
-            manager = getattr(self.context.get("request"), "user", None)
-            if not manager:
-                raise ValidationError("Cannot assign bus without authenticated user")
-            return TripBus.objects.create(
-                trip=trip,
-                bus=bus,
-                manager=manager,
-                driver_name="Auto",
-                driver_tel="N/A",
-                tour_guide_name="",
-                tour_guide_tel="",
-                description="Auto-created for passenger",
-            )
-        return None
-
-    def _coerce_bus_or_trip_bus(self, trip, original_bus, raw_id):
-        if raw_id is None:
-            return self._resolve_trip_bus(trip, original_bus, None)
-
-        trip_bus = (
-            TripBus.objects.select_related("bus", "trip").filter(pk=raw_id).first()
-        )
-        bus = None
-
-        if trip_bus and trip and trip_bus.trip_id == trip.id:
-            return trip_bus
-
-        if trip_bus:
-            bus = trip_bus.bus
-        else:
-            bus = Bus.objects.filter(pk=raw_id).first()
-
-        if raw_id is not None and not trip_bus and not bus:
-            raise ValidationError({"original_bus_bus_id": "Bus or trip bus not found"})
-
-        if trip and original_bus and original_bus.trip_id != trip.id:
-            original_bus = None
-
-        return self._resolve_trip_bus(trip, original_bus, bus)
-
-    def _ensure_round_buses(self, trip, trip_bus):
-        """Ensure round-bus rows exist for the given trip bus."""
-        if not trip or not trip_bus:
-            return
-        round_ids = list(Round.objects.filter(trip=trip).values_list("id", flat=True))
-        for round_id in round_ids:
-            RoundBus.objects.get_or_create(round_id=round_id, trip_bus=trip_bus)
-
-    def create(self, validated_data):
-        bus_or_trip_bus_id = validated_data.pop("original_bus_bus_id", None)
-        original_bus = validated_data.get("original_bus")
-        trip = validated_data.get("trip")
-        trip_bus = self._coerce_bus_or_trip_bus(trip, original_bus, bus_or_trip_bus_id)
-        validated_data["original_bus"] = trip_bus
-        obj = super().create(validated_data)
-        self._ensure_round_buses(trip, trip_bus)
-        return obj
-
-    def update(self, instance, validated_data):
-        bus_or_trip_bus_id = validated_data.pop("original_bus_bus_id", None)
-        original_bus = validated_data.get("original_bus", instance.original_bus)
-        trip = validated_data.get("trip", instance.trip)
-        trip_bus = self._coerce_bus_or_trip_bus(trip, original_bus, bus_or_trip_bus_id)
-        validated_data["original_bus"] = trip_bus
-        obj = super().update(instance, validated_data)
-        self._ensure_round_buses(trip, trip_bus)
-        return obj
+    def get_assigned_trip_bus(self, obj: Passenger):
+        qs = getattr(obj, "bus_assignments", None)
+        if qs is None:
+            return None
+        assignment = qs.filter(trip_id=obj.trip_id).order_by("-updated_at").first()
+        return assignment.trip_bus_id if assignment else None
 
 
 class PassengerTransferSerializer(serializers.ModelSerializer):
@@ -154,4 +78,55 @@ class PassengerTransferSerializer(serializers.ModelSerializer):
             passenger=passenger,
             defaults=defaults,
         )
+        return instance
+
+
+class PassengerAssignmentSerializer(serializers.ModelSerializer):
+    trip = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = PassengerBusAssignment
+        fields = [
+            "id",
+            "passenger",
+            "trip",
+            "trip_bus",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["trip", "created_at", "updated_at"]
+
+    def get_trip(self, obj: PassengerBusAssignment):
+        return obj.trip_id
+
+    def validate(self, attrs):
+        passenger = attrs.get("passenger") or getattr(self.instance, "passenger", None)
+        trip_bus = attrs.get("trip_bus") or getattr(self.instance, "trip_bus", None)
+
+        if not passenger or not trip_bus:
+            return attrs
+
+        if passenger.trip_id != trip_bus.trip_id:
+            raise ValidationError("Passenger and trip bus must belong to the same trip")
+
+        attrs["trip"] = passenger.trip
+        return attrs
+
+    def create(self, validated_data):
+        passenger = validated_data["passenger"]
+        defaults = {
+            "trip_bus": validated_data["trip_bus"],
+            "trip": validated_data.get("trip") or passenger.trip,
+        }
+        instance, _ = PassengerBusAssignment.objects.update_or_create(
+            passenger=passenger,
+            trip=defaults["trip"],
+            defaults=defaults,
+        )
+        return instance
+
+    def update(self, instance, validated_data):
+        instance.trip_bus = validated_data.get("trip_bus", instance.trip_bus)
+        instance.trip = validated_data.get("trip", instance.trip)
+        instance.save()
         return instance

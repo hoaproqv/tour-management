@@ -83,15 +83,6 @@ export default function PassengerManagement() {
     [passengersResponse],
   );
 
-  const busOptions = useMemo(
-    () =>
-      (Array.isArray(buses) ? buses : []).map((b: BusItem) => ({
-        value: b.id,
-        label: b.registration_number || b.bus_code,
-      })),
-    [buses],
-  );
-
   const tripMap = useMemo(
     () =>
       new Map(
@@ -191,12 +182,9 @@ export default function PassengerManagement() {
       message.warning("Bạn không có quyền chỉnh sửa passenger");
       return;
     }
-    const tripBus = tripBusMap.get(passenger.original_bus ?? "");
-    const busId = tripBus?.bus ?? passenger.original_bus ?? undefined;
     setEditingPassenger(passenger);
     form.setFieldsValue({
       trip: passenger.trip,
-      original_bus_bus_id: busId,
       name: passenger.name,
       phone: passenger.phone,
       note: passenger.note,
@@ -212,7 +200,6 @@ export default function PassengerManagement() {
 
         const payload: PassengerPayload = {
           trip: values.trip,
-          original_bus_bus_id: values.original_bus_bus_id || null,
           name: values.name,
           phone: values.phone || "",
           note: values.note || "",
@@ -296,7 +283,6 @@ export default function PassengerManagement() {
         }
         form={form}
         trips={trips}
-        busOptions={busOptions}
         editingPassenger={editingPassenger}
       />
     </div>

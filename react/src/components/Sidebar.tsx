@@ -9,12 +9,11 @@ import {
   MenuUnfoldOutlined,
   TeamOutlined,
   UserOutlined,
-  SearchOutlined,
   EnvironmentOutlined,
   WalletOutlined,
   ApartmentOutlined,
 } from "@ant-design/icons";
-import { Button, Input, Menu, type MenuProps } from "antd";
+import { Button, Menu, type MenuProps } from "antd";
 import { Link, useLocation } from "react-router-dom";
 
 import { useGetAccountInfo } from "../hooks/useAuth";
@@ -31,7 +30,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <DashboardOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to={ROUTES.DASHBOARD} className={linkClass}>
-        Dashboard
+        Trang chủ
       </Link>
     ),
   },
@@ -40,7 +39,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <TeamOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to={ROUTES.ACCOUNT} className={linkClass}>
-        User Management
+        Quản lý người dùng
       </Link>
     ),
   },
@@ -49,7 +48,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <ApartmentOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to={ROUTES.TENANT} className={linkClass}>
-        Tenants
+        Công ty du lịch
       </Link>
     ),
   },
@@ -58,7 +57,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <UserOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to={ROUTES.PASSENGER} className={linkClass}>
-        Passengers
+        Hành khách
       </Link>
     ),
   },
@@ -67,7 +66,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <CompassOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to={ROUTES.TRIP} className={linkClass}>
-        Trips
+        Tour du lịch
       </Link>
     ),
     children: [
@@ -76,7 +75,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
         icon: <CompassOutlined style={{ color: "#fff" }} />,
         label: (
           <Link to={ROUTES.TRIP} className={linkClass}>
-            Trip
+            Tour
           </Link>
         ),
       },
@@ -85,7 +84,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
         icon: <EnvironmentOutlined style={{ color: "#fff" }} />,
         label: (
           <Link to={ROUTES.ROUND} className={linkClass}>
-            Rounds
+            Địa điểm tham quan
           </Link>
         ),
       },
@@ -94,7 +93,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
         icon: <CarOutlined style={{ color: "#fff" }} />,
         label: (
           <Link to={ROUTES.BUS} className={linkClass}>
-            Bus
+            Xe khách
           </Link>
         ),
       },
@@ -105,7 +104,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <WalletOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to={ROUTES.TRANSACTIONS} className={linkClass}>
-        Transaction
+        Điểm danh hành khách
       </Link>
     ),
   },
@@ -114,7 +113,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     icon: <InfoCircleOutlined style={{ color: "#fff" }} />,
     label: (
       <Link to="#" className={linkClass}>
-        About us
+        Về chúng tôi
       </Link>
     ),
   },
@@ -173,20 +172,11 @@ export default function Sidebar() {
     >
       <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
         {!collapsed && (
-          <span className="text-lg font-semibold">Main Navigation</span>
+          <span className="text-lg font-semibold">Điều hướng chính</span>
         )}
         <Button type="text" onClick={toggleCollapsed} className="text-white">
           {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
         </Button>
-      </div>
-
-      <div className="px-4 py-3">
-        <Input
-          allowClear
-          placeholder="Tìm kiếm..."
-          prefix={<SearchOutlined className="text-slate-400" />}
-          className="bg-[#243447] border-none text-white placeholder:text-slate-400"
-        />
       </div>
 
       <Menu

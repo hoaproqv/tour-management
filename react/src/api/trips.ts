@@ -69,8 +69,7 @@ export type BusPayload = Omit<BusItem, "id">;
 export interface Passenger {
   id: string;
   trip: string;
-  original_bus: string | null;
-  original_bus_bus_id?: string | number | null;
+  assigned_trip_bus: string | null;
   name: string;
   phone: string;
   note: string;
@@ -80,7 +79,7 @@ export interface Passenger {
 
 export type PassengerPayload = Omit<
   Passenger,
-  "id" | "created_at" | "updated_at" | "original_bus"
+  "id" | "created_at" | "updated_at" | "assigned_trip_bus"
 >;
 
 export interface RoundBusItem {
@@ -119,6 +118,15 @@ export interface PassengerTransfer {
   from_trip_bus: string | null;
   to_trip_bus: string;
   trip: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PassengerAssignment {
+  id: string;
+  passenger: string;
+  trip: string;
+  trip_bus: string;
   created_at: string;
   updated_at: string;
 }
@@ -353,3 +361,29 @@ export const upsertPassengerTransfer = async (
 
 export const deletePassengerTransfer = async (id: string) =>
   deleteData(`/passenger-transfers/${id}/`);
+
+export const getPassengerAssignments = async (
+  params: { trip?: string | number } = {},
+): Promise<PassengerAssignment[]> => {
+  const query = new URLSearchParams();
+  if (params.trip !== undefined && params.trip !== null) {
+    query.append("trip", `${params.trip}`);
+  }
+
+  const res = await fetchData(
+    `/passenger-assignments/${query.toString() ? `?${query.toString()}` : ""}`,
+  );
+  if (Array.isArray(res)) return res as PassengerAssignment[];
+  if (Array.isArray((res as { data?: unknown })?.data)) {
+    return (res as { data: PassengerAssignment[] }).data;
+  }
+  return [];
+};
+
+export const upsertPassengerAssignment = async (payload: {
+  passenger: string;
+  trip_bus: string;
+}) => postData("/passenger-assignments/", payload);
+
+export const deletePassengerAssignment = async (id: string) =>
+  deleteData(`/passenger-assignments/${id}/`);

@@ -40,17 +40,9 @@ export default function PassengerTable({
         render: (val: string) => val || "—",
       },
       {
-        title: "Trip",
+        title: "Hành khách",
         dataIndex: "trip",
         render: (val: string) => tripMap.get(val) || "—",
-      },
-      {
-        title: "Xe gốc",
-        dataIndex: "original_bus",
-        render: (val: string | null) => {
-          const match = val ? tripBusMap.get(val) : undefined;
-          return match?.label || "—";
-        },
       },
       {
         title: "Ghi chú",

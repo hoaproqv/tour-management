@@ -6,8 +6,12 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 
-from passengers.models import Passenger, PassengerTransfer
-from passengers.serializers import PassengerSerializer, PassengerTransferSerializer
+from passengers.models import Passenger, PassengerBusAssignment, PassengerTransfer
+from passengers.serializers import (
+    PassengerAssignmentSerializer,
+    PassengerSerializer,
+    PassengerTransferSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +59,9 @@ class PassengerListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Passenger.objects.select_related("trip", "original_bus")
+        qs = Passenger.objects.select_related("trip").prefetch_related(
+            "bus_assignments__trip_bus",
+        )
         user = self.request.user
         if getattr(user, "tenant_id", None):
             qs = qs.filter(trip__tenant_id=user.tenant_id)
@@ -86,7 +92,9 @@ class PassengerDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Passenger.objects.select_related("trip", "original_bus")
+        qs = Passenger.objects.select_related("trip").prefetch_related(
+            "bus_assignments__trip_bus",
+        )
         user = self.request.user
         if getattr(user, "tenant_id", None):
             qs = qs.filter(trip__tenant_id=user.tenant_id)
@@ -246,6 +254,85 @@ class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
         summary="Delete passenger transfer",
         responses={204: None},
         tags=["PassengerTransfers"],
+    )
+    def delete(self, request, *args, **kwargs):
+        return super().delete(request, *args, **kwargs)
+
+
+class PassengerAssignmentListCreateView(generics.ListCreateAPIView):
+    serializer_class = PassengerAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = PassengerBusAssignment.objects.select_related(
+            "passenger",
+            "trip_bus",
+            "trip",
+        )
+        user = self.request.user
+        tenant_id = getattr(user, "tenant_id", None)
+        if tenant_id:
+            qs = qs.filter(trip__tenant_id=tenant_id)
+        trip = self.request.query_params.get("trip")
+        if trip:
+            qs = qs.filter(trip_id=trip)
+        return qs
+
+    @extend_schema(
+        summary="List passenger-bus assignments",
+        description="List passenger assignments by trip (tenant scoped).",
+        responses={200: PassengerAssignmentSerializer},
+        tags=["PassengerAssignments"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Upsert passenger-bus assignment",
+        description="Create or replace an assignment for a passenger.",
+        request=PassengerAssignmentSerializer,
+        responses={
+            201: PassengerAssignmentSerializer,
+            200: PassengerAssignmentSerializer,
+        },
+        tags=["PassengerAssignments"],
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+
+class PassengerAssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = PassengerAssignmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = PassengerBusAssignment.objects.select_related(
+            "passenger",
+            "trip_bus",
+            "trip",
+        )
+        user = self.request.user
+        tenant_id = getattr(user, "tenant_id", None)
+        if tenant_id:
+            qs = qs.filter(trip__tenant_id=tenant_id)
+        return qs
+
+    @extend_schema(
+        summary="Retrieve passenger-bus assignment",
+        responses={
+            200: PassengerAssignmentSerializer,
+            404: {"description": "Not found"},
+        },
+        tags=["PassengerAssignments"],
+    )
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Delete passenger-bus assignment",
+        responses={204: None},
+        tags=["PassengerAssignments"],
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)

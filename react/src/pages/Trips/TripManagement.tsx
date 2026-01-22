@@ -12,6 +12,7 @@ import {
   getTripBuses,
   getTrips,
   updateTrip,
+  deleteTrip,
   type BusItem,
   type Trip,
   type TripPayload,
@@ -21,6 +22,7 @@ import { useGetAccountInfo } from "../../hooks/useAuth";
 import { canManageCatalog } from "../../utils/helper";
 
 
+import PassengerAssignmentModal from "./components/PassengerAssignmentModal";
 import TripDetailModal from "./components/TripDetailModal";
 import TripFormModal, { type TripFormValues } from "./components/TripFormModal";
 import TripHeader from "./components/TripHeader";
@@ -46,6 +48,7 @@ export default function TripManagement() {
   } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [assigningTrip, setAssigningTrip] = useState<EnrichedTrip | null>(null);
   const [form] = Form.useForm<TripFormValues>();
   const queryClient = useQueryClient();
 
@@ -218,6 +221,21 @@ export default function TripManagement() {
     },
   });
 
+  const deleteTripMutation = useMutation({
+    mutationFn: (id: string) => deleteTrip(id),
+    onSuccess: async () => {
+      message.success("Đã xóa trip thành công");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["trips"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+        queryClient.invalidateQueries({ queryKey: ["rounds"] }),
+        queryClient.invalidateQueries({ queryKey: ["passengers"] }),
+        queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
+      ]);
+    },
+    onError: () => message.error("Xóa trip thất bại"),
+  });
+
   const openCreate = () => {
     if (!canManageTrips) {
       message.warning("Bạn không có quyền chỉnh sửa trip");
@@ -316,6 +334,14 @@ export default function TripManagement() {
             onEdit={openEdit}
             onViewRounds={(trip) => setDetail({ trip, mode: "rounds" })}
             onViewBuses={(trip) => setDetail({ trip, mode: "buses" })}
+            onAssignPassengers={(trip) => setAssigningTrip(trip)}
+            onDelete={(trip) => {
+              if (!canManageTrips) {
+                message.warning("Bạn không có quyền xóa trip");
+                return;
+              }
+              deleteTripMutation.mutate(trip.id);
+            }}
           />
         </Card>
       </div>
@@ -326,6 +352,13 @@ export default function TripManagement() {
         busMap={busMap}
         userContactMap={userContactMap}
         statusMeta={statusMeta}
+      />
+
+      <PassengerAssignmentModal
+        open={Boolean(assigningTrip)}
+        trip={assigningTrip}
+        onClose={() => setAssigningTrip(null)}
+        busLabelMap={busMap}
       />
 
       <TripFormModal
