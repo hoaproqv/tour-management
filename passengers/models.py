@@ -3,8 +3,8 @@ from django.db import models
 
 class Passenger(models.Model):
     id = models.BigAutoField(primary_key=True)
-    trip = models.ForeignKey(
-        "trips.Trip",
+    tenant = models.ForeignKey(
+        "accounts.Tenant",
         on_delete=models.CASCADE,
         related_name="passengers",
     )
@@ -17,7 +17,7 @@ class Passenger(models.Model):
     class Meta:
         ordering = ["name"]
         indexes = [
-            models.Index(fields=["trip", "name"]),
+            models.Index(fields=["tenant", "name"]),
         ]
 
     def __str__(self) -> str:
@@ -62,10 +62,15 @@ class PassengerBusAssignment(models.Model):
 
 class PassengerTransfer(models.Model):
     id = models.BigAutoField(primary_key=True)
-    passenger = models.OneToOneField(
+    passenger = models.ForeignKey(
         Passenger,
         on_delete=models.CASCADE,
-        related_name="transfer",
+        related_name="transfers",
+    )
+    trip = models.ForeignKey(
+        "trips.Trip",
+        on_delete=models.CASCADE,
+        related_name="passenger_transfers",
     )
     from_trip_bus = models.ForeignKey(
         "trips.TripBus",
@@ -84,6 +89,12 @@ class PassengerTransfer(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["passenger", "trip"],
+                name="unique_passenger_transfer_per_trip",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.passenger} -> {self.to_trip_bus}"

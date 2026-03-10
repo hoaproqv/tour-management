@@ -68,7 +68,6 @@ export type BusPayload = Omit<BusItem, "id">;
 
 export interface Passenger {
   id: string;
-  trip: string;
   assigned_trip_bus: string | null;
   name: string;
   phone: string;

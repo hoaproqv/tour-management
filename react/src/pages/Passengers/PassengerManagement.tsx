@@ -55,8 +55,14 @@ export default function PassengerManagement() {
     queryFn: () => getBuses({ page: 1, limit: 1000 }),
   });
   const { data: passengersResponse, isLoading } = useQuery({
-    queryKey: ["passengers"],
-    queryFn: () => getPassengers({ page: 1, limit: 1000 }),
+    queryKey: ["passengers", tripFilter],
+    queryFn: () =>
+      getPassengers({
+        page: 1,
+        limit: 1000,
+        ...(tripFilter !== "all" ? { trip: tripFilter } : {}),
+      }),
+    enabled: tripFilter === "all" || Boolean(tripFilter),
   });
 
   const trips = useMemo(
@@ -81,14 +87,6 @@ export default function PassengerManagement() {
     () =>
       Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
     [passengersResponse],
-  );
-
-  const tripMap = useMemo(
-    () =>
-      new Map(
-        (Array.isArray(trips) ? trips : []).map((t: Trip) => [t.id, t.name]),
-      ),
-    [trips],
   );
 
   const busMap = useMemo(
@@ -119,15 +117,14 @@ export default function PassengerManagement() {
   const filteredPassengers = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (Array.isArray(passengers) ? passengers : []).filter((p) => {
-      const matchTrip = tripFilter === "all" ? true : p.trip === tripFilter;
-      const matchTerm = term
-        ? p.name.toLowerCase().includes(term) ||
-          p.phone.toLowerCase().includes(term) ||
-          (p.note || "").toLowerCase().includes(term)
-        : true;
-      return matchTrip && matchTerm;
+      if (!term) return true;
+      return (
+        p.name.toLowerCase().includes(term) ||
+        p.phone.toLowerCase().includes(term) ||
+        (p.note || "").toLowerCase().includes(term)
+      );
     });
-  }, [passengers, search, tripFilter]);
+  }, [passengers, search]);
 
   const createMutation = useMutation({
     mutationFn: (payload: PassengerPayload) => createPassenger(payload),
@@ -184,7 +181,6 @@ export default function PassengerManagement() {
     }
     setEditingPassenger(passenger);
     form.setFieldsValue({
-      trip: passenger.trip,
       name: passenger.name,
       phone: passenger.phone,
       note: passenger.note,
@@ -199,7 +195,6 @@ export default function PassengerManagement() {
         const values = form.getFieldsValue(true) as PassengerFormValues;
 
         const payload: PassengerPayload = {
-          trip: values.trip,
           name: values.name,
           phone: values.phone || "",
           note: values.note || "",
@@ -231,7 +226,7 @@ export default function PassengerManagement() {
               Quản lý Passenger
             </Title>
             <Text type="secondary">
-              Danh sách hành khách theo trip và xe gốc.
+              Danh sách hành khách; chọn trip để xem xe được gán.
             </Text>
           </div>
           <div className="flex flex-col md:flex-row gap-2 md:items-center">
@@ -267,6 +262,7 @@ export default function PassengerManagement() {
           deleting={deleteMutation.status === "pending"}
           tripMap={tripMap}
           tripBusMap={tripBusMap}
+          selectedTripId={tripFilter}
           canManage={canManage}
           onDelete={(id) => deleteMutation.mutate(id)}
           onEdit={openEdit}
@@ -282,7 +278,6 @@ export default function PassengerManagement() {
           updateMutation.status === "pending"
         }
         form={form}
-        trips={trips}
         editingPassenger={editingPassenger}
       />
     </div>

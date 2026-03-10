@@ -5,16 +5,16 @@ from passengers import models
 
 @admin.register(models.Passenger)
 class PassengerAdmin(admin.ModelAdmin):
-    list_display = ("name", "trip", "assigned_bus", "phone")
-    list_filter = ("trip",)
+    list_display = ("name", "tenant", "assigned_bus", "phone")
+    list_filter = ("tenant",)
     search_fields = ("name", "phone")
-    raw_id_fields = ("trip",)
+    raw_id_fields = ("tenant",)
 
     def assigned_bus(self, obj):
         qs = getattr(obj, "bus_assignments", None)
         if qs is None:
             return None
-        assignment = qs.filter(trip=obj.trip).order_by("-updated_at").first()
+        assignment = qs.order_by("-updated_at").first()
         return assignment.trip_bus if assignment else None
 
     assigned_bus.short_description = "Trip bus"

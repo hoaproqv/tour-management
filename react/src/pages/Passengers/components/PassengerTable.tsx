@@ -11,8 +11,8 @@ type PassengerTableProps = {
   data: Passenger[];
   isLoading: boolean;
   deleting: boolean;
-  tripMap: Map<string, string>;
   tripBusMap: Map<string, TripBus & { label: string }>;
+  selectedTripId: string | "all";
   canManage: boolean;
   onDelete: (_id: string) => void;
   onEdit: (_passenger: Passenger) => void;
@@ -22,8 +22,8 @@ export default function PassengerTable({
   data,
   isLoading,
   deleting,
-  tripMap,
   tripBusMap,
+  selectedTripId,
   canManage,
   onDelete,
   onEdit,
@@ -40,9 +40,13 @@ export default function PassengerTable({
         render: (val: string) => val || "—",
       },
       {
-        title: "Hành khách",
-        dataIndex: "trip",
-        render: (val: string) => tripMap.get(val) || "—",
+        title: "Xe (trip đã lọc)",
+        dataIndex: "assigned_trip_bus",
+        render: (val: string | null) => {
+          if (selectedTripId === "all") return "—";
+          if (!val) return "Chưa gán";
+          return tripBusMap.get(val)?.label || "—";
+        },
       },
       {
         title: "Ghi chú",
@@ -82,7 +86,7 @@ export default function PassengerTable({
         ),
       },
     ];
-  }, [canManage, deleting, onDelete, onEdit, tripBusMap, tripMap]);
+  }, [canManage, deleting, onDelete, onEdit, selectedTripId, tripBusMap]);
 
   return (
     <Card className="mt-6" styles={{ body: { padding: 0 } }}>
@@ -94,7 +98,11 @@ export default function PassengerTable({
         scroll={{ x: true }}
         columns={columns}
         locale={{
-          emptyText: isLoading ? <span>Đang tải...</span> : <Empty description="Chưa có dữ liệu" />,
+          emptyText: isLoading ? (
+            <span>Đang tải...</span>
+          ) : (
+            <Empty description="Chưa có dữ liệu" />
+          ),
         }}
       />
     </Card>

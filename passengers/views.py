@@ -3,6 +3,7 @@ import logging
 
 import paho.mqtt.publish as publish
 from django.conf import settings
+from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 
@@ -59,17 +60,40 @@ class PassengerListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Passenger.objects.select_related("trip").prefetch_related(
-            "bus_assignments__trip_bus",
+        trip_id = self.request.query_params.get("trip")
+        assignment_qs = PassengerBusAssignment.objects.select_related(
+            "trip_bus",
+            "trip",
+        )
+        if trip_id:
+            assignment_qs = assignment_qs.filter(trip_id=trip_id)
+
+        qs = Passenger.objects.prefetch_related(
+            Prefetch("bus_assignments", queryset=assignment_qs),
         )
         user = self.request.user
         if getattr(user, "tenant_id", None):
-            qs = qs.filter(trip__tenant_id=user.tenant_id)
-        return qs
+            qs = qs.filter(tenant_id=user.tenant_id)
+        if trip_id:
+            qs = qs.filter(bus_assignments__trip_id=trip_id)
+        return qs.distinct()
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx.update(
+            {
+                "trip_id": self.request.query_params.get("trip"),
+                "tenant": getattr(self.request.user, "tenant", None),
+            }
+        )
+        return ctx
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=getattr(self.request.user, "tenant", None))
 
     @extend_schema(
         summary="List passengers",
-        description="Returns passengers, scoped to user's tenant trips if applicable.",
+        description="Returns passengers, scoped to user's tenant; optionally filter by trip assignments.",
         responses={200: PassengerSerializer},
         tags=["Passengers"],
     )
@@ -78,7 +102,7 @@ class PassengerListCreateView(generics.ListCreateAPIView):
 
     @extend_schema(
         summary="Create passenger",
-        description="Create a passenger belonging to a trip.",
+        description="Create a passenger (tenant scoped).",
         request=PassengerSerializer,
         responses={201: PassengerSerializer, 400: {"description": "Validation error"}},
         tags=["Passengers"],
@@ -92,13 +116,33 @@ class PassengerDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = Passenger.objects.select_related("trip").prefetch_related(
-            "bus_assignments__trip_bus",
+        trip_id = self.request.query_params.get("trip")
+        assignment_qs = PassengerBusAssignment.objects.select_related(
+            "trip_bus",
+            "trip",
+        )
+        if trip_id:
+            assignment_qs = assignment_qs.filter(trip_id=trip_id)
+
+        qs = Passenger.objects.prefetch_related(
+            Prefetch("bus_assignments", queryset=assignment_qs),
         )
         user = self.request.user
         if getattr(user, "tenant_id", None):
-            qs = qs.filter(trip__tenant_id=user.tenant_id)
-        return qs
+            qs = qs.filter(tenant_id=user.tenant_id)
+        if trip_id:
+            qs = qs.filter(bus_assignments__trip_id=trip_id)
+        return qs.distinct()
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx.update(
+            {
+                "trip_id": self.request.query_params.get("trip"),
+                "tenant": getattr(self.request.user, "tenant", None),
+            }
+        )
+        return ctx
 
     @extend_schema(
         summary="Retrieve passenger",
@@ -149,15 +193,15 @@ class PassengerTransferListCreateView(generics.ListCreateAPIView):
             "passenger",
             "from_trip_bus",
             "to_trip_bus",
-            "passenger__trip",
+            "trip",
         )
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
-            qs = qs.filter(passenger__trip__tenant_id=tenant_id)
+            qs = qs.filter(passenger__tenant_id=tenant_id)
         trip = self.request.query_params.get("trip")
         if trip:
-            qs = qs.filter(passenger__trip_id=trip)
+            qs = qs.filter(trip_id=trip)
         return qs
 
     def perform_create(self, serializer):
@@ -167,7 +211,7 @@ class PassengerTransferListCreateView(generics.ListCreateAPIView):
             "passenger": instance.passenger_id,
             "from_trip_bus": instance.from_trip_bus_id,
             "to_trip_bus": instance.to_trip_bus_id,
-            "trip": instance.passenger.trip_id,
+            "trip": instance.trip_id,
             "deleted": False,
         }
         publish_transfer_to_mqtt(payload)
@@ -201,12 +245,12 @@ class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
             "passenger",
             "from_trip_bus",
             "to_trip_bus",
-            "passenger__trip",
+            "trip",
         )
         user = self.request.user
         tenant_id = getattr(user, "tenant_id", None)
         if tenant_id:
-            qs = qs.filter(passenger__trip__tenant_id=tenant_id)
+            qs = qs.filter(passenger__tenant_id=tenant_id)
         return qs
 
     def perform_update(self, serializer):
@@ -216,7 +260,7 @@ class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
             "passenger": instance.passenger_id,
             "from_trip_bus": instance.from_trip_bus_id,
             "to_trip_bus": instance.to_trip_bus_id,
-            "trip": instance.passenger.trip_id,
+            "trip": instance.trip_id,
             "deleted": False,
         }
         publish_transfer_to_mqtt(payload)
@@ -227,7 +271,7 @@ class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
             "passenger": instance.passenger_id,
             "from_trip_bus": instance.from_trip_bus_id,
             "to_trip_bus": instance.to_trip_bus_id,
-            "trip": instance.passenger.trip_id,
+            "trip": instance.trip_id,
             "deleted": True,
         }
         super().perform_destroy(instance)

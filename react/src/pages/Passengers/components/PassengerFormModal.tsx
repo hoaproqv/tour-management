@@ -1,15 +1,14 @@
 import React from "react";
 
-import { Form, Input, Modal, Select } from "antd";
+import { Form, Input, Modal } from "antd";
 
-import { type Passenger, type PassengerPayload, type Trip } from "../../../api/trips";
+import { type Passenger, type PassengerPayload } from "../../../api/trips";
 
 import type { FormInstance } from "antd/es/form";
 
-
 export type PassengerFormValues = Pick<
   PassengerPayload,
-  "trip" | "name" | "phone" | "note"
+  "name" | "phone" | "note"
 >;
 
 type PassengerFormModalProps = {
@@ -18,7 +17,6 @@ type PassengerFormModalProps = {
   onSubmit: () => void;
   confirmLoading: boolean;
   form: FormInstance<PassengerFormValues>;
-  trips: Trip[];
   editingPassenger?: Passenger | null;
 };
 
@@ -28,7 +26,6 @@ export default function PassengerFormModal({
   onSubmit,
   confirmLoading,
   form,
-  trips,
   editingPassenger,
 }: PassengerFormModalProps) {
   return (
@@ -42,20 +39,12 @@ export default function PassengerFormModal({
       cancelText="Hủy"
       destroyOnClose
     >
-      <Form layout="vertical" form={form} data-ms-editor="false" autoComplete="off">
-        <Form.Item
-          label="Thuộc Trip"
-          name="trip"
-          rules={[{ required: true, message: "Chọn trip" }]}
-        >
-          <Select
-            placeholder="Chọn trip"
-            options={(Array.isArray(trips) ? trips : []).map((t) => ({
-              value: t.id,
-              label: t.name,
-            }))}
-          />
-        </Form.Item>
+      <Form
+        layout="vertical"
+        form={form}
+        data-ms-editor="false"
+        autoComplete="off"
+      >
         <Form.Item
           label="Tên"
           name="name"

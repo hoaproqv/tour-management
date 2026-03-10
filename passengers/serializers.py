@@ -11,7 +11,6 @@ class PassengerSerializer(serializers.ModelSerializer):
         model = Passenger
         fields = [
             "id",
-            "trip",
             "assigned_trip_bus",
             "name",
             "phone",
@@ -22,11 +21,24 @@ class PassengerSerializer(serializers.ModelSerializer):
         read_only_fields = ["assigned_trip_bus", "created_at", "updated_at"]
 
     def get_assigned_trip_bus(self, obj: Passenger):
+        trip_id = self.context.get("trip_id")
         qs = getattr(obj, "bus_assignments", None)
         if qs is None:
             return None
-        assignment = qs.filter(trip_id=obj.trip_id).order_by("-updated_at").first()
+        filtered_qs = qs
+        if trip_id:
+            filtered_qs = filtered_qs.filter(trip_id=trip_id)
+
+        assignment = filtered_qs.order_by("-updated_at").first()
+        if not assignment:
+            assignment = qs.order_by("-updated_at").first()
         return assignment.trip_bus_id if assignment else None
+
+    def create(self, validated_data):
+        tenant = self.context.get("tenant")
+        if tenant:
+            validated_data["tenant"] = tenant
+        return super().create(validated_data)
 
 
 class PassengerTransferSerializer(serializers.ModelSerializer):
@@ -53,29 +65,45 @@ class PassengerTransferSerializer(serializers.ModelSerializer):
             self.instance, "from_trip_bus", None
         )
 
-        if passenger and to_trip_bus and passenger.trip_id != to_trip_bus.trip_id:
+        if not to_trip_bus:
+            raise ValidationError("Target bus is required")
+
+        if (
+            to_trip_bus
+            and from_trip_bus
+            and to_trip_bus.trip_id != from_trip_bus.trip_id
+        ):
             raise ValidationError(
-                "Passenger and target bus must belong to the same trip"
+                "Source and target buses must belong to the same trip"
             )
 
-        if passenger and from_trip_bus and passenger.trip_id != from_trip_bus.trip_id:
-            raise ValidationError(
-                "Passenger and source bus must belong to the same trip"
-            )
+        trip = (
+            to_trip_bus.trip
+            if to_trip_bus
+            else from_trip_bus.trip if from_trip_bus else None
+        )
+
+        if passenger and trip and passenger.tenant_id != trip.tenant_id:
+            raise ValidationError("Passenger and trip must belong to the same tenant")
+
+        if trip:
+            attrs["trip"] = trip
 
         return attrs
 
     def get_trip(self, obj: PassengerTransfer):
-        return obj.passenger.trip_id
+        return obj.trip_id
 
     def create(self, validated_data):
         passenger = validated_data["passenger"]
         defaults = {
             "from_trip_bus": validated_data.get("from_trip_bus"),
             "to_trip_bus": validated_data.get("to_trip_bus"),
+            "trip": validated_data.get("trip") or validated_data["to_trip_bus"].trip,
         }
         instance, _created = PassengerTransfer.objects.update_or_create(
             passenger=passenger,
+            trip=defaults["trip"],
             defaults=defaults,
         )
         return instance
@@ -106,17 +134,18 @@ class PassengerAssignmentSerializer(serializers.ModelSerializer):
         if not passenger or not trip_bus:
             return attrs
 
-        if passenger.trip_id != trip_bus.trip_id:
-            raise ValidationError("Passenger and trip bus must belong to the same trip")
+        trip = trip_bus.trip
+        if passenger.tenant_id != trip.tenant_id:
+            raise ValidationError("Passenger and trip must belong to the same tenant")
 
-        attrs["trip"] = passenger.trip
+        attrs["trip"] = trip
         return attrs
 
     def create(self, validated_data):
         passenger = validated_data["passenger"]
         defaults = {
             "trip_bus": validated_data["trip_bus"],
-            "trip": validated_data.get("trip") or passenger.trip,
+            "trip": validated_data.get("trip") or validated_data["trip_bus"].trip,
         }
         instance, _ = PassengerBusAssignment.objects.update_or_create(
             passenger=passenger,
@@ -127,6 +156,6 @@ class PassengerAssignmentSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         instance.trip_bus = validated_data.get("trip_bus", instance.trip_bus)
-        instance.trip = validated_data.get("trip", instance.trip)
+        instance.trip = validated_data.get("trip", instance.trip_bus.trip)
         instance.save()
         return instance

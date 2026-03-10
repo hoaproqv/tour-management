@@ -40,19 +40,29 @@ import {
   type TripBus,
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
-import { isAdminLike, isFleetLead, isTourManagerLike } from "../../utils/helper";
+import {
+  isAdminLike,
+  isFleetLead,
+  isTourManagerLike,
+} from "../../utils/helper";
 
 import { BusPane } from "./components/BusPane";
 import { CrossCheckModal } from "./components/CrossCheckModal";
 import { RoundTimeline } from "./components/RoundTimeline";
 
-import type { PassengerRow, RoundVisualStatus, RowStatus } from "./components/types";
+import type {
+  PassengerRow,
+  RoundVisualStatus,
+  RowStatus,
+} from "./components/types";
 import type { IUser } from "../../utils/types";
 
 const { Title, Text } = Typography;
 const STORAGE_KEY = "transaction-attendance-filters";
-const MQTT_FINALIZE_TOPIC = process.env.MQTT_FINALIZE_TOPIC || "round-finalize/#";
-const MQTT_TRANSFER_TOPIC = process.env.MQTT_TRANSFER_TOPIC || "passenger-transfer/#";
+const MQTT_FINALIZE_TOPIC =
+  process.env.MQTT_FINALIZE_TOPIC || "round-finalize/#";
+const MQTT_TRANSFER_TOPIC =
+  process.env.MQTT_TRANSFER_TOPIC || "passenger-transfer/#";
 
 export default function TransactionManagement() {
   const queryClient = useQueryClient();
@@ -101,8 +111,14 @@ export default function TransactionManagement() {
     isLoading: loadingPassengers,
     isFetching: fetchingPassengers,
   } = useQuery<PaginatedResponse<Passenger>>({
-    queryKey: ["passengers"],
-    queryFn: () => getPassengers({ page: 1, limit: 1000 }),
+    queryKey: ["passengers", activeTripId],
+    queryFn: () =>
+      getPassengers({
+        page: 1,
+        limit: 1000,
+        ...(activeTripId ? { trip: activeTripId } : {}),
+      }),
+    enabled: Boolean(activeTripId),
   });
 
   const {
@@ -171,14 +187,16 @@ export default function TransactionManagement() {
   );
 
   const passengers = useMemo(
-    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    () =>
+      Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
     [passengersResponse],
   );
 
   const passengerHomeBusMap = useMemo(() => {
     const map = new Map<string, string | null>();
     passengers.forEach((p) => {
-      const assignedBus = (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
+      const assignedBus =
+        (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
       map.set(p.id, assignedBus);
     });
     return map;
@@ -190,12 +208,14 @@ export default function TransactionManagement() {
   );
 
   const roundBuses = useMemo(
-    () => (Array.isArray(roundBusesResponse?.data) ? roundBusesResponse.data : []),
+    () =>
+      Array.isArray(roundBusesResponse?.data) ? roundBusesResponse.data : [],
     [roundBusesResponse],
   );
 
   const tripBuses = useMemo(
-    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    () =>
+      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
     [tripBusesResponse],
   );
 
@@ -222,7 +242,10 @@ export default function TransactionManagement() {
   );
 
   const transactions = useMemo(
-    () => (Array.isArray(transactionsResponse?.data) ? transactionsResponse.data : []),
+    () =>
+      Array.isArray(transactionsResponse?.data)
+        ? transactionsResponse.data
+        : [],
     [transactionsResponse],
   );
 
@@ -398,7 +421,8 @@ export default function TransactionManagement() {
   const tripRoundsSorted = useMemo(() => {
     const list = [...tripScopedRound];
     list.sort((a, b) => {
-      if (a.sequence !== b.sequence) return (a.sequence || 0) - (b.sequence || 0);
+      if (a.sequence !== b.sequence)
+        return (a.sequence || 0) - (b.sequence || 0);
       return a.name.localeCompare(b.name);
     });
     return list;
@@ -444,7 +468,10 @@ export default function TransactionManagement() {
   );
 
   const canModifyRound = Boolean(
-    !tripLockedForAttendance && openRoundId && activeRoundId === openRoundId && !roundAlreadyFinalized,
+    !tripLockedForAttendance &&
+      openRoundId &&
+      activeRoundId === openRoundId &&
+      !roundAlreadyFinalized,
   );
 
   const roundBusIdFor = React.useCallback(
@@ -472,7 +499,12 @@ export default function TransactionManagement() {
 
       return "upcoming";
     },
-    [isRoundFullyFinalized, openRoundId, tripLockedForAttendance, tripRoundsSorted],
+    [
+      isRoundFullyFinalized,
+      openRoundId,
+      tripLockedForAttendance,
+      tripRoundsSorted,
+    ],
   );
 
   const tripScopedTripBuses = useMemo(
@@ -490,10 +522,19 @@ export default function TransactionManagement() {
       setActiveTripBusId(tripScopedTripBuses[0]?.id);
     }
 
-    if (!activeRoundId || !tripScopedRound.some((r) => r.id === activeRoundId)) {
+    if (
+      !activeRoundId ||
+      !tripScopedRound.some((r) => r.id === activeRoundId)
+    ) {
       setActiveRoundId(tripScopedRound[0]?.id);
     }
-  }, [activeTripId, tripScopedTripBuses, tripScopedRound, activeTripBusId, activeRoundId]);
+  }, [
+    activeTripId,
+    tripScopedTripBuses,
+    tripScopedRound,
+    activeTripBusId,
+    activeRoundId,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -583,7 +624,9 @@ export default function TransactionManagement() {
         ["passenger-transfers", tripKey],
         (prev) => {
           const list = Array.isArray(prev) ? [...prev] : [];
-          const idx = list.findIndex((t) => String(t.passenger) === String(incoming.passenger));
+          const idx = list.findIndex(
+            (t) => String(t.passenger) === String(incoming.passenger),
+          );
 
           if (incoming.deleted) {
             if (idx >= 0) list.splice(idx, 1);
@@ -593,8 +636,12 @@ export default function TransactionManagement() {
           const base: PassengerTransfer = {
             id: String(incoming.id ?? list[idx]?.id ?? incoming.passenger),
             passenger: String(incoming.passenger),
-            from_trip_bus: incoming.from_trip_bus ? String(incoming.from_trip_bus) : null,
-            to_trip_bus: incoming.to_trip_bus ? String(incoming.to_trip_bus) : list[idx]?.to_trip_bus || "",
+            from_trip_bus: incoming.from_trip_bus
+              ? String(incoming.from_trip_bus)
+              : null,
+            to_trip_bus: incoming.to_trip_bus
+              ? String(incoming.to_trip_bus)
+              : list[idx]?.to_trip_bus || "",
             trip: tripKey,
             created_at: list[idx]?.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -619,8 +666,16 @@ export default function TransactionManagement() {
       if (!process.env.MQTT_URL) return;
       try {
         const mqttModule = await import("mqtt");
-        const mqtt = (mqttModule as unknown as { default?: typeof import("mqtt"); connect: typeof import("mqtt")["connect"] }).default ||
-          (mqttModule as unknown as { connect: typeof import("mqtt")["connect"] });
+        const mqtt =
+          (
+            mqttModule as unknown as {
+              default?: typeof import("mqtt");
+              connect: (typeof import("mqtt"))["connect"];
+            }
+          ).default ||
+          (mqttModule as unknown as {
+            connect: (typeof import("mqtt"))["connect"];
+          });
         if (!mqtt?.connect) throw new Error("mqtt.connect not available");
         if (canceled) return;
         const topic = process.env.MQTT_TRANSACTIONS_TOPIC || "transactions/#";
@@ -645,7 +700,8 @@ export default function TransactionManagement() {
           try {
             const raw = payload?.toString?.() ?? "";
             const parsed = raw ? JSON.parse(raw) : null;
-            const candidate = (parsed && (parsed.transaction || parsed.data)) || parsed;
+            const candidate =
+              (parsed && (parsed.transaction || parsed.data)) || parsed;
 
             if (_topic.startsWith("round-finalize")) {
               if (
@@ -654,21 +710,29 @@ export default function TransactionManagement() {
                 "round_bus" in candidate &&
                 "trip" in candidate
               ) {
-                applyFinalizeUpdate(candidate as { round_bus: string; trip: string; finalized_at?: string | null });
+                applyFinalizeUpdate(
+                  candidate as {
+                    round_bus: string;
+                    trip: string;
+                    finalized_at?: string | null;
+                  },
+                );
                 return;
               }
             }
 
             if (_topic.startsWith("passenger-transfer")) {
               if (candidate && typeof candidate === "object") {
-                applyTransferUpdate(candidate as {
-                  passenger: string;
-                  to_trip_bus?: string | null;
-                  from_trip_bus?: string | null;
-                  trip?: string;
-                  id?: string;
-                  deleted?: boolean;
-                });
+                applyTransferUpdate(
+                  candidate as {
+                    passenger: string;
+                    to_trip_bus?: string | null;
+                    from_trip_bus?: string | null;
+                    trip?: string;
+                    id?: string;
+                    deleted?: boolean;
+                  },
+                );
                 return;
               }
             }
@@ -680,7 +744,10 @@ export default function TransactionManagement() {
               "passenger" in candidate &&
               "round_bus" in candidate
             ) {
-              console.log("✓ Received transaction update:", (candidate as { id: string }).id);
+              console.log(
+                "✓ Received transaction update:",
+                (candidate as { id: string }).id,
+              );
               // Apply the latest transaction locally so the UI updates instantly.
               applyRealtimeUpdate(candidate as TransactionItem);
             } else {
@@ -773,7 +840,8 @@ export default function TransactionManagement() {
   });
 
   const deleteTransferMutation = useMutation({
-    mutationFn: async (transferId: string) => deletePassengerTransfer(transferId),
+    mutationFn: async (transferId: string) =>
+      deletePassengerTransfer(transferId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["passenger-transfers", activeTripId],
@@ -817,9 +885,15 @@ export default function TransactionManagement() {
       const targetBusId = variables.targetTripBusId;
       if (targetBusId) {
         const existingTransfer = transferByPassenger.get(variables.passengerId);
-        const currentAssignment = existingTransfer?.to_trip_bus || passengerHomeBusMap.get(variables.passengerId) || null;
+        const currentAssignment =
+          existingTransfer?.to_trip_bus ||
+          passengerHomeBusMap.get(variables.passengerId) ||
+          null;
 
-        if (existingTransfer && targetBusId === passengerHomeBusMap.get(variables.passengerId)) {
+        if (
+          existingTransfer &&
+          targetBusId === passengerHomeBusMap.get(variables.passengerId)
+        ) {
           await deleteTransferMutation.mutateAsync(existingTransfer.id);
         } else {
           await upsertTransferMutation.mutateAsync({
@@ -835,7 +909,8 @@ export default function TransactionManagement() {
   });
 
   const finalizeRoundBusMutation = useMutation({
-    mutationFn: async (roundBusId: string) => finalizeRoundBus(roundBusId, true),
+    mutationFn: async (roundBusId: string) =>
+      finalizeRoundBus(roundBusId, true),
     onSuccess: async () => {
       message.success("Đã chốt điểm danh. Round này sẽ khoá chỉnh sửa.");
       await queryClient.invalidateQueries({ queryKey: ["round-buses"] });
@@ -865,7 +940,7 @@ export default function TransactionManagement() {
 
   const tripPassengers = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const list = passengers.filter((p) => p.trip === activeTripId);
+    const list = passengers;
     if (!term) return list;
     return list.filter(
       (p) =>
@@ -875,77 +950,99 @@ export default function TransactionManagement() {
     );
   }, [passengers, activeTripId, search]);
 
-  const rowsForBus = React.useCallback((tripBusId: string): PassengerRow[] => {
-    const transferMap = passengerTransferMap;
+  const rowsForBus = React.useCallback(
+    (tripBusId: string): PassengerRow[] => {
+      const transferMap = passengerTransferMap;
 
-    return tripPassengers
-      .filter((p) => {
-        const overrideBus = transferMap[p.id];
-        const baseAssigned = (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
-        const homeBusId = overrideBus ?? baseAssigned ?? null;
-        if (homeBusId) return homeBusId === tripBusId || baseAssigned === tripBusId;
-        return !baseAssigned || baseAssigned === tripBusId;
-      })
-      .map((p) => {
-        const overrideBus = transferMap[p.id];
-        const baseAssigned = (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ?? null;
-        const homeBusId = overrideBus ?? baseAssigned ?? null;
-        const txn = transactionByPassenger.get(p.id);
-        const txnBusId = txn ? roundBusToTripBus.get(txn.round_bus) : undefined;
-        let status: RowStatus = "pending";
-        if (txn) {
-          if (txn.check_out) {
-            status = "checkedOut";
-          } else if (txnBusId === tripBusId) {
-            status = "checkedInHere";
-          } else if (txnBusId) {
-            status = "checkedInElsewhere";
+      return tripPassengers
+        .filter((p) => {
+          const overrideBus = transferMap[p.id];
+          const baseAssigned =
+            (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ??
+            null;
+          const homeBusId = overrideBus ?? baseAssigned ?? null;
+          if (homeBusId)
+            return homeBusId === tripBusId || baseAssigned === tripBusId;
+          return !baseAssigned || baseAssigned === tripBusId;
+        })
+        .map((p) => {
+          const overrideBus = transferMap[p.id];
+          const baseAssigned =
+            (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ??
+            null;
+          const homeBusId = overrideBus ?? baseAssigned ?? null;
+          const txn = transactionByPassenger.get(p.id);
+          const txnBusId = txn
+            ? roundBusToTripBus.get(txn.round_bus)
+            : undefined;
+          let status: RowStatus = "pending";
+          if (txn) {
+            if (txn.check_out) {
+              status = "checkedOut";
+            } else if (txnBusId === tripBusId) {
+              status = "checkedInHere";
+            } else if (txnBusId) {
+              status = "checkedInElsewhere";
+            }
           }
-        }
 
-        const transferredAway =
-          Boolean(baseAssigned) &&
-          baseAssigned === tripBusId &&
-          !!overrideBus &&
-          overrideBus !== tripBusId;
+          const transferredAway =
+            Boolean(baseAssigned) &&
+            baseAssigned === tripBusId &&
+            !!overrideBus &&
+            overrideBus !== tripBusId;
 
-        const transferredHere =
-          !!overrideBus &&
-          overrideBus === tripBusId &&
-          !!baseAssigned &&
-          baseAssigned !== tripBusId;
+          const transferredHere =
+            !!overrideBus &&
+            overrideBus === tripBusId &&
+            !!baseAssigned &&
+            baseAssigned !== tripBusId;
 
-        const isOwnedByBus =
-          (homeBusId ? homeBusId === tripBusId : !baseAssigned || baseAssigned === tripBusId) &&
-          !transferredAway;
+          const isOwnedByBus =
+            (homeBusId
+              ? homeBusId === tripBusId
+              : !baseAssigned || baseAssigned === tripBusId) &&
+            !transferredAway;
 
-        return {
-          key: p.id,
-          passenger: p,
-          transaction: txn,
-          txnBusId,
-          status,
-          assignedBusId: baseAssigned,
-          homeBusId,
-          isOwnedByBus,
-          transferredAway,
-          transferredHere,
-          transferTargetLabel: overrideBus ? tripBusLabelMap.get(overrideBus) : undefined,
-        };
+          return {
+            key: p.id,
+            passenger: p,
+            transaction: txn,
+            txnBusId,
+            status,
+            assignedBusId: baseAssigned,
+            homeBusId,
+            isOwnedByBus,
+            transferredAway,
+            transferredHere,
+            transferTargetLabel: overrideBus
+              ? tripBusLabelMap.get(overrideBus)
+              : undefined,
+          };
         });
-      }, [passengerTransferMap, roundBusToTripBus, transactionByPassenger, tripBusLabelMap, tripPassengers]);
+    },
+    [
+      passengerTransferMap,
+      roundBusToTripBus,
+      transactionByPassenger,
+      tripBusLabelMap,
+      tripPassengers,
+    ],
+  );
 
   const statusTag = (row: PassengerRow) => {
     const tags: React.ReactNode[] = [];
 
-    if (row.status === "checkedInHere") tags.push(<Tag color="green">Đã lên xe</Tag>);
+    if (row.status === "checkedInHere")
+      tags.push(<Tag color="green">Đã lên xe</Tag>);
     else if (row.status === "checkedInElsewhere")
       tags.push(
         <Tag color="blue">
           Đang ở {tripBusLabelMap.get(row.txnBusId || "") || "xe khác"}
         </Tag>,
       );
-    else if (row.status === "checkedOut") tags.push(<Tag color="orange">Đã xuống</Tag>);
+    else if (row.status === "checkedOut")
+      tags.push(<Tag color="orange">Đã xuống</Tag>);
     else tags.push(<Tag>Chưa điểm danh</Tag>);
 
     if (row.transferredAway && row.transferTargetLabel) {
@@ -954,12 +1051,16 @@ export default function TransactionManagement() {
       );
     }
 
-    if (row.transferredHere && (row.passenger as { assigned_trip_bus?: string | null }).assigned_trip_bus) {
+    if (
+      row.transferredHere &&
+      (row.passenger as { assigned_trip_bus?: string | null }).assigned_trip_bus
+    ) {
       tags.push(
         <Tag color="magenta">
           Nhận từ
           {tripBusLabelMap.get(
-            (row.passenger as { assigned_trip_bus?: string | null }).assigned_trip_bus || "",
+            (row.passenger as { assigned_trip_bus?: string | null })
+              .assigned_trip_bus || "",
           ) || "xe khác"}
         </Tag>,
       );
@@ -1067,7 +1168,10 @@ export default function TransactionManagement() {
     handleSwitchBus(passengerId, fromTxn, targetRoundBusId);
   };
 
-  const handleCrossCheckUndo = (passengerId: string, sourceTripBusId: string) => {
+  const handleCrossCheckUndo = (
+    passengerId: string,
+    sourceTripBusId: string,
+  ) => {
     if (tripLockedForAttendance) {
       message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
       return;
@@ -1120,10 +1224,14 @@ export default function TransactionManagement() {
       if (!roundBusId) return null;
 
       const rows = rowsForBus(tb.id);
-      const presentCount = rows.filter((r) => r.status === "checkedInHere").length;
+      const presentCount = rows.filter(
+        (r) => r.status === "checkedInHere",
+      ).length;
       const othersCount = rows.length - presentCount;
       const busReadOnly = tripLockedForAttendance || !canOperateTripBus(tb.id);
-      const busFinalized = Boolean(finalizedRoundBuses[activeTripId || ""]?.[roundBusId]);
+      const busFinalized = Boolean(
+        finalizedRoundBuses[activeTripId || ""]?.[roundBusId],
+      );
 
       const blockReason = busReadOnly
         ? tripLockedForAttendance
@@ -1137,7 +1245,9 @@ export default function TransactionManagement() {
               ? "Tất cả round đã hoàn thành"
               : undefined;
 
-      const canModifyAttendance = Boolean(!busReadOnly && roundBusId && canModifyRound && !busFinalized);
+      const canModifyAttendance = Boolean(
+        !busReadOnly && roundBusId && canModifyRound && !busFinalized,
+      );
 
       return {
         key: tb.id,
@@ -1172,7 +1282,11 @@ export default function TransactionManagement() {
             onOpenCrossCheck={() =>
               busReadOnly
                 ? undefined
-                : setCrossCheck({ busId: tb.id, sourceBusId: undefined, passengerId: undefined })
+                : setCrossCheck({
+                    busId: tb.id,
+                    sourceBusId: undefined,
+                    passengerId: undefined,
+                  })
             }
             onFinalize={handleFinalize}
             onCheckIn={handleCheckIn}
@@ -1197,11 +1311,15 @@ export default function TransactionManagement() {
               Điểm danh hành khách nhanh
             </Title>
             <Text type="secondary">
-              Chọn trip, duyệt round theo checkpoint, chuyển tab xe và điểm danh không cần mở modal.
+              Chọn trip, duyệt round theo checkpoint, chuyển tab xe và điểm danh
+              không cần mở modal.
             </Text>
             {tripLockedForAttendance && (
               <div className="mt-2">
-                <Tag color="default">Trip đang ở trạng thái planned – chỉ xem sơ đồ round, chưa thể điểm danh.</Tag>
+                <Tag color="default">
+                  Trip đang ở trạng thái planned – chỉ xem sơ đồ round, chưa thể
+                  điểm danh.
+                </Tag>
               </div>
             )}
           </div>
@@ -1231,7 +1349,8 @@ export default function TransactionManagement() {
             {openRoundLabel && (
               <div className="mb-3">
                 <Text type={roundLockedBySequence ? "warning" : "secondary"}>
-                  Round đang mở: {openRoundLabel}. Hoàn tất round này để mở round tiếp theo.
+                  Round đang mở: {openRoundLabel}. Hoàn tất round này để mở
+                  round tiếp theo.
                 </Text>
               </div>
             )}

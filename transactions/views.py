@@ -65,7 +65,7 @@ class TransactionListCreateView(generics.ListCreateAPIView):
         )
         user = self.request.user
         if getattr(user, "tenant_id", None):
-            qs = qs.filter(passenger__trip__tenant_id=user.tenant_id)
+            qs = qs.filter(passenger__tenant_id=user.tenant_id)
         return qs
 
     @extend_schema(
@@ -107,7 +107,7 @@ class TransactionDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
         user = self.request.user
         if getattr(user, "tenant_id", None):
-            qs = qs.filter(passenger__trip__tenant_id=user.tenant_id)
+            qs = qs.filter(passenger__tenant_id=user.tenant_id)
         return qs
 
     @extend_schema(
