@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -9,6 +10,8 @@ import {
   Input,
   Popconfirm,
   Table,
+  Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
@@ -27,7 +30,6 @@ import { canManageCatalog } from "../../utils/helper";
 import BusFormModal, { type BusFormValues } from "./components/BusFormModal";
 
 import type { IUser } from "../../utils/types";
-
 
 const { Title, Text } = Typography;
 
@@ -170,11 +172,33 @@ export default function BusManagement() {
       {
         title: "Sức chứa",
         dataIndex: "capacity",
+        width: 100,
       },
       {
         title: "Mô tả",
         dataIndex: "description",
         render: (val: string | null) => val || "—",
+      },
+      {
+        title: "Trạng thái",
+        key: "status",
+        width: 200,
+        render: (_: unknown, record: BusItem) => {
+          if (record.is_available === false && record.active_trip) {
+            const statusColor =
+              record.active_trip.status === "doing" ? "processing" : "default";
+            const statusLabel =
+              record.active_trip.status === "doing"
+                ? "Đang đi"
+                : "Chưa xuất phát";
+            return (
+              <Tag color={statusColor}>
+                {statusLabel}: {record.active_trip.name}
+              </Tag>
+            );
+          }
+          return <Tag color="success">Sẵn sàng</Tag>;
+        },
       },
     ];
 
@@ -186,19 +210,32 @@ export default function BusManagement() {
         title: "Thao tác",
         dataIndex: "actions",
         render: (_: unknown, record: BusItem) => (
-          <div className="flex gap-2">
-            <Button type="link" onClick={() => openEdit(record)}>
-              Sửa
-            </Button>
+          <div className="flex gap-1">
+            <Tooltip title="Sửa">
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEdit(record)}
+                className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              />
+            </Tooltip>
             <Popconfirm
-              title="Xóa bus?"
+              title="Xóa bus này?"
+              description="Thao tác này không thể hoàn tác."
               onConfirm={() => deleteBusMutate(record.id)}
               okText="Xóa"
               cancelText="Hủy"
+              okButtonProps={{ danger: true }}
             >
-              <Button type="link" danger loading={deleteStatus === "pending"}>
-                Xóa
-              </Button>
+              <Tooltip title="Xóa">
+                <Button
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  danger
+                  loading={deleteStatus === "pending"}
+                  className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
+                />
+              </Tooltip>
             </Popconfirm>
           </div>
         ),
@@ -231,7 +268,7 @@ export default function BusManagement() {
             />
             {canManage && (
               <Button type="primary" onClick={openCreate}>
-                + New Bus
+                + Tạo xe
               </Button>
             )}
           </div>

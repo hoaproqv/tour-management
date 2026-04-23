@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from passengers.models import Passenger, PassengerBusAssignment, PassengerTransfer
+from passengers.models import ImportedBus, Passenger, PassengerBusAssignment, PassengerTransfer
 
 
 class PassengerSerializer(serializers.ModelSerializer):
@@ -119,6 +119,7 @@ class PassengerAssignmentSerializer(serializers.ModelSerializer):
             "passenger",
             "trip",
             "trip_bus",
+            "imported_bus",
             "created_at",
             "updated_at",
         ]
@@ -131,31 +132,69 @@ class PassengerAssignmentSerializer(serializers.ModelSerializer):
         passenger = attrs.get("passenger") or getattr(self.instance, "passenger", None)
         trip_bus = attrs.get("trip_bus") or getattr(self.instance, "trip_bus", None)
 
-        if not passenger or not trip_bus:
+        if not passenger:
             return attrs
 
-        trip = trip_bus.trip
-        if passenger.tenant_id != trip.tenant_id:
-            raise ValidationError("Passenger and trip must belong to the same tenant")
+        if trip_bus:
+            trip = trip_bus.trip
+            if passenger.tenant_id != trip.tenant_id:
+                raise ValidationError("Passenger and trip must belong to the same tenant")
+            attrs["trip"] = trip
 
-        attrs["trip"] = trip
         return attrs
 
     def create(self, validated_data):
         passenger = validated_data["passenger"]
-        defaults = {
-            "trip_bus": validated_data["trip_bus"],
-            "trip": validated_data.get("trip") or validated_data["trip_bus"].trip,
-        }
+        trip_bus = validated_data.get("trip_bus")
+        imported_bus = validated_data.get("imported_bus")
+        trip = validated_data.get("trip")
+        if not trip:
+            if trip_bus:
+                trip = trip_bus.trip
+            elif imported_bus:
+                trip = imported_bus.trip
+        if not trip:
+            raise ValidationError("Cannot determine trip from provided data.")
+        validated_data["trip"] = trip
+        defaults = {k: v for k, v in validated_data.items() if k != "passenger"}
         instance, _ = PassengerBusAssignment.objects.update_or_create(
             passenger=passenger,
-            trip=defaults["trip"],
+            trip=trip,
             defaults=defaults,
         )
         return instance
 
     def update(self, instance, validated_data):
         instance.trip_bus = validated_data.get("trip_bus", instance.trip_bus)
-        instance.trip = validated_data.get("trip", instance.trip_bus.trip)
+        instance.imported_bus = validated_data.get("imported_bus", instance.imported_bus)
+        if instance.trip_bus:
+            instance.trip = instance.trip_bus.trip
         instance.save()
         return instance
+
+
+class ImportedBusSerializer(serializers.ModelSerializer):
+    passenger_count = serializers.SerializerMethodField(read_only=True)
+    is_mapped = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ImportedBus
+        fields = [
+            "id",
+            "trip",
+            "sheet_name",
+            "sequence",
+            "mapped_bus",
+            "mapped_trip_bus",
+            "passenger_count",
+            "is_mapped",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["mapped_trip_bus", "passenger_count", "is_mapped", "created_at", "updated_at"]
+
+    def get_passenger_count(self, obj: ImportedBus):
+        return obj.passenger_assignments.count()
+
+    def get_is_mapped(self, obj: ImportedBus):
+        return obj.mapped_bus_id is not None

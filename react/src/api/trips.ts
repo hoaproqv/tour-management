@@ -1,4 +1,5 @@
 import { deleteData, fetchData, patchData, postData, putData } from "./api";
+import axiosInstance from "./axiosInstance";
 
 export interface Trip {
   id: string;
@@ -60,11 +61,13 @@ export interface BusItem {
   bus_code: string;
   capacity: number;
   description: string;
+  active_trip?: { id: string; name: string; status: string } | null;
+  is_available?: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
-export type BusPayload = Omit<BusItem, "id">;
+export type BusPayload = Omit<BusItem, "id" | "active_trip" | "is_available">;
 
 export interface Passenger {
   id: string;
@@ -386,3 +389,61 @@ export const upsertPassengerAssignment = async (payload: {
 
 export const deletePassengerAssignment = async (id: string) =>
   deleteData(`/passenger-assignments/${id}/`);
+
+export interface ImportedBus {
+  id: string;
+  trip: string;
+  sheet_name: string;
+  sequence: number;
+  mapped_bus: string | null;
+  mapped_trip_bus: string | null;
+  passenger_count: number;
+  is_mapped: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ImportPassengerResult {
+  trip_id: string;
+  trip_name: string;
+  imported_buses: Array<{
+    id: string;
+    sheet_name: string;
+    sequence: number;
+    passenger_count: number;
+    is_mapped: boolean;
+  }>;
+}
+
+export const importPassengers = async (
+  formData: FormData,
+): Promise<ImportPassengerResult> => {
+  const response = await axiosInstance.post("/passengers/import/", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data as ImportPassengerResult;
+};
+
+export const exportPassengers = async (tripId: string): Promise<Blob> => {
+  const response = await axiosInstance.get(
+    `/passengers/export/?trip=${tripId}`,
+    { responseType: "blob" },
+  );
+  return response.data as Blob;
+};
+
+export const getImportedBuses = async (
+  tripId: string,
+): Promise<ImportedBus[]> => {
+  const res = await fetchData(`/imported-buses/?trip=${tripId}`);
+  if (Array.isArray(res)) return res as ImportedBus[];
+  if (Array.isArray((res as { data?: unknown })?.data)) {
+    return (res as { data: ImportedBus[] }).data;
+  }
+  return [];
+};
+
+export const mapImportedBus = async (
+  id: string,
+  payload: { bus_id: string; manager_id: string },
+) => patchData(`/imported-buses/${id}/map/`, payload);

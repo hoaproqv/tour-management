@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 
+import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -11,6 +12,7 @@ import {
   Select,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
@@ -35,10 +37,11 @@ import {
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { canManageCatalog } from "../../utils/helper";
 
-import RoundFormModal, { type RoundFormValues } from "./components/RoundFormModal";
+import RoundFormModal, {
+  type RoundFormValues,
+} from "./components/RoundFormModal";
 
 import type { IUser } from "../../utils/types";
-
 
 const { Title, Text } = Typography;
 
@@ -97,7 +100,8 @@ export default function RoundManagement() {
   );
 
   const tripBuses = useMemo(
-    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    () =>
+      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
     [tripBusesResponse],
   );
 
@@ -107,7 +111,8 @@ export default function RoundManagement() {
   );
 
   const passengers = useMemo(
-    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    () =>
+      Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
     [passengersResponse],
   );
 
@@ -140,10 +145,12 @@ export default function RoundManagement() {
 
   const tripPassengersMap = useMemo(() => {
     const grouped = new Map<string, Passenger[]>();
-    passengers.forEach((p: Passenger) => {
-      const list = grouped.get(p.trip) ?? [];
+    passengers.forEach((p) => {
+      const tripId = (p as unknown as { trip?: string }).trip;
+      if (!tripId) return;
+      const list = grouped.get(tripId) ?? [];
       list.push(p);
-      grouped.set(p.trip, list);
+      grouped.set(tripId, list);
     });
     return grouped;
   }, [passengers]);
@@ -212,24 +219,27 @@ export default function RoundManagement() {
     setShowCreate(true);
   };
 
-  const openEdit = useCallback((round: RoundItem) => {
-    if (!canManage) {
-      message.warning("Bạn không có quyền chỉnh sửa round");
-      return;
-    }
-    setEditingRound(round);
-    form.setFieldsValue({
-      trip: round.trip,
-      name: round.name,
-      location: round.location,
-      sequence: round.sequence,
-      estimate_time: dayjs(round.estimate_time),
-      actual_time: round.actual_time ? dayjs(round.actual_time) : null,
-      status: round.status,
-      bus_ids: round.bus_ids,
-    });
-    setShowCreate(true);
-  }, [canManage, form]);
+  const openEdit = useCallback(
+    (round: RoundItem) => {
+      if (!canManage) {
+        message.warning("Bạn không có quyền chỉnh sửa round");
+        return;
+      }
+      setEditingRound(round);
+      form.setFieldsValue({
+        trip: round.trip,
+        name: round.name,
+        location: round.location,
+        sequence: round.sequence,
+        estimate_time: dayjs(round.estimate_time),
+        actual_time: round.actual_time ? dayjs(round.actual_time) : null,
+        status: round.status,
+        bus_ids: round.bus_ids,
+      });
+      setShowCreate(true);
+    },
+    [canManage, form],
+  );
 
   const handleSubmit = () => {
     form
@@ -265,80 +275,86 @@ export default function RoundManagement() {
     setEditingRound(null);
   };
 
-  const columns = useMemo(
-    () => {
-      const base = [
-        {
-          title: "Trip",
-          dataIndex: "trip",
-          render: (val: string) => tripMap.get(val) || "—",
+  const columns = useMemo(() => {
+    const base = [
+      {
+        title: "Trip",
+        dataIndex: "trip",
+        render: (val: string) => tripMap.get(val) || "—",
+      },
+      {
+        title: "Tên",
+        dataIndex: "name",
+      },
+      {
+        title: "Địa điểm",
+        dataIndex: "location",
+      },
+      {
+        title: "Thứ tự",
+        dataIndex: "sequence",
+      },
+      {
+        title: "Ước tính",
+        dataIndex: "estimate_time",
+        render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
+      },
+      {
+        title: "Thực tế",
+        dataIndex: "actual_time",
+        render: (val: string | null) =>
+          val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
+      },
+      {
+        title: "Trạng thái",
+        dataIndex: "status",
+        render: (val: RoundItem["status"]) => {
+          const meta = statusMeta[val];
+          return <Tag color={meta.color}>{meta.label}</Tag>;
         },
-        {
-          title: "Tên",
-          dataIndex: "name",
-        },
-        {
-          title: "Địa điểm",
-          dataIndex: "location",
-        },
-        {
-          title: "Thứ tự",
-          dataIndex: "sequence",
-        },
-        {
-          title: "Ước tính",
-          dataIndex: "estimate_time",
-          render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
-        },
-        {
-          title: "Thực tế",
-          dataIndex: "actual_time",
-          render: (val: string | null) =>
-            val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
-        },
-        {
-          title: "Trạng thái",
-          dataIndex: "status",
-          render: (val: RoundItem["status"]) => {
-            const meta = statusMeta[val];
-            return <Tag color={meta.color}>{meta.label}</Tag>;
-          },
-        },
-      ];
+      },
+    ];
 
-      if (!canManage) return base;
+    if (!canManage) return base;
 
-      return [
-        ...base,
-        {
-          title: "Thao tác",
-          dataIndex: "actions",
-          render: (_: unknown, record: RoundItem) => (
-            <div className="flex gap-2">
-              <Button type="link" onClick={() => openEdit(record)}>
-                Sửa
-              </Button>
-              <Popconfirm
-                title="Xóa round?"
-                onConfirm={() => deleteRoundMutate(record.id)}
-                okText="Xóa"
-                cancelText="Hủy"
-              >
+    return [
+      ...base,
+      {
+        title: "Thao tác",
+        dataIndex: "actions",
+        render: (_: unknown, record: RoundItem) => (
+          <div className="flex gap-1">
+            <Tooltip title="Sửa">
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEdit(record)}
+                className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              />
+            </Tooltip>
+            <Popconfirm
+              title="Xóa chặng này?"
+              description="Thao tác này không thể hoàn tác."
+              onConfirm={() => deleteRoundMutate(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="Xóa">
                 <Button
-                  type="link"
+                  size="small"
+                  icon={<DeleteOutlined />}
                   danger
                   loading={deleteStatus === "pending"}
-                >
-                  Xóa
-                </Button>
-              </Popconfirm>
-            </div>
-          ),
-        },
-      ];
-    },
-    [canManage, deleteRoundMutate, deleteStatus, openEdit, tripMap],
-  );
+                  className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
+                />
+              </Tooltip>
+            </Popconfirm>
+          </div>
+        ),
+      },
+    ];
+  }, [canManage, deleteRoundMutate, deleteStatus, openEdit, tripMap]);
 
   return (
     <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
@@ -389,7 +405,7 @@ export default function RoundManagement() {
             />
             {canManage && (
               <Button type="primary" onClick={openCreate}>
-                + New Round
+                + Tạo chặng
               </Button>
             )}
           </div>

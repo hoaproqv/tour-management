@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 
+import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -8,8 +9,8 @@ import {
   Input,
   Modal,
   Popconfirm,
-  Space,
   Table,
+  Tooltip,
   Typography,
   message,
 } from "antd";
@@ -118,7 +119,7 @@ export default function TenantManagement() {
             </Text>
           </div>
           <Button type="primary" onClick={openCreate}>
-            + New Tenant
+            + Tạo tenant
           </Button>
         </div>
 
@@ -142,21 +143,33 @@ export default function TenantManagement() {
                 title: "Thao tác",
                 dataIndex: "actions",
                 render: (_: unknown, record: TenantItem) => (
-                  <Space>
-                    <Button type="link" onClick={() => openEdit(record)}>
-                      Sửa
-                    </Button>
+                  <div className="flex gap-1">
+                    <Tooltip title="Sửa">
+                      <Button
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => openEdit(record)}
+                        className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                      />
+                    </Tooltip>
                     <Popconfirm
-                      title="Xóa tenant?"
+                      title="Xóa tenant này?"
+                      description="Thao tác này không thể hoàn tác."
                       okText="Xóa"
                       cancelText="Hủy"
+                      okButtonProps={{ danger: true }}
                       onConfirm={() => deleteMutation.mutate(record.id)}
                     >
-                      <Button type="link" danger>
-                        Xóa
-                      </Button>
+                      <Tooltip title="Xóa">
+                        <Button
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          danger
+                          className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
+                        />
+                      </Tooltip>
                     </Popconfirm>
-                  </Space>
+                  </div>
                 ),
               },
             ]}

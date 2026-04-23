@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 
-import { Button, Card, Empty, Popconfirm, Space, Table } from "antd";
+import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { Button, Card, Empty, Popconfirm, Table, Tooltip } from "antd";
 import dayjs from "dayjs";
 
 import { type Passenger, type TripBus } from "../../../api/trips";
@@ -68,21 +69,34 @@ export default function PassengerTable({
         title: "Thao tác",
         dataIndex: "actions",
         render: (_: unknown, record: Passenger) => (
-          <Space>
-            <Button type="link" onClick={() => onEdit(record)}>
-              Sửa
-            </Button>
+          <div className="flex gap-1">
+            <Tooltip title="Sửa">
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => onEdit(record)}
+                className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+              />
+            </Tooltip>
             <Popconfirm
-              title="Xóa passenger?"
+              title="Xóa hành khách?"
+              description="Thao tác này không thể hoàn tác."
               onConfirm={() => onDelete(record.id)}
               okText="Xóa"
               cancelText="Hủy"
+              okButtonProps={{ danger: true }}
             >
-              <Button type="link" danger loading={deleting}>
-                Xóa
-              </Button>
+              <Tooltip title="Xóa">
+                <Button
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  danger
+                  loading={deleting}
+                  className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
+                />
+              </Tooltip>
             </Popconfirm>
-          </Space>
+          </div>
         ),
       },
     ];

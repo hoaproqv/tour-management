@@ -153,6 +153,8 @@ export interface IUser {
   is_active?: boolean;
   is_staff?: boolean;
   is_superuser?: boolean;
+  active_trip?: { id: string; name: string; status: string } | null;
+  is_available?: boolean;
   created_at?: string;
   updated_at?: string;
 }

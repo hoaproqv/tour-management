@@ -21,7 +21,6 @@ import { getUsers } from "../../api/users";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { canManageCatalog } from "../../utils/helper";
 
-
 import PassengerAssignmentModal from "./components/PassengerAssignmentModal";
 import TripDetailModal from "./components/TripDetailModal";
 import TripFormModal, { type TripFormValues } from "./components/TripFormModal";
@@ -97,7 +96,8 @@ export default function TripManagement() {
   );
 
   const tripBuses = useMemo(
-    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    () =>
+      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
     [tripBusesResponse],
   );
 
@@ -275,15 +275,9 @@ export default function TripManagement() {
     form
       .validateFields()
       .then((values) => {
-        if (!values.bus_assignments || values.bus_assignments.length === 0) {
-          message.warning("Vui lòng thêm ít nhất 1 bus kèm trưởng xe và lái xe");
-          return;
-        }
-        if (editingTrip && !values.status) {
-          message.warning("Chọn trạng thái trip khi chỉnh sửa");
-          return;
-        }
-        const status = editingTrip ? values.status || editingTrip.status : "planned";
+        const status = editingTrip
+          ? values.status || editingTrip.status
+          : "planned";
         const payload: TripPayload = {
           name: values.name,
           description: values.description || "",

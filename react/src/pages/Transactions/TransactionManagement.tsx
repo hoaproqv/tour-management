@@ -948,7 +948,7 @@ export default function TransactionManagement() {
         (p.phone || "").toLowerCase().includes(term) ||
         (p.note || "").toLowerCase().includes(term),
     );
-  }, [passengers, activeTripId, search]);
+  }, [passengers, search]);
 
   const rowsForBus = React.useCallback(
     (tripBusId: string): PassengerRow[] => {

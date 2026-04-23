@@ -34,7 +34,7 @@ export default function TripHeader({
           Trip Management
         </p>
         <Title level={2} style={{ margin: 0 }}>
-          Quản lý Trip
+          Quản lý Tour
         </Title>
         <Text type="secondary">
           Lọc, thống kê và xem các round / bus liên quan cho từng trip.
@@ -62,7 +62,7 @@ export default function TripHeader({
         />
         {canCreate && (
           <Button type="primary" onClick={onCreate}>
-            + New Trip
+            + Tạo tour
           </Button>
         )}
       </div>

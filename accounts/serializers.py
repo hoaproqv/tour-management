@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, get_user_model
+from django.db import models
 from rest_framework import serializers
 
 from accounts.models import Role, Tenant
@@ -55,6 +56,8 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     role_name = serializers.CharField(source="role.name", read_only=True)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
+    active_trip = serializers.SerializerMethodField(read_only=True)
+    is_available = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
@@ -71,9 +74,36 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "is_superuser",
+            "active_trip",
+            "is_available",
             "created_at",
             "updated_at",
         ]
+
+    def _get_active_trip_bus(self, obj):
+        """Return the first TripBus where this user is manager or driver in a non-done trip."""
+        from trips.models import TripBus
+        return (
+            TripBus.objects
+            .filter(models.Q(manager=obj) | models.Q(driver=obj))
+            .exclude(trip__status="done")
+            .select_related("trip")
+            .order_by("-trip__start_date")
+            .first()
+        )
+
+    def get_active_trip(self, obj):
+        trip_bus = self._get_active_trip_bus(obj)
+        if trip_bus:
+            return {
+                "id": trip_bus.trip_id,
+                "name": trip_bus.trip.name,
+                "status": trip_bus.trip.status,
+            }
+        return None
+
+    def get_is_available(self, obj) -> bool:
+        return self._get_active_trip_bus(obj) is None
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
