@@ -447,3 +447,55 @@ export const mapImportedBus = async (
   id: string,
   payload: { bus_id: string; manager_id: string },
 ) => patchData(`/imported-buses/${id}/map/`, payload);
+
+export const downloadPassengerTemplate = async (): Promise<Blob> => {
+  const response = await axiosInstance.get("/passengers/import/template/", {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+
+// Buses Import/Export
+export const importBuses = async (formData: FormData): Promise<any> => {
+  const response = await axiosInstance.post("/buses/import/", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+
+export const exportBuses = async (): Promise<Blob> => {
+  const response = await axiosInstance.get("/buses/export/", {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+
+export const downloadBusTemplate = async (): Promise<Blob> => {
+  const response = await axiosInstance.get("/buses/import/template/", {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+
+// Rounds Import/Export
+export const importRounds = async (tripId: string, formData: FormData): Promise<any> => {
+  const response = await axiosInstance.post(`/rounds/import/?trip=${tripId}`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+
+export const exportRounds = async (tripId: string): Promise<Blob> => {
+  const response = await axiosInstance.get(`/rounds/export/?trip=${tripId}`, {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+
+export const downloadRoundTemplate = async (): Promise<Blob> => {
+  const response = await axiosInstance.get("/rounds/import/template/", {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+

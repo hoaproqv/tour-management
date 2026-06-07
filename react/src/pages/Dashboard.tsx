@@ -63,59 +63,61 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="w-full bg-[#f4f7fb] min-h-screen p-6">
-      <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
+    <div className="w-full bg-[#f4f7fb] h-full md:py-6">
+      <div className="bg-white shadow-sm rounded-xl md:rounded-2xl p-4 md:p-6 border border-slate-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
+            <p className="text-xs md:text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
               Main Navigation
             </p>
-            <h1 className="text-4xl font-bold text-slate-900 mt-3">
+            <h1 className="text-2xl md:text-4xl font-bold text-slate-900 mt-1 md:mt-3">
               Dashboard
             </h1>
-            <p className="text-slate-500 mt-2">
+            <p className="text-sm md:text-base text-slate-500 mt-1 md:mt-2">
               Tổng quan nhanh về chuyến, hành khách và xe bus trong hệ thống tour.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 md:mt-10">
           {metrics.map((metric) => (
             <Card
               key={metric.key}
-              className="bg-[#e5f2ff] border border-[#c5dff8] hover:shadow-lg transition-shadow"
-              styles={{ body: { padding: "24px" } }}
+              className="bg-[#e5f2ff] border border-[#c5dff8] hover:shadow-lg transition-shadow [&>.ant-card-body]:p-3 md:[&>.ant-card-body]:p-6"
+              styles={{ body: { padding: 0 } }}
             >
               {isLoading ? (
                 <Skeleton active paragraph={{ rows: 3 }} title={{ width: 140 }} />
               ) : (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 md:gap-4 p-4 md:p-6">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-lg text-slate-700 italic">
+                    <div className="flex flex-col">
+                      <p className="text-base md:text-lg text-slate-700 italic">
                         {metric.title}
                       </p>
-                      <p className="text-4xl font-bold text-slate-900 mt-2">
-                        {metric.total}
-                      </p>
-                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500 mt-1">
-                        Tổng cộng
-                      </p>
+                      <div className="flex items-baseline gap-2 mt-0.5 md:mt-2">
+                        <p className="text-3xl md:text-4xl font-bold text-slate-900">
+                          {metric.total}
+                        </p>
+                        <p className="text-[10px] md:text-xs uppercase tracking-[0.1em] text-slate-500">
+                          Tổng cộng
+                        </p>
+                      </div>
                     </div>
-                    <div className="bg-white rounded-full h-12 w-12 flex items-center justify-center shadow-sm">
+                    <div className="bg-white rounded-full h-10 w-10 md:h-12 md:w-12 flex items-center justify-center shadow-sm shrink-0">
                       {metric.icon}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5 md:gap-2">
                     {metric.breakdown.map((item) => (
                       <Tag
                         key={`${metric.key}-${item.label}`}
                         color={item.color}
-                        className="px-3 py-1 text-sm"
+                        className="m-0 px-2 py-0.5 md:px-3 md:py-1 text-[11px] md:text-sm"
                       >
                         <span className="font-semibold">{item.value}</span>
-                        <span className="ml-2 text-slate-700">{item.label}</span>
+                        <span className="ml-1 md:ml-2 text-slate-700">{item.label}</span>
                       </Tag>
                     ))}
                   </div>

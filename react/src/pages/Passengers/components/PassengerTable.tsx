@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, Popconfirm, Table, Tooltip } from "antd";
+import { Button, Card, Empty, Popconfirm, Table, Tooltip, Space } from "antd";
 import dayjs from "dayjs";
 
 import { type Passenger, type TripBus } from "../../../api/trips";
@@ -69,13 +69,13 @@ export default function PassengerTable({
         title: "Thao tác",
         dataIndex: "actions",
         render: (_: unknown, record: Passenger) => (
-          <div className="flex gap-1">
+          <Space>
             <Tooltip title="Sửa">
               <Button
-                size="small"
+                type="text"
                 icon={<EditOutlined />}
                 onClick={() => onEdit(record)}
-                className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                style={{ color: "#2563eb" }}
               />
             </Tooltip>
             <Popconfirm
@@ -84,19 +84,17 @@ export default function PassengerTable({
               onConfirm={() => onDelete(record.id)}
               okText="Xóa"
               cancelText="Hủy"
-              okButtonProps={{ danger: true }}
             >
               <Tooltip title="Xóa">
                 <Button
-                  size="small"
-                  icon={<DeleteOutlined />}
+                  type="text"
                   danger
+                  icon={<DeleteOutlined />}
                   loading={deleting}
-                  className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
                 />
               </Tooltip>
             </Popconfirm>
-          </div>
+          </Space>
         ),
       },
     ];
@@ -105,6 +103,7 @@ export default function PassengerTable({
   return (
     <Card className="mt-6" styles={{ body: { padding: 0 } }}>
       <Table
+        size="small"
         rowKey="id"
         dataSource={data}
         loading={isLoading}

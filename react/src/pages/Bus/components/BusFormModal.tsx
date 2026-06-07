@@ -1,6 +1,10 @@
 import React from "react";
 
-import { Form, Input, Modal } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button, Form, Input, Modal, Typography, Upload, message } from "antd";
+
+import { downloadBusTemplate, importBuses } from "../../../api/trips";
 
 import type { BusItem } from "../../../api/trips";
 import type { FormInstance } from "antd";
@@ -30,6 +34,37 @@ export default function BusFormModal({
   form,
   editingBus,
 }: BusFormModalProps) {
+  const queryClient = useQueryClient();
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await downloadBusTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bus_import_template.xlsx";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      message.error("Lỗi khi tải template");
+    }
+  };
+
+  const customRequest = async ({ file, onSuccess, onError }: any) => {
+    try {
+      const fd = new FormData();
+      fd.append("file", file as File);
+      const res = await importBuses(fd);
+      message.success(res.detail || "Import thành công");
+      await queryClient.invalidateQueries({ queryKey: ["buses"] });
+      onSuccess?.(res);
+      onCancel();
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || "Import thất bại");
+      onError?.(err);
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -41,6 +76,24 @@ export default function BusFormModal({
       cancelText="Hủy"
       destroyOnClose
     >
+      {!editingBus && (
+        <div className="mb-5 p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex flex-col items-center justify-center gap-3">
+          <Typography.Text className="text-slate-600 text-sm">
+            Bạn có thể thêm nhiều xe cùng lúc bằng cách import file Excel.
+          </Typography.Text>
+          <div className="flex items-center gap-2">
+            <Upload accept=".xlsx,.xls" showUploadList={false} customRequest={customRequest}>
+              <Button icon={<UploadOutlined />} size="small" className="border-blue-300 text-blue-600 hover:bg-blue-100">
+                Import từ Excel
+              </Button>
+            </Upload>
+            <Typography.Text type="secondary" className="text-xs">hoặc</Typography.Text>
+            <a onClick={handleDownloadTemplate} className="text-blue-600 underline hover:text-blue-800 text-sm font-medium">
+              tải file mẫu
+            </a>
+          </div>
+        </div>
+      )}
       <Form layout="vertical" form={form} initialValues={{ capacity: 40 }}>
         <Form.Item
           label="Biển số"

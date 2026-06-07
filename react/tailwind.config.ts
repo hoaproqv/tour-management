@@ -38,6 +38,9 @@ const config: Config = {
       margin: {
         "header-height": "70px",
       },
+      padding: {
+        "header-height": "70px",
+      },
     },
   },
   plugins: [

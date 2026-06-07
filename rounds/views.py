@@ -336,3 +336,189 @@ class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
         prev_round_status = getattr(round_obj, "status", None)
         super().perform_destroy(instance)
         sync_round_progress(round_obj, prev_status=prev_round_status)
+
+
+ROUND_COLUMNS = ["STT", "Tên địa điểm", "Vị trí", "Thứ tự", "Thời gian dự kiến (YYYY-MM-DD HH:MM)"]
+
+
+class RoundImportView(generics.GenericAPIView):
+    """POST /api/v1/rounds/import/?trip=<trip_id>"""
+
+    permission_classes = [permissions.IsAuthenticated]
+    
+    from rest_framework.parsers import MultiPartParser
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(
+        summary="Import rounds from Excel",
+        description="Upload a .xlsx file to import rounds. Requires 'file' field and 'trip' query parameter.",
+        tags=["Rounds"],
+    )
+    def post(self, request, *args, **kwargs):
+        from rest_framework.response import Response
+        from rest_framework.views import APIView
+        
+        trip_id = request.query_params.get("trip")
+        if not trip_id:
+            return Response({"detail": "trip query param required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from trips.models import Trip
+        try:
+            trip_qs = Trip.objects.all()
+            user = request.user
+            tenant_id = getattr(user, "tenant_id", None)
+            if tenant_id:
+                trip_qs = trip_qs.filter(tenant_id=tenant_id)
+            trip = trip_qs.get(pk=trip_id)
+        except Trip.DoesNotExist:
+            return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(uploaded_file, read_only=True, data_only=True)
+        except Exception as exc:
+            return Response({"detail": f"Cannot read Excel file: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        data_rows = rows[1:] if rows else []
+
+        imported_count = 0
+        from django.db import transaction
+        from django.utils.dateparse import parse_datetime
+        import datetime
+
+        with transaction.atomic():
+            for row in data_rows:
+                if not row or len(row) < 5:
+                    continue
+                
+                name = str(row[1]).strip() if row[1] else ""
+                location = str(row[2]).strip() if row[2] else ""
+                sequence_str = str(row[3]).strip() if row[3] else ""
+                estimate_time_str = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+
+                estimate_time_val = row[4] if len(row) > 4 else None
+                if not name or not location or not sequence_str.isdigit() or not estimate_time_val:
+                    continue
+                    
+                sequence = int(sequence_str)
+                if isinstance(estimate_time_val, datetime.datetime):
+                    estimate_time = estimate_time_val
+                else:
+                    try:
+                        estimate_time = parse_datetime(str(estimate_time_val).strip())
+                        if not estimate_time:
+                            continue
+                    except ValueError:
+                        continue
+
+                Round.objects.update_or_create(
+                    trip=trip,
+                    sequence=sequence,
+                    defaults={
+                        "name": name,
+                        "location": location,
+                        "estimate_time": estimate_time,
+                        "status": Round.Status.PLANNED
+                    }
+                )
+                imported_count += 1
+                
+        return Response({"detail": f"Imported {imported_count} rounds successfully."}, status=status.HTTP_201_CREATED)
+
+
+class RoundExportView(generics.GenericAPIView):
+    """GET /api/v1/rounds/export/?trip=<trip_id>"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Export rounds to Excel",
+        description="Download all rounds for a trip as a .xlsx file.",
+        tags=["Rounds"],
+    )
+    def get(self, request, *args, **kwargs):
+        from rest_framework.response import Response
+        
+        trip_id = request.query_params.get("trip")
+        if not trip_id:
+            return Response({"detail": "trip query param required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from trips.models import Trip
+        try:
+            trip_qs = Trip.objects.all()
+            user = request.user
+            tenant_id = getattr(user, "tenant_id", None)
+            if tenant_id:
+                trip_qs = trip_qs.filter(tenant_id=tenant_id)
+            trip = trip_qs.get(pk=trip_id)
+        except Trip.DoesNotExist:
+            return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        import io
+        import openpyxl
+        from django.http import HttpResponse
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Rounds"
+        ws.append(ROUND_COLUMNS)
+
+        rounds = Round.objects.filter(trip=trip).order_by("sequence")
+        for idx, rnd in enumerate(rounds, start=1):
+            estimate_time_str = rnd.estimate_time.strftime("%Y-%m-%d %H:%M") if rnd.estimate_time else ""
+            ws.append([
+                idx,
+                rnd.name,
+                rnd.location,
+                rnd.sequence,
+                estimate_time_str
+            ])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        response = HttpResponse(
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="rounds_{trip.name.replace(" ", "_")}.xlsx"'
+        return response
+
+
+class RoundTemplateDownloadView(generics.GenericAPIView):
+    """GET /api/v1/rounds/import/template/"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Download round import template",
+        description="Download a blank .xlsx template for importing rounds.",
+        tags=["Rounds"],
+    )
+    def get(self, request, *args, **kwargs):
+        import io
+        import openpyxl
+        from django.http import HttpResponse
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.append(ROUND_COLUMNS)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        response = HttpResponse(
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = 'attachment; filename="round_import_template.xlsx"'
+        return response

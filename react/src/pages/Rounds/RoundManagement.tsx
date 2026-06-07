@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { EditOutlined, DeleteOutlined, FileExcelOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -15,6 +15,7 @@ import {
   Tooltip,
   Typography,
   message,
+  Space,
 } from "antd";
 import dayjs from "dayjs";
 
@@ -27,6 +28,7 @@ import {
   getTripBuses,
   getTrips,
   updateRound,
+  exportRounds,
   type BusItem,
   type Passenger,
   type RoundItem,
@@ -35,6 +37,7 @@ import {
   type Trip,
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
+import { useDebounce } from "../../hooks/useDebounce";
 import { canManageCatalog } from "../../utils/helper";
 
 import RoundFormModal, {
@@ -49,13 +52,14 @@ const statusMeta: Record<
   RoundItem["status"],
   { label: string; color: string }
 > = {
-  planned: { label: "Planned", color: "blue" },
-  doing: { label: "Doing", color: "orange" },
-  done: { label: "Done", color: "green" },
+  planned: { label: "Chưa xuất phát", color: "blue" },
+  doing: { label: "Đang đi", color: "orange" },
+  done: { label: "Đã hoàn thành", color: "green" },
 };
 
 export default function RoundManagement() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [tripFilter, setTripFilter] = useState<string | "all">("all");
   const [statusFilter, setStatusFilter] = useState<RoundItem["status"] | "all">(
     "all",
@@ -156,7 +160,7 @@ export default function RoundManagement() {
   }, [passengers]);
 
   const filteredRounds = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = debouncedSearch.trim().toLowerCase();
     return (Array.isArray(rounds) ? rounds : []).filter((round) => {
       const matchTrip = tripFilter === "all" ? true : round.trip === tripFilter;
       const matchStatus =
@@ -167,7 +171,7 @@ export default function RoundManagement() {
         : true;
       return matchTrip && matchStatus && matchTerm;
     });
-  }, [rounds, tripFilter, statusFilter, search]);
+  }, [rounds, tripFilter, statusFilter, debouncedSearch]);
 
   const createMutation = useMutation({
     mutationFn: (payload: RoundPayload) => createRound(payload),
@@ -323,13 +327,13 @@ export default function RoundManagement() {
         title: "Thao tác",
         dataIndex: "actions",
         render: (_: unknown, record: RoundItem) => (
-          <div className="flex gap-1">
+          <Space>
             <Tooltip title="Sửa">
               <Button
-                size="small"
+                type="text"
                 icon={<EditOutlined />}
                 onClick={() => openEdit(record)}
-                className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                style={{ color: "#2563eb" }}
               />
             </Tooltip>
             <Popconfirm
@@ -338,26 +342,24 @@ export default function RoundManagement() {
               onConfirm={() => deleteRoundMutate(record.id)}
               okText="Xóa"
               cancelText="Hủy"
-              okButtonProps={{ danger: true }}
             >
               <Tooltip title="Xóa">
                 <Button
-                  size="small"
-                  icon={<DeleteOutlined />}
+                  type="text"
                   danger
+                  icon={<DeleteOutlined />}
                   loading={deleteStatus === "pending"}
-                  className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
                 />
               </Tooltip>
             </Popconfirm>
-          </div>
+          </Space>
         ),
       },
     ];
   }, [canManage, deleteRoundMutate, deleteStatus, openEdit, tripMap]);
 
   return (
-    <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
+    <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -404,15 +406,41 @@ export default function RoundManagement() {
               ]}
             />
             {canManage && (
-              <Button type="primary" onClick={openCreate}>
-                + Tạo chặng
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  icon={<FileExcelOutlined />}
+                  onClick={async () => {
+                    if (tripFilter === "all") {
+                      message.warning("Vui lòng chọn một trip cụ thể để export");
+                      return;
+                    }
+                    try {
+                      const blob = await exportRounds(tripFilter);
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `rounds_${tripFilter}.xlsx`;
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    } catch {
+                      message.error("Lỗi khi export");
+                    }
+                  }}
+                  className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
+                >
+                  Export
+                </Button>
+                <Button type="primary" onClick={openCreate} className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5">
+                  + Tạo mới
+                </Button>
+              </div>
             )}
           </div>
         </div>
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
           <Table
+            size="small"
             rowKey="id"
             dataSource={filteredRounds}
             loading={isLoading}
@@ -445,6 +473,7 @@ export default function RoundManagement() {
         tripPassengersMap={tripPassengersMap}
         editingRound={editingRound}
         statusMeta={statusMeta}
+        tripFilter={tripFilter}
       />
     </div>
   );

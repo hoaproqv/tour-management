@@ -104,7 +104,7 @@ export default function TenantManagement() {
   };
 
   return (
-    <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
+    <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>

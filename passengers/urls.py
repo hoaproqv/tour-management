@@ -9,6 +9,7 @@ from passengers.views import (
     PassengerExportView,
     PassengerImportView,
     PassengerListCreateView,
+    PassengerTemplateDownloadView,
     PassengerTransferDetailView,
     PassengerTransferListCreateView,
 )
@@ -19,6 +20,9 @@ urlpatterns = [
     ),
     path(
         "passengers/import/", PassengerImportView.as_view(), name="passenger-import"
+    ),
+    path(
+        "passengers/import/template/", PassengerTemplateDownloadView.as_view(), name="passenger-template"
     ),
     path(
         "passengers/export/", PassengerExportView.as_view(), name="passenger-export"

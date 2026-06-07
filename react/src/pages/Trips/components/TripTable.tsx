@@ -31,6 +31,7 @@ export default function TripTable({
 }: TripTableProps) {
   return (
     <Table
+      size="small"
       rowKey="id"
       dataSource={trips}
       loading={loading}

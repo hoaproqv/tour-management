@@ -120,6 +120,9 @@ const baseMenuItems: Required<MenuProps>["items"] = [
   },
 ];
 
+const COLLAPSED_WIDTH = 80;
+const EXPANDED_WIDTH = 220;
+
 interface SidebarProps {
   /** On mobile, the parent controls open state */
   mobileOpen?: boolean;
@@ -180,37 +183,60 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   if (!isMobile) {
     return (
       <aside
-        className="bg-[#1c2a3a] text-white min-h-screen flex-shrink-0"
+        className="bg-[#1c2a3a] text-white h-full flex-shrink-0 flex flex-col"
         style={{
-          maxWidth: collapsed ? 80 : 220,
-          minWidth: collapsed ? 80 : 220,
-          transition: "max-width 0.3s ease, min-width 0.3s ease",
+          width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
+          transition: "all 0.35s cubic-bezier(0.25, 1, 0.5, 1)",
+          minWidth: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
+          maxWidth: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
         }}
       >
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
+        {/* Header with toggle */}
+        <div
+          className="flex items-center border-b border-white/10 flex-shrink-0"
+          style={{
+            height: 48,
+            justifyContent: collapsed ? "center" : "space-between",
+            padding: collapsed ? "0" : "0 12px 0 16px",
+            transition: "padding 0.25s ease, justify-content 0.25s ease",
+          }}
+        >
           {!collapsed && (
-            <span className="text-lg font-semibold">Điều hướng</span>
+            <span className="text-base font-semibold whitespace-nowrap">
+              Điều hướng
+            </span>
           )}
           <Button
             type="text"
             onClick={toggleCollapsed}
-            className="text-white ml-auto"
-          >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          </Button>
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            className="text-white"
+            style={{
+              color: "#fff",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          />
         </div>
-        <Menu
-          selectedKeys={[findSelectedKey()]}
-          mode="inline"
-          inlineCollapsed={collapsed}
-          items={menuItems}
-          style={{
-            backgroundColor: "transparent",
-            color: "white",
-            borderInlineEnd: "none",
-          }}
-          className="custom-sidebar-menu"
-        />
+
+        {/* Menu */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+          <Menu
+            selectedKeys={[findSelectedKey()]}
+            mode="inline"
+            inlineCollapsed={collapsed}
+            items={menuItems}
+            style={{
+              backgroundColor: "transparent",
+              color: "white",
+              borderInlineEnd: "none",
+            }}
+            className="custom-sidebar-menu"
+          />
+        </div>
         <SidebarStyles />
       </aside>
     );
@@ -224,35 +250,57 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div
           className="fixed inset-0 bg-black/50 z-40"
           onClick={onMobileClose}
+          style={{ transition: "opacity 0.35s ease" }}
         />
       )}
 
       {/* Drawer */}
       <aside
-        className="fixed top-0 left-0 h-full bg-[#1c2a3a] text-white z-50 flex flex-col"
+        className="fixed top-0 left-0 h-full bg-[#1c2a3a] text-white z-50 flex flex-col shadow-2xl"
         style={{
-          width: 240,
+          width: 260,
           transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 0.3s ease",
+          transition: "transform 0.35s cubic-bezier(0.25, 1, 0.5, 1)",
         }}
       >
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 px-4 flex-shrink-0" style={{ height: 56 }}>
           <span className="text-lg font-semibold">Điều hướng</span>
-          <Button type="text" onClick={onMobileClose} className="text-white">
-            <CloseOutlined />
-          </Button>
+          <Button
+            type="text"
+            onClick={onMobileClose}
+            icon={<CloseOutlined />}
+            className="text-white"
+            style={{
+              color: "#fff",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          />
         </div>
-        <Menu
-          selectedKeys={[findSelectedKey()]}
-          mode="inline"
-          items={menuItems}
-          style={{
-            backgroundColor: "transparent",
-            color: "white",
-            borderInlineEnd: "none",
-          }}
-          className="custom-sidebar-menu"
-        />
+
+        {/* Menu */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <Menu
+            selectedKeys={[findSelectedKey()]}
+            mode="inline"
+            items={menuItems}
+            style={{
+              backgroundColor: "transparent",
+              color: "white",
+              borderInlineEnd: "none",
+            }}
+            className="custom-sidebar-menu"
+          />
+        </div>
+
+        {/* Mobile footer info */}
+        <div className="border-t border-white/10 px-4 py-3 text-xs text-white/50 flex-shrink-0">
+          Tour Management v1.0
+        </div>
         <SidebarStyles />
       </aside>
     </>
@@ -266,8 +314,27 @@ function SidebarStyles() {
         __html: `
         .custom-sidebar-menu .ant-menu-item,
         .custom-sidebar-menu .ant-menu-submenu-title {
-          margin: 6px 12px;
+          margin: 4px 8px !important;
           border-radius: 8px;
+        }
+        .custom-sidebar-menu.ant-menu-inline-collapsed .ant-menu-item,
+        .custom-sidebar-menu.ant-menu-inline-collapsed .ant-menu-submenu-title {
+          border-radius: 8px;
+          margin: 4px 8px !important;
+          width: 64px !important;
+          padding: 0 !important;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+        }
+        .custom-sidebar-menu.ant-menu-inline-collapsed .ant-menu-item .ant-menu-item-icon,
+        .custom-sidebar-menu.ant-menu-inline-collapsed .ant-menu-submenu-title .ant-menu-item-icon {
+          font-size: 18px !important;
+          line-height: 40px !important;
+          margin: 0 !important;
+        }
+        .custom-sidebar-menu.ant-menu-inline-collapsed .ant-menu-title-content {
+          display: none !important;
         }
         .custom-sidebar-menu .ant-menu-item-icon,
         .custom-sidebar-menu .ant-menu-submenu-arrow {
@@ -292,6 +359,19 @@ function SidebarStyles() {
         }
         .custom-sidebar-menu .ant-menu-submenu-arrow {
           color: rgba(255,255,255,0.6);
+        }
+        /* Ant collapsed popup (submenu flyout) */
+        .ant-menu-submenu-popup .ant-menu {
+          background: #1c2a3a !important;
+        }
+        .ant-menu-submenu-popup .ant-menu-item {
+          color: #fff !important;
+        }
+        .ant-menu-submenu-popup .ant-menu-item:hover {
+          background: rgba(255,255,255,0.08) !important;
+        }
+        .ant-menu-submenu-popup .ant-menu-item a {
+          color: #fff !important;
         }
       `,
       }}

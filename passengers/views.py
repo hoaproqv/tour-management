@@ -668,6 +668,37 @@ class PassengerExportView(APIView):
         return response
 
 
+class PassengerTemplateDownloadView(APIView):
+    """GET /api/v1/passengers/import/template/"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Download passenger import template",
+        description="Download a blank .xlsx template for importing passengers.",
+        tags=["Passengers"],
+    )
+    def get(self, request, *args, **kwargs):
+        import io
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.append(PASSENGER_COLUMNS)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        response = HttpResponse(
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = 'attachment; filename="passenger_import_template.xlsx"'
+        return response
+
+
 class ImportedBusListView(generics.ListAPIView):
     """GET /api/v1/imported-buses/?trip=<id>"""
 

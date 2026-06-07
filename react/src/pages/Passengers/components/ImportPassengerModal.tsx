@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { InboxOutlined } from "@ant-design/icons";
+import { DownloadOutlined, InboxOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -24,6 +24,7 @@ import * as XLSX from "xlsx";
 import {
   getTrips,
   importPassengers,
+  downloadPassengerTemplate,
   type ImportPassengerResult,
   type Trip,
 } from "../../../api/trips";
@@ -166,6 +167,21 @@ export default function ImportPassengerModal({
     importMutation.mutate(fd);
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await downloadPassengerTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "passenger_import_template.xlsx";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Lỗi tải template", err);
+      message.error("Tải template thất bại");
+    }
+  };
+
   const stepItems = [
     { title: "Tải file" },
     { title: "Chọn Trip" },
@@ -206,6 +222,15 @@ export default function ImportPassengerModal({
               </span>
             }
           />
+          <div className="flex justify-end mb-4">
+            <Button
+              type="link"
+              icon={<DownloadOutlined />}
+              onClick={handleDownloadTemplate}
+            >
+              Tải template Excel mẫu
+            </Button>
+          </div>
           <Dragger
             accept=".xlsx,.xls"
             beforeUpload={(f) => {

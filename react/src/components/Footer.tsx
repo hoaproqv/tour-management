@@ -2,11 +2,11 @@ import React, { type FC } from "react";
 
 const Footer: FC = () => {
   return (
-    <footer className="bg-[#f5f6f8] text-gray-600 border-t border-gray-200 py-3 px-6">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
-        <span>Copyright @ 2025 SOICT, HUST — All right reserved</span>
-        <span>soict.hust.edu.vn</span>
-        <span>Status: Online</span>
+    <footer className="fixed bottom-0 left-0 w-full bg-[#f5f6f8] text-gray-600 border-t border-gray-200 px-3 md:px-6 z-50 h-[45px] flex items-center">
+      <div className="w-full max-w-6xl mx-auto flex flex-row items-center justify-between gap-2 text-[10px] md:text-sm">
+        <span className="truncate">Copyright @ 2025 SOICT, HUST</span>
+        <span className="hidden md:inline">soict.hust.edu.vn</span>
+        <span className="whitespace-nowrap">Status: Online</span>
       </div>
     </footer>
   );

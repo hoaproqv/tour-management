@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 
-import { DownloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { DownloadOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Form, Input, Select, Typography, message } from "antd";
 
@@ -22,6 +22,7 @@ import {
   type TripBus,
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
+import { useDebounce } from "../../hooks/useDebounce";
 import { canManageCatalog } from "../../utils/helper";
 
 import ImportedBusMapper from "./components/ImportedBusMapper";
@@ -37,6 +38,7 @@ const { Title, Text } = Typography;
 
 export default function PassengerManagement() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [tripFilter, setTripFilter] = useState<string | "all">("all");
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -151,7 +153,7 @@ export default function PassengerManagement() {
   );
 
   const filteredPassengers = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = debouncedSearch.trim().toLowerCase();
     return (Array.isArray(passengers) ? passengers : []).filter((p) => {
       if (!term) return true;
       return (
@@ -160,7 +162,7 @@ export default function PassengerManagement() {
         (p.note || "").toLowerCase().includes(term)
       );
     });
-  }, [passengers, search]);
+  }, [passengers, debouncedSearch]);
 
   const createMutation = useMutation({
     mutationFn: (payload: PassengerPayload) => createPassenger(payload),
@@ -280,7 +282,7 @@ export default function PassengerManagement() {
   };
 
   return (
-    <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
+    <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -294,57 +296,47 @@ export default function PassengerManagement() {
               Danh sách hành khách; chọn trip để xem xe được gán.
             </Text>
           </div>
-          <div className="flex flex-col md:flex-row gap-2 md:items-center">
-            <Input
-              allowClear
-              placeholder="Tìm theo tên / số điện thoại / ghi chú"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full md:w-64"
-            />
-            <Select
-              value={tripFilter}
-              onChange={(val) => {
-                setTripFilter(val);
-                // Clear import result when switching trips
-                if (importResult && val !== importResult.trip_id) {
-                  setImportResult(null);
-                }
-              }}
-              className="w-full md:w-52"
-              options={[
-                { value: "all", label: "Tất cả trip" },
-                ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-                  value: t.id,
-                  label: t.name,
-                })),
-              ]}
-            />
-            <Button
-              icon={<DownloadOutlined />}
-              loading={exportLoading}
-              onClick={handleExport}
-              disabled={tripFilter === "all"}
-              title={
-                tripFilter === "all" ? "Chọn trip để export" : "Export .xlsx"
-              }
-            >
-              Export
-            </Button>
-            {canManage && (
-              <>
-                <Button
-                  icon={<UploadOutlined />}
-                  onClick={() => setShowImport(true)}
-                >
-                  Import
+            <div className="flex flex-wrap gap-2 md:items-center">
+              <Input
+                allowClear
+                placeholder="Tìm theo tên / số điện thoại / ghi chú"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full md:w-64"
+              />
+              <Select
+                value={tripFilter}
+                onChange={(val) => {
+                  setTripFilter(val);
+                  if (importResult && val !== importResult.trip_id) {
+                    setImportResult(null);
+                  }
+                }}
+                className="w-full md:w-52"
+                options={[
+                  { value: "all", label: "Tất cả trip" },
+                  ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
+                    value: t.id,
+                    label: t.name,
+                  })),
+                ]}
+              />
+              <Button
+                icon={<DownloadOutlined />}
+                loading={exportLoading}
+                onClick={handleExport}
+                disabled={tripFilter === "all"}
+                title={tripFilter === "all" ? "Chọn trip để export" : "Export .xlsx"}
+                className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
+              >
+                Export
+              </Button>
+              {canManage && (
+                <Button type="primary" onClick={openCreate} className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5">
+                  + Tạo mới
                 </Button>
-                <Button type="primary" onClick={openCreate}>
-                  + New Passenger
-                </Button>
-              </>
-            )}
-          </div>
+              )}
+            </div>
         </div>
         <PassengerTable
           data={filteredPassengers}
@@ -384,6 +376,10 @@ export default function PassengerManagement() {
         }
         form={form}
         editingPassenger={editingPassenger}
+        onOpenImport={() => {
+          setShowCreate(false);
+          setShowImport(true);
+        }}
       />
     </div>
   );

@@ -19,6 +19,7 @@ import {
 } from "../../api/trips";
 import { getUsers } from "../../api/users";
 import { useGetAccountInfo } from "../../hooks/useAuth";
+import { useDebounce } from "../../hooks/useDebounce";
 import { canManageCatalog } from "../../utils/helper";
 
 import PassengerAssignmentModal from "./components/PassengerAssignmentModal";
@@ -31,13 +32,14 @@ import { type EnrichedTrip } from "./components/types";
 import type { IUser } from "../../utils/types";
 
 const statusMeta: Record<Trip["status"], { label: string; color: string }> = {
-  planned: { label: "Planned", color: "blue" },
-  doing: { label: "Doing", color: "orange" },
-  done: { label: "Done", color: "green" },
+  planned: { label: "Chưa xuất phát", color: "blue" },
+  doing: { label: "Đang đi", color: "orange" },
+  done: { label: "Đã hoàn thành", color: "green" },
 };
 
 export default function TripManagement() {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [statusFilter, setStatusFilter] = useState<Trip["status"] | "all">(
     "all",
   );
@@ -173,7 +175,7 @@ export default function TripManagement() {
   }, [trips, tripBuses, rounds]);
 
   const filteredTrips = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = debouncedSearch.trim().toLowerCase();
     return enrichedTrips.filter((trip) => {
       const matchTerm = term
         ? trip.name.toLowerCase().includes(term) ||
@@ -183,7 +185,7 @@ export default function TripManagement() {
         statusFilter === "all" ? true : trip.status === statusFilter;
       return matchTerm && matchStatus;
     });
-  }, [enrichedTrips, search, statusFilter]);
+  }, [enrichedTrips, debouncedSearch, statusFilter]);
 
   const loading =
     loadingTrips || loadingTripBuses || loadingRounds || loadingTenants;
@@ -307,7 +309,7 @@ export default function TripManagement() {
   };
 
   return (
-    <div className="w-full bg-[#f4f7fb] min-h-screen py-6">
+    <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
         <TripHeader
           search={search}
