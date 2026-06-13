@@ -94,3 +94,5 @@ export const getRoles = async (): Promise<IRoleItem[]> => {
   return [];
 };
 
+export const bulkDeleteUsers = async (ids: (string | number)[]) =>
+  postData("/users/bulk-delete/", { ids });

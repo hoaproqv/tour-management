@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, Form, message } from "antd";
+import { Card, Form, message, Modal } from "antd";
 import dayjs from "dayjs";
 
 import { getTenants } from "../../api/tenants";
@@ -13,6 +13,7 @@ import {
   getTrips,
   updateTrip,
   deleteTrip,
+  bulkDeleteTrips,
   type BusItem,
   type Trip,
   type TripPayload,
@@ -49,6 +50,8 @@ export default function TripManagement() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [assigningTrip, setAssigningTrip] = useState<EnrichedTrip | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [form] = Form.useForm<TripFormValues>();
   const queryClient = useQueryClient();
 
@@ -270,6 +273,33 @@ export default function TripManagement() {
     setEditingTrip(null);
   };
 
+  const handleBulkDelete = () => {
+    if (!canManageTrips) {
+      message.warning("Bạn không có quyền xóa chuyến đi");
+      return;
+    }
+    Modal.confirm({
+      title: "Xóa nhiều chuyến đi?",
+      content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} chuyến đi đã chọn?`,
+      okText: "Xóa",
+      cancelText: "Hủy",
+      onOk: async () => {
+        const hide = message.loading("Đang xóa...", 0);
+        try {
+          await bulkDeleteTrips(selectedRowKeys as string[]);
+          message.success(`Đã xóa ${selectedRowKeys.length} chuyến đi`);
+          setSelectedRowKeys([]);
+          setIsSelectionMode(false);
+          await queryClient.invalidateQueries({ queryKey: ["trips"] });
+        } catch {
+          message.error("Lỗi khi xóa chuyến đi");
+        } finally {
+          hide();
+        }
+      },
+    });
+  };
+
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
@@ -281,6 +311,13 @@ export default function TripManagement() {
           onCreate={openCreate}
           canCreate={canManageTrips}
           statusMeta={statusMeta}
+          selectedRowKeys={selectedRowKeys}
+          onBulkDelete={handleBulkDelete}
+          isSelectionMode={isSelectionMode}
+          onSelectionModeChange={(mode) => {
+            setIsSelectionMode(mode);
+            if (!mode) setSelectedRowKeys([]);
+          }}
         />
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
@@ -289,6 +326,9 @@ export default function TripManagement() {
             loading={loading}
             statusMeta={statusMeta}
             canManage={canManageTrips}
+            selectedRowKeys={selectedRowKeys}
+            onSelectChange={setSelectedRowKeys}
+            isSelectionMode={isSelectionMode}
             onEdit={openEdit}
             onViewRounds={(trip) => setManagingRoundsTrip(trip)}
             onViewBuses={(trip) => setAssigningBusesTrip(trip)}

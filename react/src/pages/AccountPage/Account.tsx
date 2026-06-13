@@ -24,7 +24,7 @@ import {
 
 import { getTenants, type TenantItem } from "../../api/tenants";
 import { createUser, getRoles, getUsers } from "../../api/users";
-import { deleteUser, updateUser } from "../../api/users";
+import { deleteUser, updateUser, bulkDeleteUsers } from "../../api/users";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 
 import type { IRoleItem, IUser, IUserPayload } from "../../utils/types";
@@ -39,18 +39,19 @@ const roleMeta: Record<
   tour_manager: {
     label: "Quản lý chuyến đi",
     color: "geekblue",
-    permissions: "Thêm/sửa/xoá bus, trip, round, passenger.",
+    permissions: "Thêm/sửa/xoá Xe, Chuyến, Chặng, Hành khách.",
   },
   fleet_lead: {
     label: "Trưởng xe",
     color: "cyan",
     permissions:
-      "Sửa transaction của xe mình, điểm danh lên xe mình và chốt điểm danh.",
+      "Điểm danh hành khách của xe mình, điểm danh lên/xuống xe và chốt điểm danh.",
   },
   driver: {
     label: "Lái xe",
     color: "green",
-    permissions: "Chỉ xem transaction và lịch trình round/bus.",
+    permissions:
+      "Chỉ xem điểm danh hành khách và lịch trình chặng trong chuyến đi.",
   },
 };
 
@@ -73,6 +74,8 @@ export const Account = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [tenantFilter, setTenantFilter] = useState<string>("all");
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   React.useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -325,25 +328,29 @@ export const Account = () => {
               User Management
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Danh sách User
+              Quản lý Người dùng
             </Title>
-            <Text type="secondary">
-              Quản lý tài khoản và vai trò. Chỉ admin mới có thể thêm User mới.
-            </Text>
+            <Text type="secondary">Quản lý tài khoản và vai trò.</Text>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <Input
               allowClear
               placeholder="Tìm theo tên, email, sđt..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
               className="w-full sm:w-52"
             />
             {isAdmin && (
               <>
                 <Select
                   value={roleFilter}
-                  onChange={setRoleFilter}
+                  onChange={(val) => {
+                    setRoleFilter(val);
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }}
                   className="w-full sm:w-32"
                   options={[
                     { value: "all", label: "Tất cả Role" },
@@ -355,7 +362,10 @@ export const Account = () => {
                 />
                 <Select
                   value={tenantFilter}
-                  onChange={setTenantFilter}
+                  onChange={(val) => {
+                    setTenantFilter(val);
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }}
                   className="w-full sm:w-48"
                   options={[
                     { value: "all", label: "Tất cả Tenant" },
@@ -401,11 +411,75 @@ export const Account = () => {
           showIcon
         />
 
-        <Card className="mt-6" styles={{ body: { padding: 0 } }}>
+        {isAdmin && (
+          <div className="flex justify-end mt-4 mb-2">
+            {isSelectionMode ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setIsSelectionMode(false);
+                    setSelectedRowKeys([]);
+                  }}
+                >
+                  Hủy
+                </Button>
+                {selectedRowKeys.length > 0 && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: "Xóa nhiều user?",
+                        content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} user đã chọn?`,
+                        okText: "Xóa",
+                        cancelText: "Hủy",
+                        onOk: async () => {
+                          const hide = message.loading("Đang xóa...", 0);
+                          try {
+                            await bulkDeleteUsers(selectedRowKeys as (string | number)[]);
+                            message.success(
+                              `Đã xóa ${selectedRowKeys.length} user`,
+                            );
+                            setSelectedRowKeys([]);
+                            setIsSelectionMode(false);
+                            await queryClient.invalidateQueries({
+                              queryKey: ["users"],
+                            });
+                          } catch {
+                            message.error("Lỗi khi xóa user");
+                          } finally {
+                            hide();
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Xóa đã chọn ({selectedRowKeys.length})
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button danger onClick={() => setIsSelectionMode(true)}>
+                Xóa nhiều
+              </Button>
+            )}
+          </div>
+        )}
+
+        <Card className="mt-4" styles={{ body: { padding: 0 } }}>
           <Table
             size="small"
             scroll={{ x: "max-content" }}
             rowKey="id"
+            rowSelection={
+              isSelectionMode
+                ? {
+                    selectedRowKeys,
+                    onChange: (newSelectedRowKeys) =>
+                      setSelectedRowKeys(newSelectedRowKeys),
+                  }
+                : undefined
+            }
             dataSource={users}
             loading={usersQuery.isLoading || usersQuery.isFetching}
             columns={columns}
@@ -434,135 +508,114 @@ export const Account = () => {
         title={editingUser ? "Cập nhật user" : "Thêm user mới"}
       >
         <Form layout="vertical" form={form} name="create-user-form">
-          <Form.Item
-            label="Họ và tên"
-            name="name"
-            rules={[{ required: true, message: "Nhập họ tên" }]}
-          >
-            <Input placeholder="Ví dụ: Nguyễn Văn A" />
-          </Form.Item>
+          <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-4">
+            <Form.Item
+              label="Chọn công ty"
+              name="tenant"
+              rules={[{ required: true, message: "Chọn công ty" }]}
+            >
+              <Select
+                placeholder="Chọn công ty"
+                loading={tenantsQuery.isLoading}
+                options={tenants.map((tenant: TenantItem) => ({
+                  value: tenant.id,
+                  label: tenant.name,
+                }))}
+              />
+            </Form.Item>
 
-          <Form.Item
-            label="Username"
-            name="username"
-            rules={[{ required: true, message: "Nhập username" }]}
-          >
-            <Input placeholder="username" disabled={Boolean(editingUser)} />
-          </Form.Item>
+            <Form.Item
+              label="Role"
+              name="role"
+              rules={[{ required: true, message: "Chọn vai trò" }]}
+            >
+              <Select
+                placeholder="Chọn role"
+                loading={rolesQuery.isLoading}
+                options={formRoleOptions.map((role: IRoleItem) => ({
+                  value: role.id,
+                  label: roleMeta[role.name]?.label || role.name,
+                }))}
+              />
+            </Form.Item>
 
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[
-              { required: true, message: "Nhập email" },
-              { type: "email", message: "Email không hợp lệ" },
-            ]}
-          >
-            <Input placeholder="you@example.com" />
-          </Form.Item>
+            <Form.Item
+              label="Họ và tên"
+              name="name"
+              rules={[{ required: true, message: "Nhập họ tên" }]}
+            >
+              <Input placeholder="Ví dụ: Nguyễn Văn A" />
+            </Form.Item>
 
-          <Form.Item label="Số điện thoại" name="phone">
-            <Input placeholder="Nhập số điện thoại" />
-          </Form.Item>
+            <Form.Item
+              label="Username"
+              name="username"
+              rules={[{ required: true, message: "Nhập username" }]}
+            >
+              <Input placeholder="username" disabled={Boolean(editingUser)} />
+            </Form.Item>
 
-          {!editingUser && (
-            <>
-              <Form.Item
-                label="Mật khẩu"
-                name="password"
-                rules={[{ required: true, message: "Nhập mật khẩu" }]}
-              >
-                <Input.Password placeholder="Tối thiểu 6 ký tự" />
-              </Form.Item>
+            <Form.Item
+              label="Email"
+              name="email"
+              rules={[
+                { required: true, message: "Nhập email" },
+                { type: "email", message: "Email không hợp lệ" },
+              ]}
+            >
+              <Input placeholder="you@example.com" />
+            </Form.Item>
 
-              <Form.Item
-                label="Nhập lại mật khẩu"
-                name="confirmPassword"
-                dependencies={["password"]}
-                rules={[
-                  { required: true, message: "Nhập lại mật khẩu" },
-                  ({ getFieldValue }) => ({
-                    validator(_, value) {
-                      if (!value || getFieldValue("password") === value) {
-                        return Promise.resolve();
-                      }
-                      return Promise.reject(new Error("Mật khẩu không khớp"));
-                    },
-                  }),
-                ]}
-              >
-                <Input.Password placeholder="Nhập lại mật khẩu" />
-              </Form.Item>
-            </>
-          )}
+            <Form.Item
+              label="Số điện thoại"
+              name="phone"
+              rules={[{ required: true, message: "Nhập số điện thoại" }]}
+            >
+              <Input placeholder="Nhập số điện thoại" />
+            </Form.Item>
 
-          <Form.Item
-            label="Tenant"
-            name="tenant"
-            rules={[{ required: true, message: "Chọn tenant" }]}
-          >
-            <Select
-              placeholder="Chọn tenant"
-              loading={tenantsQuery.isLoading}
-              options={tenants.map((tenant: TenantItem) => ({
-                value: tenant.id,
-                label: tenant.name,
-              }))}
-            />
-          </Form.Item>
+            {!editingUser && (
+              <>
+                <Form.Item
+                  label="Mật khẩu"
+                  name="password"
+                  rules={[
+                    { required: true, message: "Nhập mật khẩu" },
+                    { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự" },
+                  ]}
+                >
+                  <Input.Password
+                    placeholder="Tối thiểu 8 ký tự"
+                    onCopy={(e) => e.preventDefault()}
+                  />
+                </Form.Item>
 
-          <Form.Item
-            label="Role"
-            name="role"
-            rules={[{ required: true, message: "Chọn role" }]}
-          >
-            <Select
-              size="large"
-              placeholder="Chọn role"
-              loading={rolesQuery.isLoading}
-              className="role-select-control"
-              classNames={{ popup: { root: "role-select-dropdown" } }}
-              optionLabelProp="label"
-              options={formRoleOptions.map((role: IRoleItem) => ({
-                value: role.id,
-                label: (
-                  <Space
-                    direction="vertical"
-                    size={0}
-                    className="leading-tight"
-                  >
-                    <span className="font-semibold text-slate-800">
-                      {roleMeta[role.name]?.label || role.name}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {roleMeta[role.name]?.permissions || role.description}
-                    </span>
-                  </Space>
-                ),
-              }))}
-            />
-          </Form.Item>
+                <Form.Item
+                  label="Nhập lại mật khẩu"
+                  name="confirmPassword"
+                  dependencies={["password"]}
+                  rules={[
+                    { required: true, message: "Nhập lại mật khẩu" },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (!value || getFieldValue("password") === value) {
+                          return Promise.resolve();
+                        }
+                        return Promise.reject(new Error("Mật khẩu không khớp"));
+                      },
+                    }),
+                  ]}
+                >
+                  <Input.Password
+                    placeholder="Nhập lại mật khẩu"
+                    onCopy={(e) => e.preventDefault()}
+                  />
+                </Form.Item>
+              </>
+            )}
+          </div>
         </Form>
       </Modal>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .role-select-control .ant-select-selector {
-              min-height: 55px;
-              display: flex;
-              align-items: center;
-            }
-            .role-select-control .ant-select-selection-item {
-              white-space: normal;
-              line-height: 1.35;
-            }
-            .role-select-dropdown .ant-select-item-option-content {
-              white-space: normal !important;
-              line-height: 1.35;
-            }
-          `,
-        }}
-      />
     </div>
   );
 };

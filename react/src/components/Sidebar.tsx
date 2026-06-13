@@ -17,7 +17,7 @@ import { Button, Menu, Modal, type MenuProps } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useGetAccountInfo } from "../hooks/useAuth";
-import { isFleetLead, isDriver } from "../utils/helper";
+import { isFleetLead, isDriver, isAdminLike } from "../utils/helper";
 import { ROUTES } from "../utils/routers";
 
 import type { IUser } from "../utils/types";
@@ -36,14 +36,14 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     label: "Trang chủ",
   },
   {
-    key: ROUTES.ACCOUNT,
-    icon: <TeamOutlined style={{ color: "#fff" }} />,
-    label: "Quản lý người dùng",
-  },
-  {
     key: ROUTES.TENANT,
     icon: <ApartmentOutlined style={{ color: "#fff" }} />,
     label: "Công ty",
+  },
+  {
+    key: ROUTES.ACCOUNT,
+    icon: <TeamOutlined style={{ color: "#fff" }} />,
+    label: "Người dùng",
   },
   {
     key: ROUTES.PASSENGER,
@@ -98,13 +98,19 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const navigate = useNavigate();
 
   const hideManagement = isFleetLead(currentUser) || isDriver(currentUser);
+  const isAdmin = isAdminLike(currentUser);
 
   const menuItems = useMemo(() => {
+    if (isAdmin) {
+      return baseMenuItems.filter(
+        (item) => item?.key === ROUTES.TENANT || item?.key === ROUTES.ACCOUNT,
+      );
+    }
     if (!hideManagement) return baseMenuItems;
     return baseMenuItems.filter(
       (item) => item?.key !== ROUTES.ACCOUNT && item?.key !== ROUTES.TENANT,
     );
-  }, [hideManagement]);
+  }, [hideManagement, isAdmin]);
 
   const findSelectedKey = () => {
     if (location.pathname.startsWith(ROUTES.ROUND)) return ROUTES.ROUND;

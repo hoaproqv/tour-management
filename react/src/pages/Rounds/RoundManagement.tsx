@@ -30,16 +30,18 @@ import {
   Typography,
   message,
   Space,
+  Modal,
 } from "antd";
 import dayjs from "dayjs";
 
 import {
   createRound,
-  deleteRound,
   getRounds,
   getTripBuses,
   getTrips,
   updateRound,
+  deleteRound,
+  bulkDeleteRounds,
   exportRounds,
   reorderRounds,
   type RoundItem,
@@ -126,6 +128,8 @@ export default function RoundManagement() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingRound, setEditingRound] = useState<RoundItem | null>(null);
   const [localRounds, setLocalRounds] = useState<RoundItem[]>([]);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   
   const [form] = Form.useForm<RoundFormValues>();
   const queryClient = useQueryClient();
@@ -471,41 +475,92 @@ export default function RoundManagement() {
               ]}
             />
             {canManage && (
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  icon={<FileExcelOutlined />}
-                  onClick={async () => {
-                    if (!tripFilter) {
-                      message.warning("Vui lòng chọn một chuyến đi");
-                      return;
-                    }
-                    try {
-                      const blob = await exportRounds(tripFilter);
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `rounds_${tripFilter}.xlsx`;
-                      a.click();
-                      window.URL.revokeObjectURL(url);
-                    } catch {
-                      message.error("Lỗi khi export");
-                    }
-                  }}
-                  className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
-                >
-                  Export
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={openCreate}
-                  className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
-                >
-                  + Tạo mới
-                </Button>
-              </div>
+              <Button
+                icon={<FileExcelOutlined />}
+                onClick={async () => {
+                  if (!tripFilter) {
+                    message.warning("Vui lòng chọn một chuyến đi");
+                    return;
+                  }
+                  try {
+                    const blob = await exportRounds(tripFilter);
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `rounds_${tripFilter}.xlsx`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                  } catch {
+                    message.error("Lỗi khi export");
+                  }
+                }}
+                className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
+              >
+                Export
+              </Button>
+            )}
+            {canManage && (
+              <Button
+                type="primary"
+                onClick={openCreate}
+                className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
+              >
+                + Tạo mới
+              </Button>
             )}
           </div>
         </div>
+
+        {canManage && (
+          <div className="flex justify-end mt-4 mb-2">
+            {isSelectionMode ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setIsSelectionMode(false);
+                    setSelectedRowKeys([]);
+                  }}
+                >
+                  Hủy
+                </Button>
+                {selectedRowKeys.length > 0 && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: "Xóa nhiều chặng?",
+                        content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} chặng đã chọn?`,
+                        okText: "Xóa",
+                        cancelText: "Hủy",
+                        onOk: async () => {
+                          const hide = message.loading("Đang xóa...", 0);
+                          try {
+                            await bulkDeleteRounds(selectedRowKeys as string[]);
+                            message.success(`Đã xóa ${selectedRowKeys.length} chặng`);
+                            setSelectedRowKeys([]);
+                            setIsSelectionMode(false);
+                            await queryClient.invalidateQueries({ queryKey: ["rounds"] });
+                          } catch {
+                            message.error("Lỗi khi xóa chặng");
+                          } finally {
+                            hide();
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Xóa đã chọn ({selectedRowKeys.length})
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button danger onClick={() => setIsSelectionMode(true)}>
+                Xóa nhiều
+              </Button>
+            )}
+          </div>
+        )}
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
           <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
@@ -517,6 +572,14 @@ export default function RoundManagement() {
                 components={{ body: { row: DraggableRow } }}
                 size="small"
                 rowKey="id"
+                rowSelection={
+                  isSelectionMode
+                    ? {
+                        selectedRowKeys,
+                        onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
+                      }
+                    : undefined
+                }
                 dataSource={localRounds}
                 loading={isLoading}
                 pagination={false}

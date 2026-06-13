@@ -363,3 +363,53 @@ def refresh_token(request):
 def csrf_token(_request):
     """Set CSRF cookie"""
     return BaseAPIView().success({"csrf": "set"})
+
+class UserBulkDeleteView(UserListCreateView):
+    @extend_schema(
+        summary="Bulk delete users",
+        description="Delete multiple users by ID.",
+        request=inline_serializer("UserBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
+        responses={
+            200: inline_serializer(
+                "UserBulkDeleteResponse", 
+                fields={
+                    "success": serializers.BooleanField(), 
+                    "data": inline_serializer("UserBulkDeleteData", fields={"deleted": serializers.IntegerField()})
+                }
+            )
+        },
+        tags=["Users"],
+    )
+    def post(self, request, *args, **kwargs):
+        if not self._is_admin(request.user):
+            raise PermissionDenied("Only admin accounts can delete users.")
+        ids = request.data.get("ids", [])
+        if not ids:
+            return BaseAPIView().error("No ids provided")
+        qs = self.get_queryset().filter(id__in=ids)
+        deleted, _ = qs.delete()
+        return BaseAPIView().success({"deleted": deleted})
+
+class TenantBulkDeleteView(TenantListCreateView):
+    @extend_schema(
+        summary="Bulk delete tenants",
+        description="Delete multiple tenants by ID.",
+        request=inline_serializer("TenantBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
+        responses={
+            200: inline_serializer(
+                "TenantBulkDeleteResponse", 
+                fields={
+                    "success": serializers.BooleanField(), 
+                    "data": inline_serializer("TenantBulkDeleteData", fields={"deleted": serializers.IntegerField()})
+                }
+            )
+        },
+        tags=["Tenants"],
+    )
+    def post(self, request, *args, **kwargs):
+        ids = request.data.get("ids", [])
+        if not ids:
+            return BaseAPIView().error("No ids provided")
+        qs = self.get_queryset().filter(id__in=ids)
+        deleted, _ = qs.delete()
+        return BaseAPIView().success({"deleted": deleted})

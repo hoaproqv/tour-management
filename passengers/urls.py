@@ -13,9 +13,13 @@ from passengers.views import (
     PassengerTemplateDownloadView,
     PassengerTransferDetailView,
     PassengerTransferListCreateView,
+    PassengerBulkDeleteView,
 )
 
 urlpatterns = [
+    path(
+        "passengers/bulk-delete/", PassengerBulkDeleteView.as_view(), name="passenger-bulk-delete"
+    ),
     path(
         "passengers/", PassengerListCreateView.as_view(), name="passenger-list-create"
     ),

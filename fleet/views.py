@@ -217,3 +217,32 @@ class BusTemplateDownloadView(APIView):
         )
         response["Content-Disposition"] = 'attachment; filename="bus_import_template.xlsx"'
         return response
+
+class BusBulkDeleteView(BusListCreateView):
+    from rest_framework import serializers
+    from drf_spectacular.utils import inline_serializer
+    from common.views import BaseAPIView
+
+    @extend_schema(
+        summary="Bulk delete buses",
+        description="Delete multiple buses by ID.",
+        request=inline_serializer("BusBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
+        responses={
+            200: inline_serializer(
+                "BusBulkDeleteResponse", 
+                fields={
+                    "success": serializers.BooleanField(), 
+                    "data": inline_serializer("BusBulkDeleteData", fields={"deleted": serializers.IntegerField()})
+                }
+            )
+        },
+        tags=["Buses"],
+    )
+    def post(self, request, *args, **kwargs):
+        from common.views import BaseAPIView
+        ids = request.data.get("ids", [])
+        if not ids:
+            return BaseAPIView().error("No ids provided")
+        qs = self.get_queryset().filter(id__in=ids)
+        deleted, _ = qs.delete()
+        return BaseAPIView().success({"deleted": deleted})

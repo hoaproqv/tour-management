@@ -9,9 +9,11 @@ from rounds.views import (
     RoundImportView,
     RoundExportView,
     RoundTemplateDownloadView,
+    RoundBulkDeleteView,
 )
 
 urlpatterns = [
+    path("rounds/bulk-delete/", RoundBulkDeleteView.as_view(), name="round-bulk-delete"),
     path("rounds/", RoundListCreateView.as_view(), name="round-list-create"),
     path("rounds/reorder/", RoundReorderView.as_view(), name="round-reorder"),
     path("rounds/import/", RoundImportView.as_view(), name="round-import"),

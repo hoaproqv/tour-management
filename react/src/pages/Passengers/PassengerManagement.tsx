@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 
-import { DownloadOutlined } from "@ant-design/icons";
+import { DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Form, Input, Select, Typography, message } from "antd";
+import { Button, Form, Input, Select, Typography, message, Modal } from "antd";
 
 import {
   createPassenger,
@@ -12,6 +12,7 @@ import {
   getPassengers,
   getTrips,
   updatePassenger,
+  bulkDeletePassengers,
   type ImportPassengerResult,
   type Passenger,
   type PassengerPayload,
@@ -43,6 +44,8 @@ export default function PassengerManagement() {
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(
     null,
   );
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [form] = Form.useForm<PassengerFormValues>();
   const queryClient = useQueryClient();
@@ -295,11 +298,66 @@ export default function PassengerManagement() {
             )}
           </div>
         </div>
+
+        {canManage && (
+          <div className="flex justify-end mt-4 mb-2">
+            {isSelectionMode ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setIsSelectionMode(false);
+                    setSelectedRowKeys([]);
+                  }}
+                >
+                  Hủy
+                </Button>
+                {selectedRowKeys.length > 0 && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: "Xóa nhiều hành khách?",
+                        content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} hành khách đã chọn?`,
+                        okText: "Xóa",
+                        cancelText: "Hủy",
+                        onOk: async () => {
+                          const hide = message.loading("Đang xóa...", 0);
+                          try {
+                            await bulkDeletePassengers(selectedRowKeys as string[]);
+                            message.success(`Đã xóa ${selectedRowKeys.length} hành khách`);
+                            setSelectedRowKeys([]);
+                            setIsSelectionMode(false);
+                            await queryClient.invalidateQueries({ queryKey: ["passengers"] });
+                          } catch {
+                            message.error("Lỗi khi xóa hành khách");
+                          } finally {
+                            hide();
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Xóa đã chọn ({selectedRowKeys.length})
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button danger onClick={() => setIsSelectionMode(true)}>
+                Xóa nhiều
+              </Button>
+            )}
+          </div>
+        )}
+
         <PassengerTable
           data={filteredPassengers}
           isLoading={isLoading}
           deleting={deleteMutation.status === "pending"}
           canManage={canManage}
+          selectedRowKeys={selectedRowKeys}
+          onSelectChange={setSelectedRowKeys}
+          isSelectionMode={isSelectionMode}
           onDelete={(id) => deleteMutation.mutate(id)}
           onEdit={openEdit}
         />

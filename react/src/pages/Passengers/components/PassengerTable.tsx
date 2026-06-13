@@ -14,6 +14,9 @@ type PassengerTableProps = {
   canManage: boolean;
   onDelete: (_id: string) => void;
   onEdit: (_passenger: Passenger) => void;
+  selectedRowKeys?: React.Key[];
+  onSelectChange?: (_selectedRowKeys: React.Key[]) => void;
+  isSelectionMode?: boolean;
 };
 
 export default function PassengerTable({
@@ -23,6 +26,9 @@ export default function PassengerTable({
   canManage,
   onDelete,
   onEdit,
+  selectedRowKeys = [],
+  onSelectChange,
+  isSelectionMode,
 }: PassengerTableProps) {
   const columns: ColumnsType<Passenger> = useMemo(() => {
     const base: ColumnsType<Passenger> = [
@@ -102,6 +108,14 @@ export default function PassengerTable({
       <Table
         size="small"
         rowKey="id"
+        rowSelection={
+          isSelectionMode && onSelectChange
+            ? {
+                selectedRowKeys,
+                onChange: onSelectChange,
+              }
+            : undefined
+        }
         dataSource={data}
         loading={isLoading}
         pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}

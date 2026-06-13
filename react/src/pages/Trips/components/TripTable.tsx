@@ -16,6 +16,9 @@ interface TripTableProps {
   onAssignPassengers: (_trip: EnrichedTrip) => void;
   onDelete: (_trip: EnrichedTrip) => void;
   canManage?: boolean;
+  selectedRowKeys?: React.Key[];
+  onSelectChange?: (_selectedRowKeys: React.Key[]) => void;
+  isSelectionMode?: boolean;
 }
 
 export default function TripTable({
@@ -28,11 +31,22 @@ export default function TripTable({
   onAssignPassengers,
   onDelete,
   canManage = true,
+  selectedRowKeys = [],
+  onSelectChange,
+  isSelectionMode,
 }: TripTableProps) {
   return (
     <Table
       size="small"
       rowKey="id"
+      rowSelection={
+        isSelectionMode && onSelectChange
+          ? {
+              selectedRowKeys,
+              onChange: onSelectChange,
+            }
+          : undefined
+      }
       dataSource={trips}
       loading={loading}
       pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}

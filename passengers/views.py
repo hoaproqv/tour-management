@@ -896,3 +896,32 @@ class ImportedBusMapView(APIView):
 
         serializer = ImportedBusSerializer(imported_bus)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class PassengerBulkDeleteView(PassengerListCreateView):
+    from rest_framework import serializers
+    from drf_spectacular.utils import inline_serializer
+    from common.views import BaseAPIView
+
+    @extend_schema(
+        summary="Bulk delete passengers",
+        description="Delete multiple passengers by ID.",
+        request=inline_serializer("PassengerBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
+        responses={
+            200: inline_serializer(
+                "PassengerBulkDeleteResponse", 
+                fields={
+                    "success": serializers.BooleanField(), 
+                    "data": inline_serializer("PassengerBulkDeleteData", fields={"deleted": serializers.IntegerField()})
+                }
+            )
+        },
+        tags=["Passengers"],
+    )
+    def post(self, request, *args, **kwargs):
+        from common.views import BaseAPIView
+        ids = request.data.get("ids", [])
+        if not ids:
+            return BaseAPIView().error("No ids provided")
+        qs = self.get_queryset().filter(id__in=ids)
+        deleted, _ = qs.delete()
+        return BaseAPIView().success({"deleted": deleted})

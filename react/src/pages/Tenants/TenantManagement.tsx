@@ -19,6 +19,7 @@ import {
 import {
   createTenant,
   deleteTenant,
+  bulkDeleteTenants,
   getTenants,
   updateTenant,
   type TenantItem,
@@ -31,6 +32,8 @@ export default function TenantManagement() {
   const [form] = Form.useForm();
   const [showModal, setShowModal] = useState(false);
   const [editingTenant, setEditingTenant] = useState<TenantItem | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: tenantsResponse, isLoading } = useQuery({
@@ -123,15 +126,75 @@ export default function TenantManagement() {
               Tạo, cập nhật hoặc xóa Công ty để gán cho Chuyến đi.
             </Text>
           </div>
-          <Button type="primary" onClick={openCreate}>
-            + Tạo Công ty
-          </Button>
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+            <Button type="primary" onClick={openCreate}>
+              + Tạo Công ty
+            </Button>
+          </div>
         </div>
 
-        <Card className="mt-6" styles={{ body: { padding: 0 } }}>
+        <div className="flex justify-end mt-4 mb-2">
+          {isSelectionMode ? (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setIsSelectionMode(false);
+                  setSelectedRowKeys([]);
+                }}
+              >
+                Hủy
+              </Button>
+              {selectedRowKeys.length > 0 && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    Modal.confirm({
+                      title: "Xóa nhiều công ty?",
+                      content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} công ty đã chọn?`,
+                      okText: "Xóa",
+                      cancelText: "Hủy",
+                      onOk: async () => {
+                        const hide = message.loading("Đang xóa...", 0);
+                        try {
+                          await bulkDeleteTenants(selectedRowKeys as (string | number)[]);
+                          message.success(`Đã xóa ${selectedRowKeys.length} công ty`);
+                          setSelectedRowKeys([]);
+                          setIsSelectionMode(false);
+                          await queryClient.invalidateQueries({ queryKey: ["tenants"] });
+                        } catch {
+                          message.error("Lỗi khi xóa công ty");
+                        } finally {
+                          hide();
+                        }
+                      },
+                    });
+                  }}
+                >
+                  Xóa đã chọn ({selectedRowKeys.length})
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Button danger onClick={() => setIsSelectionMode(true)}>
+              Xóa nhiều
+            </Button>
+          )}
+        </div>
+
+        <Card className="mt-4" styles={{ body: { padding: 0 } }}>
           <Table scroll={{ x: "max-content" }}
             size="small"
             rowKey="id"
+            rowSelection={
+              isSelectionMode
+                ? {
+                    selectedRowKeys,
+                    onChange: (newSelectedRowKeys) =>
+                      setSelectedRowKeys(newSelectedRowKeys),
+                  }
+                : undefined
+            }
             dataSource={tenants}
             loading={isLoading}
             pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}

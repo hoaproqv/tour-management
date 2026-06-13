@@ -19,11 +19,13 @@ import {
   Typography,
   message,
   Space,
+  Modal,
 } from "antd";
 
 import {
   createBus,
   deleteBus,
+  bulkDeleteBuses,
   getBuses,
   updateBus,
   exportBuses,
@@ -46,6 +48,8 @@ export default function BusManagement() {
   const [pageSize, setPageSize] = useState(10);
   const [showCreate, setShowCreate] = useState(false);
   const [editingBus, setEditingBus] = useState<BusItem | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [form] = Form.useForm<BusFormValues>();
   const queryClient = useQueryClient();
   const { data: accountInfo } = useGetAccountInfo();
@@ -299,10 +303,69 @@ export default function BusManagement() {
           </div>
         </div>
 
+        {canManage && (
+          <div className="flex justify-end mt-4 mb-2">
+            {isSelectionMode ? (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setIsSelectionMode(false);
+                    setSelectedRowKeys([]);
+                  }}
+                >
+                  Hủy
+                </Button>
+                {selectedRowKeys.length > 0 && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      Modal.confirm({
+                        title: "Xóa nhiều xe khách?",
+                        content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} xe khách đã chọn?`,
+                        okText: "Xóa",
+                        cancelText: "Hủy",
+                        onOk: async () => {
+                          const hide = message.loading("Đang xóa...", 0);
+                          try {
+                            await bulkDeleteBuses(selectedRowKeys as string[]);
+                            message.success(`Đã xóa ${selectedRowKeys.length} xe khách`);
+                            setSelectedRowKeys([]);
+                            setIsSelectionMode(false);
+                            await queryClient.invalidateQueries({ queryKey: ["buses"] });
+                          } catch {
+                            message.error("Lỗi khi xóa xe khách");
+                          } finally {
+                            hide();
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Xóa đã chọn ({selectedRowKeys.length})
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button danger onClick={() => setIsSelectionMode(true)}>
+                Xóa nhiều
+              </Button>
+            )}
+          </div>
+        )}
+
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
           <Table scroll={{ x: "max-content" }}
             size="small"
             rowKey="id"
+            rowSelection={
+              isSelectionMode
+                ? {
+                    selectedRowKeys,
+                    onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
+                  }
+                : undefined
+            }
             dataSource={buses}
             loading={isLoading || isFetching}
             pagination={{

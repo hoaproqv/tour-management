@@ -230,6 +230,9 @@ export const updateTrip = async (id: string, payload: TripPayload) =>
 
 export const deleteTrip = async (id: string) => deleteData(`/trips/${id}/`);
 
+export const bulkDeleteTrips = async (ids: (string | number)[]) =>
+  postData("/trips/bulk-delete/", { ids });
+
 export const getTripBuses = async (
   params: PaginatedParams = {},
 ): Promise<PaginatedResponse<TripBus>> => {
@@ -258,6 +261,9 @@ export const updateRound = async (id: string, payload: RoundPayload) =>
 
 export const deleteRound = async (id: string) => deleteData(`/rounds/${id}/`);
 
+export const bulkDeleteRounds = async (ids: (string | number)[]) =>
+  postData("/rounds/bulk-delete/", { ids });
+
 export const reorderRounds = async (
   items: Array<{ id: string | number; sequence: number }>,
 ): Promise<void> => {
@@ -280,6 +286,9 @@ export const updateBus = async (id: string, payload: BusPayload) =>
 
 export const deleteBus = async (id: string) => deleteData(`/buses/${id}/`);
 
+export const bulkDeleteBuses = async (ids: (string | number)[]) =>
+  postData("/buses/bulk-delete/", { ids });
+
 export const getPassengers = async (
   params: PaginatedParams = {},
 ): Promise<PaginatedResponse<Passenger>> => {
@@ -298,6 +307,9 @@ export const updatePassenger = async (id: string, payload: PassengerPayload) =>
 
 export const deletePassenger = async (id: string) =>
   deleteData(`/passengers/${id}/`);
+
+export const bulkDeletePassengers = async (ids: (string | number)[]) =>
+  postData("/passengers/bulk-delete/", { ids });
 
 export const getRoundBuses = async (
   params: PaginatedParams = {},
@@ -433,6 +445,15 @@ export const importPassengers = async (
     headers: { "Content-Type": "multipart/form-data" },
   });
   return response.data as ImportPassengerResult;
+};
+
+export const checkImportPassengers = async (
+  formData: FormData,
+): Promise<any> => {
+  const response = await axiosInstance.post("/passengers/import/check/", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
 };
 
 export const exportPassengers = async (tripId: string): Promise<Blob> => {

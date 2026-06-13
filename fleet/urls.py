@@ -6,9 +6,11 @@ from fleet.views import (
     BusImportView,
     BusListCreateView,
     BusTemplateDownloadView,
+    BusBulkDeleteView,
 )
 
 urlpatterns = [
+    path("buses/bulk-delete/", BusBulkDeleteView.as_view(), name="bus-bulk-delete"),
     path("buses/", BusListCreateView.as_view(), name="bus-list-create"),
     path("buses/import/", BusImportView.as_view(), name="bus-import"),
     path("buses/import/template/", BusTemplateDownloadView.as_view(), name="bus-template"),

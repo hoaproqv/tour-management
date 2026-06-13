@@ -99,3 +99,6 @@ export const updateTenant = async (
 
 export const deleteTenant = async (id: number | string) =>
   deleteData(`/tenants/${id}/`);
+
+export const bulkDeleteTenants = async (ids: (string | number)[]) =>
+  postData("/tenants/bulk-delete/", { ids });

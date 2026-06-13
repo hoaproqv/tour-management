@@ -194,3 +194,32 @@ class TripBusDetailView(generics.RetrieveUpdateDestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+class TripBulkDeleteView(TripListCreateView):
+    from rest_framework import serializers
+    from drf_spectacular.utils import inline_serializer
+    from common.views import BaseAPIView
+
+    @extend_schema(
+        summary="Bulk delete trips",
+        description="Delete multiple trips by ID.",
+        request=inline_serializer("TripBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
+        responses={
+            200: inline_serializer(
+                "TripBulkDeleteResponse", 
+                fields={
+                    "success": serializers.BooleanField(), 
+                    "data": inline_serializer("TripBulkDeleteData", fields={"deleted": serializers.IntegerField()})
+                }
+            )
+        },
+        tags=["Trips"],
+    )
+    def post(self, request, *args, **kwargs):
+        from common.views import BaseAPIView
+        ids = request.data.get("ids", [])
+        if not ids:
+            return BaseAPIView().error("No ids provided")
+        qs = self.get_queryset().filter(id__in=ids)
+        deleted, _ = qs.delete()
+        return BaseAPIView().success({"deleted": deleted})
