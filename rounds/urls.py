@@ -5,6 +5,7 @@ from rounds.views import (
     RoundBusListCreateView,
     RoundDetailView,
     RoundListCreateView,
+    RoundReorderView,
     RoundImportView,
     RoundExportView,
     RoundTemplateDownloadView,
@@ -12,6 +13,7 @@ from rounds.views import (
 
 urlpatterns = [
     path("rounds/", RoundListCreateView.as_view(), name="round-list-create"),
+    path("rounds/reorder/", RoundReorderView.as_view(), name="round-reorder"),
     path("rounds/import/", RoundImportView.as_view(), name="round-import"),
     path("rounds/import/template/", RoundTemplateDownloadView.as_view(), name="round-template"),
     path("rounds/export/", RoundExportView.as_view(), name="round-export"),

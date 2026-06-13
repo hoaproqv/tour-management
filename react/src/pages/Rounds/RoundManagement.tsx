@@ -1,6 +1,20 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { EditOutlined, DeleteOutlined, FileExcelOutlined } from "@ant-design/icons";
+import {
+  EditOutlined,
+  DeleteOutlined,
+  FileExcelOutlined,
+  MenuOutlined,
+} from "@ant-design/icons";
+import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -22,15 +36,12 @@ import dayjs from "dayjs";
 import {
   createRound,
   deleteRound,
-  getBuses,
-  getPassengers,
   getRounds,
   getTripBuses,
   getTrips,
   updateRound,
   exportRounds,
-  type BusItem,
-  type Passenger,
+  reorderRounds,
   type RoundItem,
   type RoundPayload,
   type TripBus,
@@ -38,7 +49,7 @@ import {
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
-import { canManageCatalog } from "../../utils/helper";
+import { canManageCatalog, removeAccents } from "../../utils/helper";
 
 import RoundFormModal, {
   type RoundFormValues,
@@ -57,15 +68,65 @@ const statusMeta: Record<
   done: { label: "Đã hoàn thành", color: "green" },
 };
 
+interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
+  "data-row-key": string;
+}
+
+const DraggableRow = ({ children, ...props }: RowProps) => {
+  const isPlaceholder = props.className?.includes("ant-table-placeholder") || !props["data-row-key"];
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: props["data-row-key"] || "empty",
+  });
+
+  if (isPlaceholder) {
+    return <tr {...props}>{children}</tr>;
+  }
+
+  const style: React.CSSProperties = {
+    ...props.style,
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    ...(isDragging ? { position: "relative", zIndex: 9999, background: "#fafafa" } : {}),
+  };
+
+  return (
+    <tr {...props} ref={setNodeRef} style={style} {...attributes}>
+      {React.Children.map(children, (child) => {
+        if ((child as React.ReactElement).key === "drag-handle") {
+          return React.cloneElement(child as React.ReactElement<any>, {
+            children: (
+              <MenuOutlined
+                style={{ touchAction: "none", cursor: "grab", color: "#999" }}
+                {...listeners}
+              />
+            ),
+          });
+        }
+        return child;
+      })}
+    </tr>
+  );
+};
+
 export default function RoundManagement() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [tripFilter, setTripFilter] = useState<string | "all">("all");
+  const [tripFilter, setTripFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<RoundItem["status"] | "all">(
     "all",
   );
   const [showCreate, setShowCreate] = useState(false);
   const [editingRound, setEditingRound] = useState<RoundItem | null>(null);
+  const [localRounds, setLocalRounds] = useState<RoundItem[]>([]);
+  
   const [form] = Form.useForm<RoundFormValues>();
   const queryClient = useQueryClient();
   const { data: accountInfo } = useGetAccountInfo();
@@ -80,14 +141,7 @@ export default function RoundManagement() {
     queryKey: ["trip-buses", "for-rounds"],
     queryFn: () => getTripBuses({ page: 1, limit: 1000 }),
   });
-  const { data: busesResponse } = useQuery({
-    queryKey: ["buses", "for-rounds"],
-    queryFn: () => getBuses({ page: 1, limit: 1000 }),
-  });
-  const { data: passengersResponse } = useQuery({
-    queryKey: ["passengers", "for-rounds"],
-    queryFn: () => getPassengers({ page: 1, limit: 1000 }),
-  });
+
   const { data: roundsResponse, isLoading } = useQuery({
     queryKey: ["rounds"],
     queryFn: () => getRounds({ page: 1, limit: 1000 }),
@@ -98,6 +152,12 @@ export default function RoundManagement() {
     [tripsResponse],
   );
 
+  useEffect(() => {
+    if (trips.length > 0 && !tripFilter) {
+      setTripFilter(trips[0].id);
+    }
+  }, [trips, tripFilter]);
+
   const rounds = useMemo(
     () => (Array.isArray(roundsResponse?.data) ? roundsResponse.data : []),
     [roundsResponse],
@@ -107,17 +167,6 @@ export default function RoundManagement() {
     () =>
       Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
     [tripBusesResponse],
-  );
-
-  const buses = useMemo(
-    () => (Array.isArray(busesResponse?.data) ? busesResponse.data : []),
-    [busesResponse],
-  );
-
-  const passengers = useMemo(
-    () =>
-      Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
-    [passengersResponse],
   );
 
   const tripMap = useMemo(
@@ -138,45 +187,69 @@ export default function RoundManagement() {
     return grouped;
   }, [tripBuses]);
 
-  const busOptions = useMemo(
-    () =>
-      (Array.isArray(buses) ? buses : []).map((b: BusItem) => ({
-        value: b.id,
-        label: b.registration_number || b.bus_code || `Bus ${b.id}`,
-      })),
-    [buses],
-  );
-
-  const tripPassengersMap = useMemo(() => {
-    const grouped = new Map<string, Passenger[]>();
-    passengers.forEach((p) => {
-      const tripId = (p as unknown as { trip?: string }).trip;
-      if (!tripId) return;
-      const list = grouped.get(tripId) ?? [];
-      list.push(p);
-      grouped.set(tripId, list);
-    });
-    return grouped;
-  }, [passengers]);
-
   const filteredRounds = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
-    return (Array.isArray(rounds) ? rounds : []).filter((round) => {
-      const matchTrip = tripFilter === "all" ? true : round.trip === tripFilter;
+    const term = removeAccents(debouncedSearch).trim().toLowerCase();
+    const filtered = (Array.isArray(rounds) ? rounds : []).filter((round) => {
+      const matchTrip = round.trip === tripFilter;
       const matchStatus =
         statusFilter === "all" ? true : round.status === statusFilter;
       const matchTerm = term
-        ? round.name.toLowerCase().includes(term) ||
-          round.location.toLowerCase().includes(term)
+        ? removeAccents(round.name).toLowerCase().includes(term) ||
+          removeAccents(round.location).toLowerCase().includes(term)
         : true;
       return matchTrip && matchStatus && matchTerm;
     });
+    return filtered.sort((a, b) => a.sequence - b.sequence);
   }, [rounds, tripFilter, statusFilter, debouncedSearch]);
+
+  useEffect(() => {
+    setLocalRounds(filteredRounds);
+  }, [filteredRounds]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const reorderMutation = useMutation({
+    mutationFn: (items: Array<{ id: string | number; sequence: number }>) =>
+      reorderRounds(items),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["rounds"] });
+    },
+    onError: () => {
+      message.error("Lỗi khi cập nhật thứ tự chặng");
+      queryClient.invalidateQueries({ queryKey: ["rounds"] });
+    },
+  });
+
+  const onDragEnd = ({ active, over }: any) => {
+    if (active.id !== over?.id) {
+      setLocalRounds((prev) => {
+        const activeIndex = prev.findIndex((i) => i.id === active.id);
+        const overIndex = prev.findIndex((i) => i.id === over?.id);
+        const newArr = arrayMove(prev, activeIndex, overIndex);
+        
+        const updatedArr = newArr.map((item, index) => ({
+          ...item,
+          sequence: index + 1,
+        }));
+        
+        const payload = updatedArr.map(i => ({ id: i.id, sequence: i.sequence }));
+        reorderMutation.mutate(payload);
+        
+        return updatedArr;
+      });
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: RoundPayload) => createRound(payload),
     onSuccess: async () => {
-      message.success("Tạo round thành công");
+      message.success("Tạo chặng thành công");
       setShowCreate(false);
       form.resetFields();
       await Promise.all([
@@ -184,14 +257,14 @@ export default function RoundManagement() {
         queryClient.invalidateQueries({ queryKey: ["round-buses"] }),
       ]);
     },
-    onError: () => message.error("Tạo round thất bại"),
+    onError: () => message.error("Tạo chặng thất bại"),
   });
 
   const updateMutation = useMutation({
     mutationFn: (data: { id: string; payload: RoundPayload }) =>
       updateRound(data.id, data.payload),
     onSuccess: async () => {
-      message.success("Cập nhật round thành công");
+      message.success("Cập nhật chặng thành công");
       setEditingRound(null);
       form.resetFields();
       await Promise.all([
@@ -199,7 +272,7 @@ export default function RoundManagement() {
         queryClient.invalidateQueries({ queryKey: ["round-buses"] }),
       ]);
     },
-    onError: () => message.error("Cập nhật round thất bại"),
+    onError: () => message.error("Cập nhật chặng thất bại"),
   });
 
   const deleteMutation = useMutation({
@@ -208,7 +281,7 @@ export default function RoundManagement() {
       message.success("Xóa round thành công");
       await queryClient.invalidateQueries({ queryKey: ["rounds"] });
     },
-    onError: () => message.error("Xóa round thất bại"),
+    onError: () => message.error("Xóa chặng thất bại"),
   });
 
   const { mutate: deleteRoundMutate, status: deleteStatus } = deleteMutation;
@@ -234,11 +307,6 @@ export default function RoundManagement() {
         trip: round.trip,
         name: round.name,
         location: round.location,
-        sequence: round.sequence,
-        estimate_time: dayjs(round.estimate_time),
-        actual_time: round.actual_time ? dayjs(round.actual_time) : null,
-        status: round.status,
-        bus_ids: round.bus_ids,
       });
       setShowCreate(true);
     },
@@ -253,16 +321,8 @@ export default function RoundManagement() {
           trip: values.trip,
           name: values.name,
           location: values.location,
-          sequence: Number(values.sequence),
-          estimate_time: values.estimate_time.format("YYYY-MM-DDTHH:mm:ss"),
-          actual_time: values.actual_time
-            ? values.actual_time.format("YYYY-MM-DDTHH:mm:ss")
-            : null,
-          status: values.status,
-          bus_ids:
-            values.bus_ids && values.bus_ids.length
-              ? values.bus_ids.map((id) => Number(id))
-              : tripDefaultBusMap.get(values.trip) || [],
+          sequence: editingRound ? editingRound.sequence : localRounds.length + 1,
+          bus_ids: tripDefaultBusMap.get(values.trip) || [],
         };
         if (editingRound) {
           updateMutation.mutate({ id: editingRound.id, payload });
@@ -282,7 +342,12 @@ export default function RoundManagement() {
   const columns = useMemo(() => {
     const base = [
       {
-        title: "Trip",
+        key: "drag-handle",
+        width: 50,
+        render: () => null, // Renders the drag handle inside DraggableRow
+      },
+      {
+        title: "Chuyến đi",
         dataIndex: "trip",
         render: (val: string) => tripMap.get(val) || "—",
       },
@@ -361,42 +426,42 @@ export default function RoundManagement() {
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-2">
+          <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
-              Round Management
+              ROUND MANAGEMENT
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Quản lý Round
+              Quản lý Chặng
             </Title>
             <Text type="secondary">
-              Quản lý các round thuộc trip và trạng thái thực hiện.
+              Quản lý các chặng thuộc chuyến đi và trạng thái thực hiện.
             </Text>
           </div>
-          <div className="flex flex-col md:flex-row gap-2 md:items-center">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <Input
               allowClear
               placeholder="Tìm theo tên hoặc địa điểm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full md:w-64"
+              className="w-full sm:w-64"
             />
             <Select
               value={tripFilter}
               onChange={(val) => setTripFilter(val)}
-              className="w-full md:w-48"
+              className="w-full sm:w-48"
               options={[
-                { value: "all", label: "Tất cả trip" },
                 ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
                   value: t.id,
                   label: t.name,
                 })),
               ]}
+              placeholder="Chọn chuyến"
             />
             <Select
               value={statusFilter}
               onChange={(val) => setStatusFilter(val)}
-              className="w-full md:w-48"
+              className="w-full sm:w-48"
               options={[
                 { value: "all", label: "Tất cả trạng thái" },
                 ...Object.entries(statusMeta).map(([value, meta]) => ({
@@ -410,8 +475,8 @@ export default function RoundManagement() {
                 <Button
                   icon={<FileExcelOutlined />}
                   onClick={async () => {
-                    if (tripFilter === "all") {
-                      message.warning("Vui lòng chọn một trip cụ thể để export");
+                    if (!tripFilter) {
+                      message.warning("Vui lòng chọn một chuyến đi");
                       return;
                     }
                     try {
@@ -430,7 +495,11 @@ export default function RoundManagement() {
                 >
                   Export
                 </Button>
-                <Button type="primary" onClick={openCreate} className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5">
+                <Button
+                  type="primary"
+                  onClick={openCreate}
+                  className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
+                >
                   + Tạo mới
                 </Button>
               </div>
@@ -439,22 +508,30 @@ export default function RoundManagement() {
         </div>
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
-          <Table
-            size="small"
-            rowKey="id"
-            dataSource={filteredRounds}
-            loading={isLoading}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            scroll={{ x: true }}
-            columns={columns}
-            locale={{
-              emptyText: isLoading ? (
-                <span>Đang tải...</span>
-              ) : (
-                <Empty description="Chưa có dữ liệu" />
-              ),
-            }}
-          />
+          <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+            <SortableContext
+              items={localRounds.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <Table
+                components={{ body: { row: DraggableRow } }}
+                size="small"
+                rowKey="id"
+                dataSource={localRounds}
+                loading={isLoading}
+                pagination={false}
+                scroll={{ x: "max-content" }}
+                columns={columns}
+                locale={{
+                  emptyText: isLoading ? (
+                    <span>Đang tải...</span>
+                  ) : (
+                    <Empty description="Chưa có dữ liệu" />
+                  ),
+                }}
+              />
+            </SortableContext>
+          </DndContext>
         </Card>
       </div>
 
@@ -468,11 +545,7 @@ export default function RoundManagement() {
         }
         form={form}
         trips={trips}
-        busOptions={busOptions}
-        tripDefaultBusMap={tripDefaultBusMap}
-        tripPassengersMap={tripPassengersMap}
         editingRound={editingRound}
-        statusMeta={statusMeta}
         tripFilter={tripFilter}
       />
     </div>

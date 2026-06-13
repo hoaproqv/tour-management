@@ -13,6 +13,7 @@ import {
   Tooltip,
   Typography,
   message,
+  Space,
 } from "antd";
 
 import {
@@ -80,6 +81,8 @@ export default function TenantManagement() {
     setEditingTenant(tenant);
     form.setFieldsValue({
       name: tenant.name,
+      phone: tenant.phone,
+      address: tenant.address,
       description: tenant.description,
     });
     setShowModal(true);
@@ -91,6 +94,8 @@ export default function TenantManagement() {
       .then((values) => {
         const payload: TenantPayload = {
           name: values.name,
+          phone: values.phone,
+          address: values.address,
           description: values.description || "",
         };
         if (editingTenant) {
@@ -106,33 +111,44 @@ export default function TenantManagement() {
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-2">
+          <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
               Tenant Management
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Quản lý Tenant
+              Quản lý Công ty
             </Title>
             <Text type="secondary">
-              Tạo, cập nhật hoặc xóa tenant để gán cho chuyến đi.
+              Tạo, cập nhật hoặc xóa Công ty để gán cho Chuyến đi.
             </Text>
           </div>
           <Button type="primary" onClick={openCreate}>
-            + Tạo tenant
+            + Tạo Công ty
           </Button>
         </div>
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
-          <Table
+          <Table scroll={{ x: "max-content" }}
+            size="small"
             rowKey="id"
             dataSource={tenants}
             loading={isLoading}
-            pagination={{ pageSize: 8, showSizeChanger: false }}
+            pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
             columns={[
               {
                 title: "Tên",
                 dataIndex: "name",
+              },
+              {
+                title: "Số điện thoại",
+                dataIndex: "phone",
+                render: (val: string) => val || "—",
+              },
+              {
+                title: "Địa chỉ",
+                dataIndex: "address",
+                render: (val: string) => val || "—",
               },
               {
                 title: "Mô tả",
@@ -143,33 +159,31 @@ export default function TenantManagement() {
                 title: "Thao tác",
                 dataIndex: "actions",
                 render: (_: unknown, record: TenantItem) => (
-                  <div className="flex gap-1">
+                  <Space>
                     <Tooltip title="Sửa">
                       <Button
-                        size="small"
+                        type="text"
                         icon={<EditOutlined />}
                         onClick={() => openEdit(record)}
-                        className="text-blue-500 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                        style={{ color: "#2563eb" }}
                       />
                     </Tooltip>
                     <Popconfirm
                       title="Xóa tenant này?"
                       description="Thao tác này không thể hoàn tác."
+                      onConfirm={() => deleteMutation.mutate(record.id)}
                       okText="Xóa"
                       cancelText="Hủy"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => deleteMutation.mutate(record.id)}
                     >
                       <Tooltip title="Xóa">
                         <Button
-                          size="small"
-                          icon={<DeleteOutlined />}
+                          type="text"
                           danger
-                          className="border border-transparent hover:border-red-400 hover:bg-red-50 transition-colors"
+                          icon={<DeleteOutlined />}
                         />
                       </Tooltip>
                     </Popconfirm>
-                  </div>
+                  </Space>
                 ),
               },
             ]}
@@ -185,7 +199,7 @@ export default function TenantManagement() {
           createMutation.status === "pending" ||
           updateMutation.status === "pending"
         }
-        title={editingTenant ? "Cập nhật tenant" : "Tạo tenant mới"}
+        title={editingTenant ? "Cập nhật Công ty" : "Tạo Công ty mới"}
         okText={editingTenant ? "Cập nhật" : "Tạo"}
         cancelText="Hủy"
         destroyOnHidden
@@ -194,9 +208,15 @@ export default function TenantManagement() {
           <Form.Item
             label="Tên"
             name="name"
-            rules={[{ required: true, message: "Nhập tên tenant" }]}
+            rules={[{ required: true, message: "Nhập tên Công ty" }]}
           >
             <Input placeholder="Ví dụ: Công ty ABC" />
+          </Form.Item>
+          <Form.Item label="Số điện thoại" name="phone">
+            <Input placeholder="Nhập số điện thoại" />
+          </Form.Item>
+          <Form.Item label="Địa chỉ" name="address">
+            <Input placeholder="Nhập địa chỉ" />
           </Form.Item>
           <Form.Item label="Mô tả" name="description">
             <Input.TextArea rows={3} placeholder="Ghi chú" />

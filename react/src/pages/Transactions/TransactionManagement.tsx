@@ -44,6 +44,7 @@ import {
   isAdminLike,
   isFleetLead,
   isTourManagerLike,
+  removeAccents,
 } from "../../utils/helper";
 
 import { BusPane } from "./components/BusPane";
@@ -939,14 +940,14 @@ export default function TransactionManagement() {
     fetchingTransfers;
 
   const tripPassengers = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = removeAccents(search).trim().toLowerCase();
     const list = passengers;
     if (!term) return list;
     return list.filter(
       (p) =>
-        p.name.toLowerCase().includes(term) ||
-        (p.phone || "").toLowerCase().includes(term) ||
-        (p.note || "").toLowerCase().includes(term),
+        removeAccents(p.name).toLowerCase().includes(term) ||
+        removeAccents(p.phone || "").toLowerCase().includes(term) ||
+        removeAccents(p.note || "").toLowerCase().includes(term),
     );
   }, [passengers, search]);
 
@@ -1104,6 +1105,45 @@ export default function TransactionManagement() {
     checkOutMutation.mutate(txn);
   };
 
+  const handleCheckOutAll = (
+    checkedInRows: PassengerRow[],
+    roundBusId?: string,
+  ) => {
+    if (tripLockedForAttendance) {
+      message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
+      return;
+    }
+    if (!roundBusId) return;
+    if (!canOperateRoundBus(roundBusId)) {
+      message.warning("Bạn không được phép thao tác với xe này");
+      return;
+    }
+    const now = new Date().toISOString();
+    const toCheckOut = checkedInRows.filter(
+      (r) =>
+        r.status === "checkedInHere" &&
+        r.transaction &&
+        !r.transaction.check_out,
+    );
+    if (toCheckOut.length === 0) return;
+    // Fire all in parallel — acceptable since they are independent transactions
+    Promise.all(
+      toCheckOut.map((r) =>
+        updateTransaction(r.transaction!.id, {
+          passenger: r.transaction!.passenger,
+          round_bus: r.transaction!.round_bus,
+          check_in: r.transaction!.check_in,
+          check_out: now,
+        }),
+      ),
+    )
+      .then(() => {
+        message.success(`Điểm danh xuống ${toCheckOut.length} hành khách`);
+        return queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      })
+      .catch(() => message.error("Điểm danh xuống thất bại"));
+  };
+
   const handleSwitchBus = (
     passengerId: string,
     fromTxn: TransactionItem | undefined,
@@ -1213,6 +1253,44 @@ export default function TransactionManagement() {
     refreshing ||
     transactionsLoading;
 
+  // Track which round-buses have completed the "checkout" phase for intermediate stops
+  const [checkoutDoneRbs, setCheckoutDoneRbs] = React.useState<Set<string>>(
+    new Set(),
+  );
+
+  // Position of the currently viewed round within the trip
+  const activeRoundIndex = tripRoundsSorted.findIndex(
+    (r) => r.id === activeRoundId,
+  );
+  const roundPosition: "first" | "middle" | "last" = React.useMemo(() => {
+    if (activeRoundIndex < 0 || tripRoundsSorted.length === 0) return "first";
+    if (activeRoundIndex === 0) return "first";
+    if (activeRoundIndex === tripRoundsSorted.length - 1) return "last";
+    return "middle";
+  }, [activeRoundIndex, tripRoundsSorted.length]);
+
+  // Finalise the checkout phase for a middle stop — opens check-in phase
+  const handleFinalizeCheckout = (roundBusId: string) => {
+    if (!canOperateRoundBus(roundBusId)) {
+      message.warning("Bạn không được phép thao tác với xe này");
+      return;
+    }
+    setCheckoutDoneRbs((prev) => new Set([...prev, roundBusId]));
+    message.success("Đã chốt điểm danh xuống. Bây giờ có thể điểm danh lên.");
+  };
+
+  // Finalise check-in phase (or first-round-only finalize)
+  const handleFinalizeCheckin = (roundBusId?: string) => {
+    if (!roundBusId) return;
+    handleFinalize(roundBusId);
+    // Clear checkout-done flag when entire round-bus is finalized
+    setCheckoutDoneRbs((prev) => {
+      const next = new Set(prev);
+      next.delete(roundBusId);
+      return next;
+    });
+  };
+
   const busTabs = tripScopedTripBuses
     .map((tb) => {
       const label = tripBusLabelMap.get(tb.id) || "Bus";
@@ -1288,10 +1366,16 @@ export default function TransactionManagement() {
                     passengerId: undefined,
                   })
             }
-            onFinalize={handleFinalize}
+            onFinalize={handleFinalizeCheckin}
+            onFinalizeCheckout={handleFinalizeCheckout}
             onCheckIn={handleCheckIn}
             onCheckOut={handleCheckOut}
+            onCheckOutAll={(checkedInRows) =>
+              handleCheckOutAll(checkedInRows, roundBusId)
+            }
             onSwitchBus={handleSwitchBus}
+            roundPosition={roundPosition}
+            checkoutPhaseFinalized={checkoutDoneRbs.has(roundBusId)}
             busy={mutationBusy}
           />
         ),
@@ -1302,13 +1386,13 @@ export default function TransactionManagement() {
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-2">
+          <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
               Transaction
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Điểm danh hành khách nhanh
+              Điểm danh hành khách
             </Title>
             <Text type="secondary">
               Chọn trip, duyệt round theo checkpoint, chuyển tab xe và điểm danh

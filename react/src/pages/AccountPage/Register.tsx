@@ -39,7 +39,7 @@ const Register = () => {
         <div className="hidden md:flex flex-col justify-between bg-[rgba(28,100,242,0.12)] p-10 border-r border-white/40">
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-sky-700 font-semibold">
-              Tour Management
+              Quản lý Chuyến đi
             </p>
             <h1 className="text-3xl font-bold text-slate-900 mt-4 leading-tight">
               Tạo tài khoản mới

@@ -80,6 +80,7 @@ class PassengerListCreateView(generics.ListCreateAPIView):
 
         qs = Passenger.objects.prefetch_related(
             Prefetch("bus_assignments", queryset=assignment_qs),
+            Prefetch("bus_assignments", queryset=PassengerBusAssignment.objects.select_related("trip"), to_attr="all_assignments"),
         )
         user = self.request.user
         if getattr(user, "tenant_id", None):
@@ -136,6 +137,7 @@ class PassengerDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         qs = Passenger.objects.prefetch_related(
             Prefetch("bus_assignments", queryset=assignment_qs),
+            Prefetch("bus_assignments", queryset=PassengerBusAssignment.objects.select_related("trip"), to_attr="all_assignments"),
         )
         user = self.request.user
         if getattr(user, "tenant_id", None):
@@ -396,6 +398,75 @@ class PassengerAssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 # Import / Export
 # ---------------------------------------------------------------------------
 
+class PassengerImportCheckView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(
+        summary="Check passengers import",
+        tags=["Passengers"],
+    )
+    def post(self, request, *args, **kwargs):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = request.user
+        tenant = getattr(user, "tenant", None)
+        if not tenant:
+            return Response({"detail": "Cần có tenant để check."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(uploaded_file, read_only=True, data_only=True)
+        except Exception as e:
+            return Response({"detail": f"Error reading Excel: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_passengers = []
+        conflicts = []
+        
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            rows = list(ws.iter_rows(values_only=True))
+            data_rows = rows[1:] if rows else []
+            
+            for row in data_rows:
+                if not row or not any(row): continue
+                name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                phone = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+                note = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                
+                if not name: continue
+                
+                row_data = {
+                    "name": name,
+                    "phone": phone if phone.lower() != 'none' else "",
+                    "note": note if note.lower() != 'none' else "",
+                    "sheet_name": sheet_name
+                }
+                
+                conflict_passenger = None
+                if row_data["phone"]:
+                    conflict_passenger = Passenger.objects.filter(tenant=tenant, phone=row_data["phone"]).first()
+                
+                if conflict_passenger and conflict_passenger.name != name:
+                    conflicts.append({
+                        "imported": row_data,
+                        "existing": {
+                            "id": conflict_passenger.id,
+                            "name": conflict_passenger.name,
+                            "phone": conflict_passenger.phone,
+                        }
+                    })
+                else:
+                    valid_passengers.append(row_data)
+
+        return Response({
+            "valid_passengers": valid_passengers,
+            "conflicts": conflicts
+        })
+
+
 class PassengerImportView(APIView):
     """POST /api/v1/passengers/import/
 
@@ -423,6 +494,13 @@ class PassengerImportView(APIView):
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        import json
+        conflict_resolutions_str = request.data.get("conflict_resolutions", "{}")
+        try:
+            conflict_resolutions = json.loads(conflict_resolutions_str)
+        except:
+            conflict_resolutions = {}
 
         # --- Resolve / create trip ---
         trip_id = request.data.get("trip_id")
@@ -508,7 +586,9 @@ class PassengerImportView(APIView):
                         continue
                     name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
                     phone = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+                    phone = phone if phone.lower() != 'none' else ""
                     note = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                    note = note if note.lower() != 'none' else ""
 
                     if not name:
                         continue
@@ -523,6 +603,7 @@ class PassengerImportView(APIView):
                         passenger = Passenger.objects.filter(
                             tenant=tenant, name=name
                         ).first()
+                        
                     if not passenger:
                         passenger = Passenger.objects.create(
                             tenant=tenant,
@@ -531,6 +612,12 @@ class PassengerImportView(APIView):
                             note=note,
                         )
                     else:
+                        # Apply conflict resolution
+                        res = conflict_resolutions.get(phone)
+                        if res == "update" and passenger.name != name:
+                            passenger.name = name
+                            passenger.save(update_fields=["name"])
+                            
                         # Update note if provided and previously blank
                         if note and not passenger.note:
                             passenger.note = note
@@ -684,7 +771,7 @@ class PassengerTemplateDownloadView(APIView):
 
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Sheet1"
+        ws.title = "Xe 1"
         ws.append(PASSENGER_COLUMNS)
 
         buf = io.BytesIO()

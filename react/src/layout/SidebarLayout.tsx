@@ -25,7 +25,7 @@ export default function SidebarLayout() {
           />
         </div>
 
-        <main className="flex-1 min-w-0 px-3 md:px-6 pb-10 overflow-y-auto custom-scrollbar">
+        <main className="flex-1 min-w-0 px-3 md:px-6 pb-10 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {/* Mobile toggle button */}
           <div className="md:hidden sticky top-0 z-30 bg-[#f2f3f7] py-3 -mx-3 px-3 mb-4 shadow-sm border-b border-gray-200 flex items-center justify-between">
             <span className="font-medium text-gray-700">Trình điều khiển</span>

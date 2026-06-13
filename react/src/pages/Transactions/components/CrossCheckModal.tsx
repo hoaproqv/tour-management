@@ -130,7 +130,7 @@ export function CrossCheckModal({
               key: b.id,
               label: sourceLabel,
               children: (
-                <Table
+                <Table scroll={{ x: "max-content" }}
                   size="small"
                   rowKey="key"
                   dataSource={sourceRowsFiltered}

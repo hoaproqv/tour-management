@@ -7,6 +7,7 @@ from passengers.views import (
     PassengerAssignmentListCreateView,
     PassengerDetailView,
     PassengerExportView,
+    PassengerImportCheckView,
     PassengerImportView,
     PassengerListCreateView,
     PassengerTemplateDownloadView,
@@ -17,6 +18,9 @@ from passengers.views import (
 urlpatterns = [
     path(
         "passengers/", PassengerListCreateView.as_view(), name="passenger-list-create"
+    ),
+    path(
+        "passengers/import/check/", PassengerImportCheckView.as_view(), name="passenger-import-check"
     ),
     path(
         "passengers/import/", PassengerImportView.as_view(), name="passenger-import"

@@ -2,7 +2,8 @@ import React from "react";
 
 import { TeamOutlined, CarOutlined, FieldTimeOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Skeleton, Tag } from "antd";
+import { Card, Skeleton, Tag, Table, Typography } from "antd";
+import dayjs from "dayjs";
 
 import { getDashboardOverview } from "../api/dashboard";
 
@@ -74,7 +75,7 @@ const Dashboard: React.FC = () => {
               Dashboard
             </h1>
             <p className="text-sm md:text-base text-slate-500 mt-1 md:mt-2">
-              Tổng quan nhanh về chuyến, hành khách và xe bus trong hệ thống tour.
+              Tổng quan nhanh về chuyến, hành khách và xe bus trong hệ thống chuyến đi.
             </p>
           </div>
         </div>
@@ -125,6 +126,117 @@ const Dashboard: React.FC = () => {
               )}
             </Card>
           ))}
+        </div>
+
+        {/* Recent Data Sections */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-8">
+          {/* Recent Trips */}
+          <div className="bg-white border border-slate-100 shadow-sm rounded-xl p-4 md:p-6 flex flex-col">
+            <div className="mb-4">
+              <Typography.Title level={4} className="!mb-0 !text-slate-800">
+                Chuyến đi gần đây
+              </Typography.Title>
+              <Typography.Text className="text-slate-500">
+                5 chuyến đi được cập nhật mới nhất
+              </Typography.Text>
+            </div>
+            <Table scroll={{ x: "max-content" }}
+              dataSource={data?.recent_trips}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              loading={isLoading}
+              className="custom-table overflow-x-auto"
+              columns={[
+                {
+                  title: "Tên chuyến",
+                  dataIndex: "name",
+                  key: "name",
+                  render: (text) => <span className="font-medium text-slate-700">{text}</span>,
+                },
+                {
+                  title: "Ngày bắt đầu",
+                  dataIndex: "start_date",
+                  key: "start_date",
+                  render: (date) => (
+                    <span className="text-slate-600">
+                      {date ? dayjs(date).format("DD/MM/YYYY") : "—"}
+                    </span>
+                  ),
+                },
+                {
+                  title: "Trạng thái",
+                  dataIndex: "status",
+                  key: "status",
+                  render: (status) => {
+                    const colors = {
+                      planned: "blue",
+                      doing: "orange",
+                      done: "green",
+                    };
+                    const labels = {
+                      planned: "Lên kế hoạch",
+                      doing: "Đang đi",
+                      done: "Hoàn thành",
+                    };
+                    return (
+                      <Tag color={colors[status as keyof typeof colors]}>
+                        {labels[status as keyof typeof labels] || status}
+                      </Tag>
+                    );
+                  },
+                },
+              ]}
+            />
+          </div>
+
+          {/* Recent Transactions */}
+          <div className="bg-white border border-slate-100 shadow-sm rounded-xl p-4 md:p-6 flex flex-col">
+            <div className="mb-4">
+              <Typography.Title level={4} className="!mb-0 !text-slate-800">
+                Hoạt động điểm danh
+              </Typography.Title>
+              <Typography.Text className="text-slate-500">
+                5 lượt check-in gần nhất trên hệ thống
+              </Typography.Text>
+            </div>
+            <Table scroll={{ x: "max-content" }}
+              dataSource={data?.recent_transactions}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              loading={isLoading}
+              className="custom-table overflow-x-auto"
+              columns={[
+                {
+                  title: "Hành khách",
+                  dataIndex: "passenger_name",
+                  key: "passenger_name",
+                  render: (text) => <span className="font-medium text-slate-700">{text}</span>,
+                },
+                {
+                  title: "Điểm đến / Xe",
+                  key: "round_bus",
+                  render: (_, record) => (
+                    <div className="flex flex-col">
+                      <span className="text-slate-800 text-sm">{record.round_name}</span>
+                      <span className="text-slate-500 text-xs">{record.bus_number}</span>
+                    </div>
+                  ),
+                },
+                {
+                  title: "Thời gian",
+                  dataIndex: "check_in",
+                  key: "check_in",
+                  render: (date) => (
+                    <span className="text-slate-600 text-sm">
+                      {date ? dayjs(date).format("HH:mm DD/MM") : "—"}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
         </div>
       </div>
     </div>

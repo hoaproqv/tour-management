@@ -20,12 +20,13 @@ import {
 import { getUsers } from "../../api/users";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
-import { canManageCatalog } from "../../utils/helper";
+import { canManageCatalog, removeAccents } from "../../utils/helper";
 
 import PassengerAssignmentModal from "./components/PassengerAssignmentModal";
-import TripDetailModal from "./components/TripDetailModal";
+import TripBusAssignmentModal from "./components/TripBusAssignmentModal";
 import TripFormModal, { type TripFormValues } from "./components/TripFormModal";
 import TripHeader from "./components/TripHeader";
+import TripRoundManagementModal from "./components/TripRoundManagementModal";
 import TripTable from "./components/TripTable";
 import { type EnrichedTrip } from "./components/types";
 
@@ -43,10 +44,8 @@ export default function TripManagement() {
   const [statusFilter, setStatusFilter] = useState<Trip["status"] | "all">(
     "all",
   );
-  const [detail, setDetail] = useState<{
-    trip: EnrichedTrip;
-    mode: "rounds" | "buses";
-  } | null>(null);
+  const [managingRoundsTrip, setManagingRoundsTrip] = useState<EnrichedTrip | null>(null);
+  const [assigningBusesTrip, setAssigningBusesTrip] = useState<EnrichedTrip | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [assigningTrip, setAssigningTrip] = useState<EnrichedTrip | null>(null);
@@ -119,16 +118,6 @@ export default function TripManagement() {
     [fleetLeadResponse],
   );
 
-  const userContactMap = useMemo(() => {
-    const map = new Map<string | number, { name?: string; phone?: string }>();
-    drivers.forEach((u) => {
-      map.set(u.id, { name: u.name, phone: (u as { phone?: string }).phone });
-    });
-    fleetLeads.forEach((u) => {
-      map.set(u.id, { name: u.name, phone: (u as { phone?: string }).phone });
-    });
-    return map;
-  }, [drivers, fleetLeads]);
 
   useEffect(() => {
     if (accountInfo?.tenant) {
@@ -175,11 +164,11 @@ export default function TripManagement() {
   }, [trips, tripBuses, rounds]);
 
   const filteredTrips = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
+    const term = removeAccents(debouncedSearch).trim().toLowerCase();
     return enrichedTrips.filter((trip) => {
       const matchTerm = term
-        ? trip.name.toLowerCase().includes(term) ||
-          trip.description.toLowerCase().includes(term)
+        ? removeAccents(trip.name).toLowerCase().includes(term) ||
+          removeAccents(trip.description).toLowerCase().includes(term)
         : true;
       const matchStatus =
         statusFilter === "all" ? true : trip.status === statusFilter;
@@ -193,54 +182,42 @@ export default function TripManagement() {
   const createTripMutation = useMutation({
     mutationFn: (payload: TripPayload) => createTrip(payload),
     onSuccess: async () => {
-      message.success("Tạo trip thành công");
+      message.success("Tạo chuyến đi thành công");
       setShowCreate(false);
       form.resetFields();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["trips"] }),
-        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
-      ]);
+      // Chỉ cần xóa cache "trips" — trip-buses và rounds chưa tồn tại cho tour mới
+      await queryClient.invalidateQueries({ queryKey: ["trips"] });
     },
-    onError: () => {
-      message.error("Tạo trip thất bại");
-    },
+    onError: () => message.error("Tạo chuyến đi thất bại"),
   });
 
   const updateTripMutation = useMutation({
     mutationFn: (data: { id: string; payload: TripPayload }) =>
       updateTrip(data.id, data.payload),
     onSuccess: async () => {
-      message.success("Cập nhật trip thành công");
+      message.success("Cập nhật chuyến đi thành công");
       setEditingTrip(null);
       form.resetFields();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["trips"] }),
-        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
-      ]);
+      // Chỉ cần cập nhật cache "trips" — trip-buses không thay đổi khi sửa thông tin tour
+      await queryClient.invalidateQueries({ queryKey: ["trips"] });
     },
-    onError: () => {
-      message.error("Cập nhật trip thất bại");
-    },
+    onError: () => message.error("Cập nhật chuyến đi thất bại"),
   });
 
   const deleteTripMutation = useMutation({
     mutationFn: (id: string) => deleteTrip(id),
     onSuccess: async () => {
-      message.success("Đã xóa trip thành công");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["trips"] }),
-        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
-        queryClient.invalidateQueries({ queryKey: ["rounds"] }),
-        queryClient.invalidateQueries({ queryKey: ["passengers"] }),
-        queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
-      ]);
+      message.success("Đã xóa chuyến đi thành công");
+      // Khi xóa tour, các entity liên quan (rounds, passengers) cũng không còn.
+      // staleTime sẽ tự expire trong vòng 1 phút — chỉ force xóa trips.
+      await queryClient.invalidateQueries({ queryKey: ["trips"] });
     },
-    onError: () => message.error("Xóa trip thất bại"),
+    onError: () => message.error("Xóa chuyến đi thất bại"),
   });
 
   const openCreate = () => {
     if (!canManageTrips) {
-      message.warning("Bạn không có quyền chỉnh sửa trip");
+      message.warning("Bạn không có quyền chỉnh sửa chuyến đi");
       return;
     }
     setEditingTrip(null);
@@ -250,25 +227,16 @@ export default function TripManagement() {
 
   const openEdit = (trip: Trip) => {
     if (!canManageTrips) {
-      message.warning("Bạn không có quyền chỉnh sửa trip");
+      message.warning("Bạn không có quyền chỉnh sửa chuyến đi");
       return;
     }
     setEditingTrip(trip);
-    const assignments = tripBuses
-      .filter((tb) => tb.trip === trip.id)
-      .map((tb) => ({
-        bus: tb.bus,
-        manager: tb.manager,
-        driver: tb.driver ?? undefined,
-      }));
     form.setFieldsValue({
       name: trip.name,
       tenant_id: trip.tenant || tenants[0]?.id,
       description: trip.description,
-      status: trip.status,
       start_date: dayjs(trip.start_date),
       end_date: dayjs(trip.end_date),
-      bus_assignments: assignments,
     });
     setShowCreate(true);
   };
@@ -277,21 +245,15 @@ export default function TripManagement() {
     form
       .validateFields()
       .then((values) => {
-        const status = editingTrip
-          ? values.status || editingTrip.status
-          : "planned";
         const payload: TripPayload = {
           name: values.name,
           description: values.description || "",
-          status,
+          // Status is read-only — always preserve the trip's current status
+          status: editingTrip ? editingTrip.status : "planned",
           start_date: values.start_date.format("YYYY-MM-DD"),
           end_date: values.end_date.format("YYYY-MM-DD"),
           tenant_id: Number(values.tenant_id),
-          bus_assignments: (values.bus_assignments || []).map((item) => ({
-            bus: Number(item.bus as string | number),
-            manager: Number(item.manager as string | number),
-            driver: Number(item.driver as string | number),
-          })),
+          bus_assignments: [],
         };
         if (editingTrip) {
           updateTripMutation.mutate({ id: editingTrip.id, payload });
@@ -328,12 +290,12 @@ export default function TripManagement() {
             statusMeta={statusMeta}
             canManage={canManageTrips}
             onEdit={openEdit}
-            onViewRounds={(trip) => setDetail({ trip, mode: "rounds" })}
-            onViewBuses={(trip) => setDetail({ trip, mode: "buses" })}
+            onViewRounds={(trip) => setManagingRoundsTrip(trip)}
+            onViewBuses={(trip) => setAssigningBusesTrip(trip)}
             onAssignPassengers={(trip) => setAssigningTrip(trip)}
             onDelete={(trip) => {
               if (!canManageTrips) {
-                message.warning("Bạn không có quyền xóa trip");
+                message.warning("Bạn không có quyền xóa chuyến đi");
                 return;
               }
               deleteTripMutation.mutate(trip.id);
@@ -342,12 +304,20 @@ export default function TripManagement() {
         </Card>
       </div>
 
-      <TripDetailModal
-        detail={detail}
-        onClose={() => setDetail(null)}
-        busMap={busMap}
-        userContactMap={userContactMap}
-        statusMeta={statusMeta}
+      <TripRoundManagementModal
+        open={Boolean(managingRoundsTrip)}
+        trip={managingRoundsTrip}
+        onClose={() => setManagingRoundsTrip(null)}
+      />
+
+      <TripBusAssignmentModal
+        open={Boolean(assigningBusesTrip)}
+        trip={assigningBusesTrip}
+        onClose={() => setAssigningBusesTrip(null)}
+        buses={buses}
+        loadingBuses={!busesResponse}
+        drivers={drivers}
+        fleetLeads={fleetLeads}
       />
 
       <PassengerAssignmentModal
@@ -368,13 +338,8 @@ export default function TripManagement() {
         form={form}
         tenants={tenants}
         loadingTenants={loadingTenants}
-        buses={buses}
-        loadingBuses={!busesResponse}
         accountTenant={accountInfo?.tenant ?? undefined}
         editingTrip={editingTrip}
-        statusMeta={statusMeta}
-        drivers={drivers}
-        fleetLeads={fleetLeads}
       />
     </div>
   );

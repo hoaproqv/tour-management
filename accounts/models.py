@@ -10,6 +10,8 @@ class Tenant(models.Model):
     id = models.BigAutoField(primary_key=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    phone = models.CharField(max_length=30, blank=True, null=True)
+    address = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

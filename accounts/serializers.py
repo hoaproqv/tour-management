@@ -155,7 +155,7 @@ class RoleSerializer(serializers.ModelSerializer):
 class TenantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tenant
-        fields = ["id", "name", "description", "created_at", "updated_at"]
+        fields = ["id", "name", "description", "phone", "address", "created_at", "updated_at"]
 
 
 class TokenPairSerializer(serializers.Serializer):

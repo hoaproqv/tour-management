@@ -216,7 +216,7 @@ export default function ImportedBusMapper({
         </Space>
       }
       extra={
-        onDone && allMapped ? (
+        onDone && allMapped && !readOnly ? (
           <Button type="primary" size="small" onClick={onDone}>
             Hoàn tất
           </Button>
@@ -228,7 +228,7 @@ export default function ImportedBusMapper({
           type="warning"
           showIcon
           className="mb-4"
-          message="Tour đã bắt đầu — không thể thay đổi gán xe."
+          message="Chuyến đi đã bắt đầu — không thể thay đổi gán xe."
         />
       ) : !allMapped ? (
         <Alert
@@ -239,7 +239,7 @@ export default function ImportedBusMapper({
         />
       ) : null}
 
-      <Table
+      <Table scroll={{ x: "max-content" }}
         rowKey="id"
         dataSource={importedBuses}
         columns={columns}

@@ -115,7 +115,55 @@ def sync_round_progress(round_obj: Round, *, prev_status: str | None = None) -> 
     return round_obj
 
 
+class RoundReorderView(generics.GenericAPIView):
+    """
+    POST /rounds/reorder/
+    Body: [{"id": 1, "sequence": 1}, {"id": 2, "sequence": 2}, ...]
+    Atomically reassigns sequence numbers to avoid unique-constraint conflicts.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        request={"application/json": {"type": "array", "items": {"type": "object"}}},
+        responses={200: {"description": "Reordered successfully"}},
+        tags=["Rounds"],
+    )
+    def post(self, request, *args, **kwargs):
+        from django.db import transaction
+
+        items = request.data
+        if not isinstance(items, list):
+            from rest_framework.response import Response
+            return Response(
+                {"detail": "Expected a list of {id, sequence} objects."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ids = [item.get("id") for item in items if item.get("id") is not None]
+        rounds_qs = Round.objects.filter(pk__in=ids)
+        round_map = {r.pk: r for r in rounds_qs}
+
+        with transaction.atomic():
+            # Step 1: push all to large temp values to avoid unique conflicts
+            for item in items:
+                rid = item.get("id")
+                if rid in round_map:
+                    Round.objects.filter(pk=rid).update(sequence=999000 + rid)
+
+            # Step 2: apply the real new sequences
+            for item in items:
+                rid = item.get("id")
+                new_seq = item.get("sequence")
+                if rid in round_map and new_seq is not None:
+                    Round.objects.filter(pk=rid).update(sequence=new_seq)
+
+        from rest_framework.response import Response
+        return Response({"detail": "Reordered successfully."}, status=status.HTTP_200_OK)
+
+
 class RoundListCreateView(generics.ListCreateAPIView):
+
     serializer_class = RoundSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -383,6 +431,8 @@ class RoundImportView(generics.GenericAPIView):
         except Exception as exc:
             return Response({"detail": f"Cannot read Excel file: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        action = request.data.get("action", "") # 'overwrite', 'skip', or ''
+        
         ws = wb.active
         rows = list(ws.iter_rows(values_only=True))
         data_rows = rows[1:] if rows else []
@@ -391,6 +441,26 @@ class RoundImportView(generics.GenericAPIView):
         from django.db import transaction
         from django.utils.dateparse import parse_datetime
         import datetime
+        
+        # Collect new locations to check for duplicates
+        new_locations = set()
+        for row in data_rows:
+            if not row or len(row) < 5:
+                continue
+            loc = str(row[2]).strip() if row[2] else ""
+            if loc:
+                new_locations.add(loc)
+                
+        existing_rounds = Round.objects.filter(trip=trip, location__in=new_locations)
+        if existing_rounds.exists() and not action:
+            duplicates = [r.location for r in existing_rounds]
+            return Response(
+                {
+                    "detail": "Có chặng trùng địa điểm",
+                    "duplicates": list(set(duplicates))
+                },
+                status=status.HTTP_409_CONFLICT
+            )
 
         with transaction.atomic():
             for row in data_rows:
@@ -417,17 +487,28 @@ class RoundImportView(generics.GenericAPIView):
                     except ValueError:
                         continue
 
-                Round.objects.update_or_create(
-                    trip=trip,
-                    sequence=sequence,
-                    defaults={
-                        "name": name,
-                        "location": location,
-                        "estimate_time": estimate_time,
-                        "status": Round.Status.PLANNED
-                    }
-                )
-                imported_count += 1
+                existing_round = Round.objects.filter(trip=trip, location=location).first()
+                if existing_round:
+                    if action == "skip":
+                        continue
+                    elif action == "overwrite":
+                        existing_round.name = name
+                        existing_round.sequence = sequence
+                        existing_round.estimate_time = estimate_time
+                        existing_round.save()
+                        imported_count += 1
+                else:
+                    Round.objects.update_or_create(
+                        trip=trip,
+                        sequence=sequence,
+                        defaults={
+                            "name": name,
+                            "location": location,
+                            "estimate_time": estimate_time,
+                            "status": Round.Status.PLANNED
+                        }
+                    )
+                    imported_count += 1
                 
         return Response({"detail": f"Imported {imported_count} rounds successfully."}, status=status.HTTP_201_CREATED)
 

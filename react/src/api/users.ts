@@ -15,7 +15,7 @@ const buildQueryString = (
   const page = params.page ?? 1;
   const limit = params.limit ?? defaultLimit;
   const search = params.search ?? "";
-  const role = params.role ?? "";
+  const role = String(params.role ?? "");
   const tenant = params.tenant;
 
   const query = new URLSearchParams({
@@ -69,7 +69,7 @@ const normalizePaginated = <T>(
 export const getUsers = async (
   params: UserListParams = {},
 ): Promise<PaginatedResponse<IUser>> => {
-  const { queryString, page, limit } = buildQueryString(params, 20);
+  const { queryString, page, limit } = buildQueryString(params, 10);
   const res = await fetchData(`/users/${queryString ? `?${queryString}` : ""}`);
   return normalizePaginated<IUser>(res, { page, limit });
 };
@@ -93,3 +93,4 @@ export const getRoles = async (): Promise<IRoleItem[]> => {
   if (Array.isArray(res)) return res as IRoleItem[];
   return [];
 };
+

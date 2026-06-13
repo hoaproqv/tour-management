@@ -47,13 +47,17 @@ export interface RoundItem {
   name: string;
   location: string;
   sequence: number;
-  estimate_time: string;
+  estimate_time: string | null;
   actual_time: string | null;
   status: "planned" | "doing" | "done";
   bus_ids: Array<string | number>;
 }
 
-export type RoundPayload = Omit<RoundItem, "id">;
+export type RoundPayload = Omit<RoundItem, "id" | "estimate_time" | "actual_time" | "status"> & {
+  estimate_time?: string | null;
+  actual_time?: string | null;
+  status?: "planned" | "doing" | "done";
+};
 
 export interface BusItem {
   id: string;
@@ -75,6 +79,7 @@ export interface Passenger {
   name: string;
   phone: string;
   note: string;
+  trips?: Array<{ id: string; name: string }>;
   created_at: string;
   updated_at: string;
 }
@@ -252,6 +257,12 @@ export const updateRound = async (id: string, payload: RoundPayload) =>
   putData(`/rounds/${id}/`, payload);
 
 export const deleteRound = async (id: string) => deleteData(`/rounds/${id}/`);
+
+export const reorderRounds = async (
+  items: Array<{ id: string | number; sequence: number }>,
+): Promise<void> => {
+  await postData("/rounds/reorder/", items);
+};
 
 export const getBuses = async (
   params: PaginatedParams = {},
@@ -478,10 +489,17 @@ export const downloadBusTemplate = async (): Promise<Blob> => {
 };
 
 // Rounds Import/Export
-export const importRounds = async (tripId: string, formData: FormData): Promise<any> => {
-  const response = await axiosInstance.post(`/rounds/import/?trip=${tripId}`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+export const importRounds = async (
+  tripId: string,
+  formData: FormData,
+): Promise<any> => {
+  const response = await axiosInstance.post(
+    `/rounds/import/?trip=${tripId}`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
   return response.data;
 };
 
@@ -498,4 +516,3 @@ export const downloadRoundTemplate = async (): Promise<Blob> => {
   });
   return response.data as Blob;
 };
-

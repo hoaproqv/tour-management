@@ -25,6 +25,7 @@ import {
   getTrips,
   importPassengers,
   downloadPassengerTemplate,
+  checkImportPassengers,
   type ImportPassengerResult,
   type Trip,
 } from "../../../api/trips";
@@ -56,6 +57,10 @@ export default function ImportPassengerModal({
   const [newTripForm] = Form.useForm();
   const queryClient = useQueryClient();
 
+  const [validPassengers, setValidPassengers] = useState<any[]>([]);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [conflictResolutions, setConflictResolutions] = useState<Record<number, "keep" | "update">>({});
+
   const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
@@ -63,17 +68,35 @@ export default function ImportPassengerModal({
   });
   const trips = React.useMemo(() => {
     const all = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
-    // Only show trips not yet finished (planned or doing = chưa xuất phát / đang đi)
-    return all.filter(
-      (t: Trip) => t.status === "planned" || t.status === "doing",
-    );
+    return all.filter((t: Trip) => t.status === "planned" || t.status === "doing");
   }, [tripsResponse]);
+
+  const checkMutation = useMutation({
+    mutationFn: (f: File) => {
+      const fd = new FormData();
+      fd.append("file", f);
+      return checkImportPassengers(fd);
+    },
+    onSuccess: (res: any) => {
+      setValidPassengers(res.valid_passengers || []);
+      setConflicts(res.conflicts || []);
+      const defaultResolutions: Record<number, "keep" | "update"> = {};
+      (res.conflicts || []).forEach((_: any, i: number) => {
+        defaultResolutions[i] = "keep";
+      });
+      setConflictResolutions(defaultResolutions);
+      setCurrent(2);
+    },
+    onError: (err: any) => {
+      message.error(err?.message || "Lỗi khi kiểm tra file");
+    },
+  });
 
   const importMutation = useMutation({
     mutationFn: (formData: FormData) => importPassengers(formData),
     onSuccess: async (result) => {
       message.success(
-        `Import thành công ${result.imported_buses.length} xe, trip: ${result.trip_name}`,
+        `Import thành công ${result.imported_buses?.length || 0} xe, trip: ${result.trip_name || ""}`,
       );
       await queryClient.invalidateQueries({ queryKey: ["passengers"] });
       await queryClient.invalidateQueries({ queryKey: ["trips"] });
@@ -93,10 +116,12 @@ export default function ImportPassengerModal({
     setTripMode("existing");
     setSelectedTripId(null);
     newTripForm.resetFields();
+    setValidPassengers([]);
+    setConflicts([]);
+    setConflictResolutions({});
     onCancel();
   };
 
-  // Client-side preview by parsing sheet names from xlsx
   const parsePreview = async (f: File): Promise<PreviewSheet[]> => {
     try {
       const buf = await f.arrayBuffer();
@@ -104,17 +129,14 @@ export default function ImportPassengerModal({
       return wb.SheetNames.map((name: string) => {
         const ws = wb.Sheets[name];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
-        // Count only rows where the name column (index 1) is non-empty
-        const dataRows = rows
-          .slice(1)
-          .filter(
-            (r) =>
-              Array.isArray(r) &&
-              r.length > 1 &&
-              r[1] !== null &&
-              r[1] !== undefined &&
-              String(r[1]).trim() !== "",
-          );
+        const dataRows = rows.slice(1).filter(
+          (r) =>
+            Array.isArray(r) &&
+            r.length > 1 &&
+            r[1] !== null &&
+            r[1] !== undefined &&
+            String(r[1]).trim() !== "",
+        );
         return { name, rowCount: dataRows.length };
       });
     } catch (e) {
@@ -148,7 +170,10 @@ export default function ImportPassengerModal({
           return;
         }
       }
-      setCurrent(2);
+      // Check for conflicts
+      checkMutation.mutate(file!);
+    } else if (current === 2) {
+      setCurrent(3);
     }
   };
 
@@ -164,6 +189,14 @@ export default function ImportPassengerModal({
       fd.append("trip_start_date", vals.dates[0].format("YYYY-MM-DD"));
       fd.append("trip_end_date", vals.dates[1].format("YYYY-MM-DD"));
     }
+    
+    // Map conflict resolutions: phone -> update | keep
+    const resolutionsMap: Record<string, string> = {};
+    conflicts.forEach((c, idx) => {
+        resolutionsMap[c.existing.phone] = conflictResolutions[idx];
+    });
+    fd.append("conflict_resolutions", JSON.stringify(resolutionsMap));
+
     importMutation.mutate(fd);
   };
 
@@ -185,7 +218,48 @@ export default function ImportPassengerModal({
   const stepItems = [
     { title: "Tải file" },
     { title: "Chọn Trip" },
+    { title: "Kiểm tra" },
     { title: "Xác nhận" },
+  ];
+  
+  const conflictColumns = [
+    {
+      title: "Thông tin File Excel",
+      key: "imported",
+      render: (_: any, record: any) => (
+        <div>
+          <p><b>Tên:</b> {record.imported.name}</p>
+          <p><b>SĐT:</b> {record.imported.phone}</p>
+          <p><b>Ghi chú:</b> {record.imported.note}</p>
+          <p><b>Thuộc xe:</b> {record.imported.sheet_name}</p>
+        </div>
+      )
+    },
+    {
+      title: "Đã có trong hệ thống",
+      key: "existing",
+      render: (_: any, record: any) => (
+        <div>
+          <p><b>Tên:</b> <Text type="danger">{record.existing.name}</Text></p>
+          <p><b>SĐT:</b> {record.existing.phone}</p>
+        </div>
+      )
+    },
+    {
+      title: "Quyết định",
+      key: "resolution",
+      render: (_: any, __: any, index: number) => (
+        <Radio.Group 
+          value={conflictResolutions[index]} 
+          onChange={(e) => setConflictResolutions(prev => ({...prev, [index]: e.target.value}))}
+        >
+          <Space direction="vertical">
+            <Radio value="keep">Giữ tên hiện tại</Radio>
+            <Radio value="update">Lấy tên từ file Excel</Radio>
+          </Space>
+        </Radio.Group>
+      )
+    }
   ];
 
   return (
@@ -193,7 +267,7 @@ export default function ImportPassengerModal({
       open={open}
       title="Import danh sách hành khách (.xlsx)"
       onCancel={handleClose}
-      width={640}
+      width={740}
       footer={null}
       destroyOnClose
     >
@@ -235,7 +309,7 @@ export default function ImportPassengerModal({
             accept=".xlsx,.xls"
             beforeUpload={(f) => {
               handleFileSelect(f);
-              return false; // prevent auto-upload
+              return false;
             }}
             maxCount={1}
             onRemove={() => {
@@ -257,7 +331,7 @@ export default function ImportPassengerModal({
               <Text type="secondary" className="text-sm">
                 Xem trước ({preview.length} sheet):
               </Text>
-              <Table
+              <Table scroll={{ x: "max-content" }}
                 className="mt-2"
                 size="small"
                 pagination={false}
@@ -316,7 +390,7 @@ export default function ImportPassengerModal({
                 label="Tên trip"
                 rules={[{ required: true, message: "Nhập tên trip" }]}
               >
-                <Input placeholder="VD: Tour Đà Lạt 05/2026" />
+                <Input placeholder="VD: Chuyến đi Đà Lạt 05/2026" />
               </Form.Item>
               <Form.Item
                 name="dates"
@@ -333,6 +407,40 @@ export default function ImportPassengerModal({
 
           <Space className="flex justify-between mt-4">
             <Button onClick={() => setCurrent(0)}>Quay lại</Button>
+            <Button type="primary" onClick={handleNext} loading={checkMutation.isPending}>
+              Tiếp theo
+            </Button>
+          </Space>
+        </div>
+      )}
+
+      {/* Step 2: Resolve conflicts */}
+      {current === 2 && (
+        <div>
+          <Alert
+            type={conflicts.length > 0 ? "warning" : "success"}
+            showIcon
+            className="mb-4"
+            message={`Kiểm tra dữ liệu hoàn tất: ${validPassengers.length} hợp lệ, ${conflicts.length} trùng lặp.`}
+            description={
+              conflicts.length > 0
+                ? "Các hành khách dưới đây có Số điện thoại đã tồn tại nhưng Tên khác nhau. Vui lòng chọn Tên muốn sử dụng."
+                : "Tất cả dữ liệu hợp lệ và sẵn sàng thêm mới."
+            }
+          />
+
+          {conflicts.length > 0 && (
+             <Table scroll={{ x: "max-content" }}
+               size="small"
+               dataSource={conflicts}
+               columns={conflictColumns}
+               rowKey={(_, index) => String(index)}
+               pagination={{ pageSize: 5 }}
+             />
+          )}
+
+          <Space className="flex justify-between mt-4">
+            <Button onClick={() => setCurrent(1)}>Quay lại</Button>
             <Button type="primary" onClick={handleNext}>
               Tiếp theo
             </Button>
@@ -340,8 +448,8 @@ export default function ImportPassengerModal({
         </div>
       )}
 
-      {/* Step 2: Confirm */}
-      {current === 2 && (
+      {/* Step 3: Confirm */}
+      {current === 3 && (
         <div>
           <Alert
             type="warning"
@@ -367,7 +475,7 @@ export default function ImportPassengerModal({
             </Text>
           </div>
 
-          <Table
+          <Table scroll={{ x: "max-content" }}
             size="small"
             pagination={false}
             dataSource={preview.map((s, i) => ({ key: i, ...s }))}
@@ -382,7 +490,7 @@ export default function ImportPassengerModal({
           />
 
           <Space className="flex justify-between mt-4">
-            <Button onClick={() => setCurrent(1)}>Quay lại</Button>
+            <Button onClick={() => setCurrent(2)}>Quay lại</Button>
             <Button
               type="primary"
               loading={importMutation.isPending}

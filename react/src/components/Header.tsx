@@ -67,7 +67,7 @@ function Header() {
             <HomeOutlined className="text-xl" />
           </div>
           <div>
-            <p className="text-sm leading-tight">Tour Management</p>
+            <p className="text-sm leading-tight">Quản lý Chuyến đi</p>
             <p className="text-lg font-semibold leading-tight">Dashboard</p>
           </div>
         </Link>

@@ -95,7 +95,7 @@ class RoleListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Role.objects.all().order_by("name")
+        return Role.objects.exclude(name__in=["admin", "Manager"]).order_by("name")
 
     @extend_schema(
         summary="List roles",
@@ -121,7 +121,9 @@ class UserListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        base_qs = User.objects.select_related("tenant", "role").all()
+        base_qs = User.objects.select_related("tenant", "role").exclude(
+            role__name__in=["admin", "Manager"]
+        ).exclude(is_superuser=True)
         if not self._is_admin(user):
             if getattr(user, "tenant_id", None):
                 base_qs = base_qs.filter(tenant_id=user.tenant_id)
@@ -130,11 +132,21 @@ class UserListCreateView(generics.ListCreateAPIView):
 
         role_param = self.request.query_params.get("role")
         if role_param:
-            base_qs = base_qs.filter(role__name__iexact=role_param)
+            base_qs = base_qs.filter(role__id=role_param)
 
         tenant_param = self.request.query_params.get("tenant")
         if tenant_param:
             base_qs = base_qs.filter(tenant_id=tenant_param)
+
+        search_param = self.request.query_params.get("search")
+        if search_param:
+            from django.db.models import Q
+            base_qs = base_qs.filter(
+                Q(name__icontains=search_param) |
+                Q(username__icontains=search_param) |
+                Q(email__icontains=search_param) |
+                Q(phone__icontains=search_param)
+            )
 
         return base_qs
 

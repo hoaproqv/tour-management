@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-import {
-  CarOutlined,
+import Icon, {
   DashboardOutlined,
   InfoCircleOutlined,
   CompassOutlined,
@@ -14,8 +13,8 @@ import {
   ApartmentOutlined,
   CloseOutlined,
 } from "@ant-design/icons";
-import { Button, Menu, type MenuProps } from "antd";
-import { Link, useLocation } from "react-router-dom";
+import { Button, Menu, Modal, type MenuProps } from "antd";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { useGetAccountInfo } from "../hooks/useAuth";
 import { isFleetLead, isDriver } from "../utils/helper";
@@ -23,100 +22,58 @@ import { ROUTES } from "../utils/routers";
 
 import type { IUser } from "../utils/types";
 
-const linkClass = "text-white hover:text-white no-underline";
+const BusSvg = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em">
+    <path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z" />
+  </svg>
+);
+const BusIcon = (props: any) => <Icon component={BusSvg} {...props} />;
 
 const baseMenuItems: Required<MenuProps>["items"] = [
   {
-    key: "dashboard",
+    key: ROUTES.DASHBOARD,
     icon: <DashboardOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to={ROUTES.DASHBOARD} className={linkClass}>
-        Trang chủ
-      </Link>
-    ),
+    label: "Trang chủ",
   },
   {
-    key: "users",
+    key: ROUTES.ACCOUNT,
     icon: <TeamOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to={ROUTES.ACCOUNT} className={linkClass}>
-        Quản lý người dùng
-      </Link>
-    ),
+    label: "Quản lý người dùng",
   },
   {
-    key: "tenants",
+    key: ROUTES.TENANT,
     icon: <ApartmentOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to={ROUTES.TENANT} className={linkClass}>
-        Công ty du lịch
-      </Link>
-    ),
+    label: "Công ty",
   },
   {
-    key: "passengers",
+    key: ROUTES.PASSENGER,
     icon: <UserOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to={ROUTES.PASSENGER} className={linkClass}>
-        Hành khách
-      </Link>
-    ),
+    label: "Hành khách",
   },
   {
-    key: "trips",
+    key: ROUTES.TRIP,
     icon: <CompassOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to={ROUTES.TRIP} className={linkClass}>
-        Tour du lịch
-      </Link>
-    ),
-    children: [
-      {
-        key: "trip-home",
-        icon: <CompassOutlined style={{ color: "#fff" }} />,
-        label: (
-          <Link to={ROUTES.TRIP} className={linkClass}>
-            Tour
-          </Link>
-        ),
-      },
-      {
-        key: "rounds",
-        icon: <EnvironmentOutlined style={{ color: "#fff" }} />,
-        label: (
-          <Link to={ROUTES.ROUND} className={linkClass}>
-            Địa điểm tham quan
-          </Link>
-        ),
-      },
-      {
-        key: "bus",
-        icon: <CarOutlined style={{ color: "#fff" }} />,
-        label: (
-          <Link to={ROUTES.BUS} className={linkClass}>
-            Xe khách
-          </Link>
-        ),
-      },
-    ],
+    label: "Chuyến đi",
   },
   {
-    key: "transactions",
+    key: ROUTES.ROUND,
+    icon: <EnvironmentOutlined style={{ color: "#fff" }} />,
+    label: "Chặng",
+  },
+  {
+    key: ROUTES.BUS,
+    icon: <BusIcon style={{ color: "#fff" }} />,
+    label: "Xe khách",
+  },
+  {
+    key: ROUTES.TRANSACTIONS,
     icon: <WalletOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to={ROUTES.TRANSACTIONS} className={linkClass}>
-        Điểm danh hành khách
-      </Link>
-    ),
+    label: "Điểm danh hành khách",
   },
   {
     key: "about",
     icon: <InfoCircleOutlined style={{ color: "#fff" }} />,
-    label: (
-      <Link to="#" className={linkClass}>
-        Về chúng tôi
-      </Link>
-    ),
+    label: "Về chúng tôi",
   },
 ];
 
@@ -138,25 +95,52 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   );
   const location = useLocation();
 
+  const navigate = useNavigate();
+
   const hideManagement = isFleetLead(currentUser) || isDriver(currentUser);
 
   const menuItems = useMemo(() => {
     if (!hideManagement) return baseMenuItems;
     return baseMenuItems.filter(
-      (item) => item?.key !== "users" && item?.key !== "tenants",
+      (item) => item?.key !== ROUTES.ACCOUNT && item?.key !== ROUTES.TENANT,
     );
   }, [hideManagement]);
 
   const findSelectedKey = () => {
-    if (location.pathname.startsWith(ROUTES.ROUND)) return "trips";
-    if (location.pathname.startsWith(ROUTES.BUS)) return "trips";
-    if (location.pathname.startsWith(ROUTES.TRIP)) return "trips";
-    if (location.pathname.startsWith(ROUTES.TENANT)) return "tenants";
-    if (location.pathname.startsWith(ROUTES.PASSENGER)) return "passengers";
+    if (location.pathname.startsWith(ROUTES.ROUND)) return ROUTES.ROUND;
+    if (location.pathname.startsWith(ROUTES.BUS)) return ROUTES.BUS;
+    if (location.pathname.startsWith(ROUTES.TRIP)) return ROUTES.TRIP;
+    if (location.pathname.startsWith(ROUTES.TENANT)) return ROUTES.TENANT;
+    if (location.pathname.startsWith(ROUTES.PASSENGER)) return ROUTES.PASSENGER;
     if (location.pathname.startsWith(ROUTES.TRANSACTIONS))
-      return "transactions";
-    if (location.pathname.startsWith(ROUTES.ACCOUNT)) return "users";
-    return "dashboard";
+      return ROUTES.TRANSACTIONS;
+    if (location.pathname.startsWith(ROUTES.ACCOUNT)) return ROUTES.ACCOUNT;
+    return ROUTES.DASHBOARD;
+  };
+
+  const handleMenuClick: MenuProps["onClick"] = (e) => {
+    if (e.key === "about") {
+      Modal.info({
+        title: "Về chúng tôi",
+        content: (
+          <div className="mt-4">
+            <p className="text-slate-600">
+              Đây là đồ án tốt nghiệp văn bằng 2 của sinh viên{" "}
+              <strong>Hàn Minh Hòa</strong>.
+            </p>
+            <p className="text-slate-600 mt-2">
+              Hệ thống được phát triển với mục đích quản lý xe khách và hành
+              khách du lịch một cách hiệu quả.
+            </p>
+          </div>
+        ),
+        maskClosable: true,
+        okText: "Đóng",
+        centered: true,
+      });
+      return;
+    }
+    navigate(e.key);
   };
 
   useEffect(() => {
@@ -229,6 +213,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             mode="inline"
             inlineCollapsed={collapsed}
             items={menuItems}
+            onClick={handleMenuClick}
             style={{
               backgroundColor: "transparent",
               color: "white",
@@ -264,7 +249,10 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-4 flex-shrink-0" style={{ height: 56 }}>
+        <div
+          className="flex items-center justify-between border-b border-white/10 px-4 flex-shrink-0"
+          style={{ height: 56 }}
+        >
           <span className="text-lg font-semibold">Điều hướng</span>
           <Button
             type="text"
@@ -288,6 +276,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             selectedKeys={[findSelectedKey()]}
             mode="inline"
             items={menuItems}
+            onClick={handleMenuClick}
             style={{
               backgroundColor: "transparent",
               color: "white",
@@ -299,7 +288,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
         {/* Mobile footer info */}
         <div className="border-t border-white/10 px-4 py-3 text-xs text-white/50 flex-shrink-0">
-          Tour Management v1.0
+          Quản lý Chuyến đi v1.0
         </div>
         <SidebarStyles />
       </aside>
@@ -340,7 +329,7 @@ function SidebarStyles() {
         .custom-sidebar-menu .ant-menu-submenu-arrow {
           color: #fff !important;
         }
-        .custom-sidebar-menu .ant-menu-title-content a {
+        .custom-sidebar-menu .ant-menu-title-content {
           color: #fff !important;
         }
         .custom-sidebar-menu .ant-menu-item-selected {
@@ -352,9 +341,9 @@ function SidebarStyles() {
           background: rgba(255,255,255,0.08) !important;
           color: #fff !important;
         }
-        .custom-sidebar-menu .ant-menu-item:hover .ant-menu-title-content a,
-        .custom-sidebar-menu .ant-menu-item-selected .ant-menu-title-content a,
-        .custom-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-title-content a {
+        .custom-sidebar-menu .ant-menu-item:hover .ant-menu-title-content,
+        .custom-sidebar-menu .ant-menu-item-selected .ant-menu-title-content,
+        .custom-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-title-content {
           color: #fff !important;
         }
         .custom-sidebar-menu .ant-menu-submenu-arrow {
@@ -370,7 +359,7 @@ function SidebarStyles() {
         .ant-menu-submenu-popup .ant-menu-item:hover {
           background: rgba(255,255,255,0.08) !important;
         }
-        .ant-menu-submenu-popup .ant-menu-item a {
+        .ant-menu-submenu-popup .ant-menu-item .ant-menu-title-content {
           color: #fff !important;
         }
       `,

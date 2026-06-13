@@ -8,22 +8,18 @@ import {
   createPassenger,
   deletePassenger,
   exportPassengers,
-  getBuses,
   getImportedBuses,
   getPassengers,
-  getTripBuses,
   getTrips,
   updatePassenger,
-  type BusItem,
   type ImportPassengerResult,
   type Passenger,
   type PassengerPayload,
   type Trip,
-  type TripBus,
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
-import { canManageCatalog } from "../../utils/helper";
+import { canManageCatalog, removeAccents } from "../../utils/helper";
 
 import ImportedBusMapper from "./components/ImportedBusMapper";
 import ImportPassengerModal from "./components/ImportPassengerModal";
@@ -58,14 +54,7 @@ export default function PassengerManagement() {
     queryKey: ["trips"],
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
-  const { data: tripBusesAllResponse } = useQuery({
-    queryKey: ["trip-buses", "all"],
-    queryFn: () => getTripBuses({ page: 1, limit: 1000 }),
-  });
-  const { data: busesResponse } = useQuery({
-    queryKey: ["buses"],
-    queryFn: () => getBuses({ page: 1, limit: 1000 }),
-  });
+
   const { data: passengersResponse, isLoading } = useQuery({
     queryKey: ["passengers", tripFilter],
     queryFn: () =>
@@ -87,19 +76,6 @@ export default function PassengerManagement() {
   const trips = useMemo(
     () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
     [tripsResponse],
-  );
-
-  const tripBuses = useMemo(
-    () =>
-      Array.isArray(tripBusesAllResponse?.data)
-        ? tripBusesAllResponse.data
-        : [],
-    [tripBusesAllResponse],
-  );
-
-  const buses = useMemo(
-    () => (Array.isArray(busesResponse?.data) ? busesResponse.data : []),
-    [busesResponse],
   );
 
   const passengers = useMemo(
@@ -127,39 +103,14 @@ export default function PassengerManagement() {
   const tripIsActive =
     selectedTrip?.status === "doing" || selectedTrip?.status === "done";
 
-  const busMap = useMemo(
-    () =>
-      new Map(
-        (Array.isArray(buses) ? buses : []).map((b: BusItem) => [
-          b.id,
-          b.registration_number || b.bus_code,
-        ]),
-      ),
-    [buses],
-  );
-
-  const tripBusMap = useMemo(
-    () =>
-      new Map(
-        (Array.isArray(tripBuses) ? tripBuses : []).map((tb: TripBus) => [
-          tb.id,
-          {
-            ...tb,
-            label: busMap.get(tb.bus) || "Bus",
-          },
-        ]),
-      ),
-    [tripBuses, busMap],
-  );
-
   const filteredPassengers = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase();
+    const term = removeAccents(debouncedSearch).trim().toLowerCase();
     return (Array.isArray(passengers) ? passengers : []).filter((p) => {
       if (!term) return true;
       return (
-        p.name.toLowerCase().includes(term) ||
-        p.phone.toLowerCase().includes(term) ||
-        (p.note || "").toLowerCase().includes(term)
+        removeAccents(p.name).toLowerCase().includes(term) ||
+        removeAccents(p.phone).toLowerCase().includes(term) ||
+        removeAccents(p.note || "").toLowerCase().includes(term)
       );
     });
   }, [passengers, debouncedSearch]);
@@ -284,66 +235,70 @@ export default function PassengerManagement() {
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-2">
+          <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
               Passenger Management
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Quản lý Passenger
+              Quản lý Hành khách
             </Title>
             <Text type="secondary">
-              Danh sách hành khách; chọn trip để xem xe được gán.
+              Danh sách hành khách; chọn Chuyến đi để xem xe được gán.
             </Text>
           </div>
-            <div className="flex flex-wrap gap-2 md:items-center">
-              <Input
-                allowClear
-                placeholder="Tìm theo tên / số điện thoại / ghi chú"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full md:w-64"
-              />
-              <Select
-                value={tripFilter}
-                onChange={(val) => {
-                  setTripFilter(val);
-                  if (importResult && val !== importResult.trip_id) {
-                    setImportResult(null);
-                  }
-                }}
-                className="w-full md:w-52"
-                options={[
-                  { value: "all", label: "Tất cả trip" },
-                  ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-                    value: t.id,
-                    label: t.name,
-                  })),
-                ]}
-              />
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+            <Input
+              allowClear
+              placeholder="Tìm theo tên / số điện thoại / ghi chú"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-64"
+            />
+            <Select
+              value={tripFilter}
+              onChange={(val) => {
+                setTripFilter(val);
+                if (importResult && val !== importResult.trip_id) {
+                  setImportResult(null);
+                }
+              }}
+              className="w-full sm:w-52"
+              options={[
+                { value: "all", label: "Tất cả chuyến" },
+                ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
+                  value: t.id,
+                  label: t.name,
+                })),
+              ]}
+            />
+            <Button
+              icon={<DownloadOutlined />}
+              loading={exportLoading}
+              onClick={handleExport}
+              disabled={tripFilter === "all"}
+              title={
+                tripFilter === "all" ? "Chọn trip để export" : "Export .xlsx"
+              }
+              className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
+            >
+              Export
+            </Button>
+            {canManage && (
               <Button
-                icon={<DownloadOutlined />}
-                loading={exportLoading}
-                onClick={handleExport}
-                disabled={tripFilter === "all"}
-                title={tripFilter === "all" ? "Chọn trip để export" : "Export .xlsx"}
-                className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
+                type="primary"
+                onClick={openCreate}
+                className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
               >
-                Export
+                + Tạo mới
               </Button>
-              {canManage && (
-                <Button type="primary" onClick={openCreate} className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5">
-                  + Tạo mới
-                </Button>
-              )}
-            </div>
+            )}
+          </div>
         </div>
         <PassengerTable
           data={filteredPassengers}
           isLoading={isLoading}
           deleting={deleteMutation.status === "pending"}
-          tripBusMap={tripBusMap}
-          selectedTripId={tripFilter}
           canManage={canManage}
           onDelete={(id) => deleteMutation.mutate(id)}
           onEdit={openEdit}

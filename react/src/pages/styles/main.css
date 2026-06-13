@@ -22,3 +22,7 @@
     text-wrap: balance;
   }
 }
+
+:where(.css-dev-only-do-not-override-16dneet).ant-table-wrapper .ant-table-pagination.ant-pagination {
+    margin: 12px 10px;
+}

@@ -10,8 +10,12 @@ export default function QueryProvider({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             retry: false,
-            staleTime: 0,
-            gcTime: 0,
+            // Dữ liệu được coi là fresh trong 1 phút → không gọi lại API khi component re-mount
+            staleTime: 60 * 1000,
+            // Cache tồn tại 5 phút sau khi component unmount
+            gcTime: 5 * 60 * 1000,
+            // Không refetch khi tab được focus lại
+            refetchOnWindowFocus: false,
           },
         },
       }),

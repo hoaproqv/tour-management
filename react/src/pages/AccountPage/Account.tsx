@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 
-import { UserAddOutlined } from "@ant-design/icons";
+import {
+  UserAddOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -13,6 +17,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
@@ -27,21 +32,20 @@ import type { TableColumnsType } from "antd";
 
 const { Title, Text } = Typography;
 
-const roleMeta: Record<string, { label: string; color: string; permissions: string }> = {
-  admin: {
-    label: "Admin",
-    color: "magenta",
-    permissions: "Toàn quyền quản lý tất cả dữ liệu.",
-  },
+const roleMeta: Record<
+  string,
+  { label: string; color: string; permissions: string }
+> = {
   tour_manager: {
-    label: "Quản lý tour",
+    label: "Quản lý chuyến đi",
     color: "geekblue",
     permissions: "Thêm/sửa/xoá bus, trip, round, passenger.",
   },
   fleet_lead: {
     label: "Trưởng xe",
     color: "cyan",
-    permissions: "Sửa transaction của xe mình, điểm danh lên xe mình và chốt điểm danh.",
+    permissions:
+      "Sửa transaction của xe mình, điểm danh lên xe mình và chốt điểm danh.",
   },
   driver: {
     label: "Lái xe",
@@ -59,37 +63,51 @@ const renderRoleTag = (roleName?: string | null) => {
   return <Tag color={meta.color}>{meta.label}</Tag>;
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "—";
-  try {
-    return new Intl.DateTimeFormat("vi-VN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(value));
-  } catch (error) {
-    console.error("Date format error", error);
-    return value;
-  }
-};
-
 export const Account = () => {
   const queryClient = useQueryClient();
   const [form] = Form.useForm<UserFormValues>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<IUser | null>(null);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [tenantFilter, setTenantFilter] = useState<string>("all");
+
+  React.useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   const { data: accountData } = useGetAccountInfo();
   const currentUser = accountData as IUser | undefined;
 
   const isAdmin = useMemo(() => {
     const roleSlug = (currentUser?.role_name || "").toString().toLowerCase();
-    return Boolean(currentUser?.is_superuser || currentUser?.is_staff || roleSlug === "admin");
+    return Boolean(
+      currentUser?.is_superuser ||
+        currentUser?.is_staff ||
+        roleSlug === "admin",
+    );
   }, [currentUser]);
 
   const usersQuery = useQuery({
-    queryKey: ["users", pagination.page, pagination.limit],
-    queryFn: () => getUsers({ page: pagination.page, limit: pagination.limit }),
+    queryKey: [
+      "users",
+      pagination.page,
+      pagination.limit,
+      debouncedSearch,
+      roleFilter,
+      tenantFilter,
+    ],
+    queryFn: () =>
+      getUsers({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: debouncedSearch,
+        role: roleFilter !== "all" ? roleFilter : undefined,
+        tenant: tenantFilter !== "all" ? tenantFilter : undefined,
+      }),
     enabled: Boolean(currentUser),
     retry: 1,
   });
@@ -108,13 +126,18 @@ export const Account = () => {
 
   const users = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data]);
   const tenants = useMemo(
-    () => (Array.isArray(tenantsQuery.data?.data) ? tenantsQuery.data?.data : []),
+    () =>
+      Array.isArray(tenantsQuery.data?.data) ? tenantsQuery.data?.data : [],
     [tenantsQuery.data],
   );
-  const roleOptions = useMemo(() => {
-    const allowed = new Set(["tour_manager", "fleet_lead", "driver"]);
-    return (rolesQuery.data ?? []).filter((role) => allowed.has(String(role.name)));
+  const allRoleOptions = useMemo(() => {
+    return rolesQuery.data ?? [];
   }, [rolesQuery.data]);
+
+  const formRoleOptions = useMemo(() => {
+    const allowed = new Set(["tour_manager", "fleet_lead", "driver"]);
+    return allRoleOptions.filter((role) => allowed.has(String(role.name)));
+  }, [allRoleOptions]);
 
   const createUserMutation = useMutation({
     mutationFn: (payload: IUserPayload) => createUser(payload),
@@ -130,8 +153,10 @@ export const Account = () => {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: (data: { id: number | string; payload: Partial<IUserPayload> }) =>
-      updateUser(data.id, data.payload),
+    mutationFn: (data: {
+      id: number | string;
+      payload: Partial<IUserPayload>;
+    }) => updateUser(data.id, data.payload),
     onSuccess: async () => {
       message.success("Cập nhật user thành công");
       await queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -150,7 +175,8 @@ export const Account = () => {
       message.success("Xóa user thành công");
       await queryClient.invalidateQueries({ queryKey: ["users"] });
     },
-    onError: (error: any) => message.error(error?.message || "Không thể xóa user"),
+    onError: (error: any) =>
+      message.error(error?.message || "Không thể xóa user"),
   });
 
   const columns: TableColumnsType<IUser> = [
@@ -175,7 +201,8 @@ export const Account = () => {
     {
       title: "Tenant",
       dataIndex: "tenant_name",
-      render: (_: string, record: IUser) => record.tenant_name || record.tenant || "—",
+      render: (_: string, record: IUser) =>
+        record.tenant_name || record.tenant || "—",
     },
     {
       title: "Role",
@@ -186,37 +213,40 @@ export const Account = () => {
       title: "Trạng thái",
       dataIndex: "is_active",
       render: (value: boolean) => (
-        <Tag color={value ? "green" : "red"}>{value ? "Active" : "Inactive"}</Tag>
+        <Tag color={value ? "green" : "red"}>
+          {value ? "Active" : "Inactive"}
+        </Tag>
       ),
-    },
-    {
-      title: "Ngày tạo",
-      dataIndex: "created_at",
-      render: (val: string | null | undefined) => formatDate(val),
     },
     {
       title: "Thao tác",
       dataIndex: "actions",
       render: (_: unknown, record: IUser) => (
         <Space>
-          <Button type="link" onClick={() => openEditModal(record)}>
-            Sửa
-          </Button>
-          <Button
-            type="link"
-            danger
-            onClick={() =>
-              Modal.confirm({
-                title: "Xóa user?",
-                content: `Bạn chắc chắn muốn xóa ${record.name || record.username}?`,
-                okText: "Xóa",
-                cancelText: "Hủy",
-                onOk: () => deleteUserMutation.mutate(record.id),
-              })
-            }
-          >
-            Xóa
-          </Button>
+          <Tooltip title="Sửa">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => openEditModal(record)}
+              style={{ color: "#2563eb" }}
+            />
+          </Tooltip>
+          <Tooltip title="Xóa">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() =>
+                Modal.confirm({
+                  title: "Xóa user?",
+                  content: `Bạn chắc chắn muốn xóa ${record.name || record.username}?`,
+                  okText: "Xóa",
+                  cancelText: "Hủy",
+                  onOk: () => deleteUserMutation.mutate(record.id),
+                })
+              }
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -267,7 +297,7 @@ export const Account = () => {
         };
         if (editingUser) {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { password, confirmPassword, ...rest } = values as any;  
+          const { password, confirmPassword, ...rest } = values as any;
           updateUserMutation.mutate({
             id: editingUser.id,
             payload: {
@@ -289,41 +319,79 @@ export const Account = () => {
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
               User Management
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Danh sách user
+              Danh sách User
             </Title>
             <Text type="secondary">
-              Quản lý tài khoản và vai trò. Chỉ admin mới có thể thêm user mới.
+              Quản lý tài khoản và vai trò. Chỉ admin mới có thể thêm User mới.
             </Text>
           </div>
-          {isAdmin && (
-            <Button
-              type="primary"
-              icon={<UserAddOutlined />}
-              onClick={openCreateModal}
-              size="large"
-            >
-              Thêm user
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+            <Input
+              allowClear
+              placeholder="Tìm theo tên, email, sđt..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-52"
+            />
+            {isAdmin && (
+              <>
+                <Select
+                  value={roleFilter}
+                  onChange={setRoleFilter}
+                  className="w-full sm:w-32"
+                  options={[
+                    { value: "all", label: "Tất cả Role" },
+                    ...allRoleOptions.map((r: any) => ({
+                      value: r.id,
+                      label: roleMeta[r.name]?.label || r.name,
+                    })),
+                  ]}
+                />
+                <Select
+                  value={tenantFilter}
+                  onChange={setTenantFilter}
+                  className="w-full sm:w-48"
+                  options={[
+                    { value: "all", label: "Tất cả Tenant" },
+                    ...tenants.map((t: any) => ({
+                      value: t.id,
+                      label: t.name,
+                    })),
+                  ]}
+                />
+                <Button
+                  type="primary"
+                  icon={<UserAddOutlined />}
+                  onClick={openCreateModal}
+                >
+                  + Thêm User
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <Alert
           className="mt-5"
           message="Quyền theo role"
           description={
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
               {Object.entries(roleMeta).map(([key, meta]) => (
                 <div key={key} className="flex items-start gap-2">
                   {renderRoleTag(key)}
                   <div>
-                    <p className="font-semibold text-slate-800 text-sm">{meta.label}</p>
-                    <p className="text-xs text-slate-600 leading-snug">{meta.permissions}</p>
+                    <p className="font-semibold text-slate-800 text-sm">
+                      {meta.label}
+                    </p>
+                    <p className="text-xs text-slate-600 leading-snug">
+                      {meta.permissions}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -335,6 +403,8 @@ export const Account = () => {
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
           <Table
+            size="small"
+            scroll={{ x: "max-content" }}
             rowKey="id"
             dataSource={users}
             loading={usersQuery.isLoading || usersQuery.isFetching}
@@ -343,7 +413,8 @@ export const Account = () => {
               current: pagination.page,
               pageSize: pagination.limit,
               total: usersQuery.data?.pagination.total_items ?? users.length,
-              onChange: (page, pageSize) => setPagination({ page, limit: pageSize }),
+              onChange: (page, pageSize) =>
+                setPagination({ page, limit: pageSize }),
               showSizeChanger: true,
               pageSizeOptions: [10, 20, 50, 100],
             }}
@@ -452,10 +523,14 @@ export const Account = () => {
               className="role-select-control"
               classNames={{ popup: { root: "role-select-dropdown" } }}
               optionLabelProp="label"
-              options={roleOptions.map((role: IRoleItem) => ({
+              options={formRoleOptions.map((role: IRoleItem) => ({
                 value: role.id,
                 label: (
-                  <Space direction="vertical" size={0} className="leading-tight">
+                  <Space
+                    direction="vertical"
+                    size={0}
+                    className="leading-tight"
+                  >
                     <span className="font-semibold text-slate-800">
                       {roleMeta[role.name]?.label || role.name}
                     </span>

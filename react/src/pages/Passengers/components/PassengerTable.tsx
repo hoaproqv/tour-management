@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, Popconfirm, Table, Tooltip, Space } from "antd";
-import dayjs from "dayjs";
+import { Button, Card, Empty, Popconfirm, Table, Tooltip, Space, Tag } from "antd";
 
-import { type Passenger, type TripBus } from "../../../api/trips";
+import { type Passenger } from "../../../api/trips";
 
 import type { ColumnsType } from "antd/es/table";
 
@@ -12,8 +11,6 @@ type PassengerTableProps = {
   data: Passenger[];
   isLoading: boolean;
   deleting: boolean;
-  tripBusMap: Map<string, TripBus & { label: string }>;
-  selectedTripId: string | "all";
   canManage: boolean;
   onDelete: (_id: string) => void;
   onEdit: (_passenger: Passenger) => void;
@@ -23,8 +20,6 @@ export default function PassengerTable({
   data,
   isLoading,
   deleting,
-  tripBusMap,
-  selectedTripId,
   canManage,
   onDelete,
   onEdit,
@@ -41,23 +36,25 @@ export default function PassengerTable({
         render: (val: string) => val || "—",
       },
       {
-        title: "Xe (trip đã lọc)",
-        dataIndex: "assigned_trip_bus",
-        render: (val: string | null) => {
-          if (selectedTripId === "all") return "—";
-          if (!val) return "Chưa gán";
-          return tripBusMap.get(val)?.label || "—";
-        },
-      },
-      {
         title: "Ghi chú",
         dataIndex: "note",
         render: (val: string) => val || "—",
       },
       {
-        title: "Tạo lúc",
-        dataIndex: "created_at",
-        render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
+        title: "Các chuyến đi",
+        dataIndex: "trips",
+        render: (trips: Array<{ id: string; name: string }> | undefined) => {
+          if (!trips || trips.length === 0) return "—";
+          return (
+            <div className="flex flex-wrap gap-1 max-w-[250px]">
+              {trips.map((t) => (
+                <Tag key={t.id} color="cyan">
+                  {t.name}
+                </Tag>
+              ))}
+            </div>
+          );
+        },
       },
     ];
 
@@ -98,7 +95,7 @@ export default function PassengerTable({
         ),
       },
     ];
-  }, [canManage, deleting, onDelete, onEdit, selectedTripId, tripBusMap]);
+  }, [canManage, deleting, onDelete, onEdit]);
 
   return (
     <Card className="mt-6" styles={{ body: { padding: 0 } }}>
@@ -107,8 +104,8 @@ export default function PassengerTable({
         rowKey="id"
         dataSource={data}
         loading={isLoading}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-        scroll={{ x: true }}
+        pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
+        scroll={{ x: 'max-content' }}
         columns={columns}
         locale={{
           emptyText: isLoading ? (

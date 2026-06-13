@@ -35,8 +35,8 @@ export default function TripTable({
       rowKey="id"
       dataSource={trips}
       loading={loading}
-      pagination={{ pageSize: 8, showSizeChanger: false }}
-      scroll={{ x: true }}
+      pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
+      scroll={{ x: 'max-content' }}
       columns={[
         {
           title: "Tên",
@@ -70,7 +70,11 @@ export default function TripTable({
           dataIndex: "status",
           render: (val: Trip["status"]) => {
             const meta = statusMeta[val];
-            return <Tag color={meta.color}>{meta.label}</Tag>;
+            return (
+              <Tooltip title="Trạng thái được cập nhật tự động theo giao dịch">
+                <Tag color={meta.color}>{meta.label}</Tag>
+              </Tooltip>
+            );
           },
         },
         {
@@ -113,7 +117,7 @@ export default function TripTable({
                   style={{ color: "#16a34a" }}
                 />
               </Tooltip>
-              <Tooltip title="Xem round liên quan">
+              <Tooltip title="Xem hành trình">
                 <Button
                   type="text"
                   icon={<ApartmentOutlined />}
@@ -121,7 +125,7 @@ export default function TripTable({
                   style={{ color: "#f59e0b" }}
                 />
               </Tooltip>
-              <Tooltip title="Xem bus liên quan">
+              <Tooltip title="Quản lý xe">
                 <Button
                   type="text"
                   icon={<CarOutlined />}

@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { EditOutlined, DeleteOutlined, FileExcelOutlined } from "@ant-design/icons";
+import {
+  EditOutlined,
+  DeleteOutlined,
+  FileExcelOutlined,
+} from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -193,11 +197,7 @@ export default function BusManagement() {
               record.active_trip.status === "doing"
                 ? "Đang đi"
                 : "Chưa xuất phát";
-            return (
-              <Tag color={statusColor}>
-                {statusLabel}
-              </Tag>
-            );
+            return <Tag color={statusColor}>{statusLabel}</Tag>;
           }
           return <Tag color="success">Sẵn sàng</Tag>;
         },
@@ -246,25 +246,25 @@ export default function BusManagement() {
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
       <div className="bg-white shadow-sm rounded-2xl p-6 border border-slate-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-2">
+          <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
-              Bus Management
+              BUS MANAGEMENT
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Quản lý Bus
+              Quản lý Xe khách
             </Title>
             <Text type="secondary">
-              Quản lý danh sách xe phục vụ cho các trip.
+              Quản lý danh sách xe phục vụ cho các Chuyến đi.
             </Text>
           </div>
-          <div className="flex flex-col md:flex-row gap-2 md:items-center">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <Input
               allowClear
               placeholder="Tìm theo biển số, mã xe, mô tả"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full md:w-80"
+              className="w-full sm:w-80"
             />
             {canManage && (
               <div className="flex flex-wrap items-center gap-3">
@@ -287,7 +287,11 @@ export default function BusManagement() {
                 >
                   Export
                 </Button>
-                <Button type="primary" onClick={openCreate} className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5">
+                <Button
+                  type="primary"
+                  onClick={openCreate}
+                  className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
+                >
                   + Tạo mới
                 </Button>
               </div>
@@ -296,7 +300,7 @@ export default function BusManagement() {
         </div>
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
-          <Table
+          <Table scroll={{ x: "max-content" }}
             size="small"
             rowKey="id"
             dataSource={buses}
@@ -312,7 +316,6 @@ export default function BusManagement() {
                 setPageSize(nextPageSize);
               },
             }}
-            scroll={{ x: true }}
             columns={columns}
             locale={{
               emptyText: isLoading ? (

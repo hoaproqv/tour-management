@@ -6,6 +6,7 @@ from passengers.models import ImportedBus, Passenger, PassengerBusAssignment, Pa
 
 class PassengerSerializer(serializers.ModelSerializer):
     assigned_trip_bus = serializers.SerializerMethodField(read_only=True)
+    trips = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Passenger
@@ -15,10 +16,11 @@ class PassengerSerializer(serializers.ModelSerializer):
             "name",
             "phone",
             "note",
+            "trips",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["assigned_trip_bus", "created_at", "updated_at"]
+        read_only_fields = ["assigned_trip_bus", "trips", "created_at", "updated_at"]
 
     def get_assigned_trip_bus(self, obj: Passenger):
         trip_id = self.context.get("trip_id")
@@ -33,6 +35,21 @@ class PassengerSerializer(serializers.ModelSerializer):
         if not assignment:
             assignment = qs.order_by("-updated_at").first()
         return assignment.trip_bus_id if assignment else None
+
+    def get_trips(self, obj: Passenger):
+        qs = getattr(obj, "all_assignments", None)
+        if qs is None:
+            qs = getattr(obj, "bus_assignments", None)
+            if qs is None:
+                return []
+        
+        seen = set()
+        result = []
+        for a in qs.all() if hasattr(qs, "all") else qs:
+            if getattr(a, "trip", None) and a.trip.id not in seen:
+                seen.add(a.trip.id)
+                result.append({"id": str(a.trip.id), "name": a.trip.name})
+        return result
 
     def create(self, validated_data):
         tenant = self.context.get("tenant")

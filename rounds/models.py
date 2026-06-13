@@ -18,7 +18,7 @@ class Round(models.Model):
     sequence = models.PositiveIntegerField(
         help_text="Order of this round within the trip"
     )
-    estimate_time = models.DateTimeField()
+    estimate_time = models.DateTimeField(null=True, blank=True)
     actual_time = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20,

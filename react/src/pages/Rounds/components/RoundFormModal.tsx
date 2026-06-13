@@ -1,24 +1,35 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
-import { UploadOutlined } from "@ant-design/icons";
+import { InboxOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, DatePicker, Form, Input, Modal, Select, Typography, Upload, message } from "antd";
-import dayjs from "dayjs";
+import {
+  Form,
+  Input,
+  Modal,
+  Select,
+  Row,
+  Col,
+  Tabs,
+  Upload,
+  Typography,
+  message,
+  Table,
+  Button,
+} from "antd";
+import * as XLSX from "xlsx";
 
 import { downloadRoundTemplate, importRounds } from "../../../api/trips";
 
-import type { Passenger, RoundItem, Trip } from "../../../api/trips";
+import type { RoundItem, Trip } from "../../../api/trips";
 import type { FormInstance } from "antd";
+
+const { Dragger } = Upload;
+const { Text } = Typography;
 
 export interface RoundFormValues {
   trip: string;
   name: string;
   location: string;
-  sequence: number;
-  estimate_time: dayjs.Dayjs;
-  actual_time?: dayjs.Dayjs | null;
-  status: RoundItem["status"];
-  bus_ids?: Array<string | number>;
 }
 
 interface RoundFormModalProps {
@@ -28,15 +39,16 @@ interface RoundFormModalProps {
   confirmLoading: boolean;
   form: FormInstance<RoundFormValues>;
   trips: Trip[];
-  busOptions: { value: string | number; label: string }[];
-  tripDefaultBusMap: Map<string, Array<string | number>>;
-  tripPassengersMap: Map<string, Passenger[]>;
   editingRound?: RoundItem | null;
-  statusMeta: Record<
-    RoundItem["status"],
-    { label: string; color: string }
-  >;
   tripFilter?: string;
+}
+
+interface PreviewRecord {
+  key: number;
+  name: string;
+  location: string;
+  sequence: string;
+  estimateTime: string;
 }
 
 export default function RoundFormModal({
@@ -46,23 +58,38 @@ export default function RoundFormModal({
   confirmLoading,
   form,
   trips,
-  busOptions,
-  tripDefaultBusMap,
-  tripPassengersMap,
   editingRound,
-  statusMeta,
   tripFilter,
 }: RoundFormModalProps) {
   const queryClient = useQueryClient();
   const tripValue = Form.useWatch("trip", form);
-  const [showPassengersModal, setShowPassengersModal] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("manual");
+  const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewRecord[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab("manual");
+      setFile(null);
+      setPreviewData([]);
+    }
+  }, [open]);
 
   // Auto set trip if tripFilter is provided and not "all"
   useEffect(() => {
-    if (open && tripFilter && tripFilter !== "all" && !editingRound && !form.getFieldValue("trip")) {
+    if (
+      open &&
+      tripFilter &&
+      tripFilter !== "all" &&
+      !editingRound &&
+      !form.getFieldValue("trip")
+    ) {
       form.setFieldsValue({ trip: tripFilter });
     }
   }, [open, tripFilter, form, editingRound]);
+
 
   const handleDownloadTemplate = async () => {
     try {
@@ -78,186 +105,214 @@ export default function RoundFormModal({
     }
   };
 
-  const customRequest = async ({ file, onSuccess, onError }: any) => {
+  const handleUpload = async (action: "" | "overwrite" | "skip" = "") => {
     if (!tripValue) {
-      message.warning("Vui lòng chọn một trip ở form bên dưới trước khi import file");
-      onError?.(new Error("No trip selected"));
+      message.warning("Vui lòng chọn chuyến đi ở trên");
       return;
     }
+    if (!file) {
+      message.warning("Vui lòng chọn file Excel");
+      return;
+    }
+
+    setImporting(true);
     try {
       const fd = new FormData();
-      fd.append("file", file as File);
+      fd.append("file", file);
+      if (action) {
+        fd.append("action", action);
+      }
+
       const res = await importRounds(tripValue, fd);
       message.success(res.detail || "Import thành công");
       await queryClient.invalidateQueries({ queryKey: ["rounds"] });
-      onSuccess?.(res);
       onCancel();
     } catch (err: any) {
-      message.error(err?.response?.data?.detail || "Import thất bại");
-      onError?.(err);
+      if (err?.response?.status === 409 && err.response.data?.duplicates) {
+        Modal.confirm({
+          title: "Phát hiện trùng lặp địa điểm",
+          content: (
+            <div>
+              <p>Các địa điểm sau đã tồn tại trong chuyến đi:</p>
+              <ul className="text-orange-600 max-h-40 overflow-y-auto pl-4">
+                {err.response.data.duplicates.map((d: string) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </ul>
+              <p className="mt-2">Bạn muốn xử lý thế nào?</p>
+            </div>
+          ),
+          okText: "Ghi đè dữ liệu mới",
+          okType: "danger",
+          cancelText: "Giữ lại dữ liệu cũ",
+          onOk: () => handleUpload("overwrite"),
+          onCancel: () => handleUpload("skip"),
+          icon: <ExclamationCircleOutlined className="text-orange-600" />,
+        });
+      } else {
+        message.error(err?.response?.data?.detail || "Import thất bại");
+      }
+    } finally {
+      setImporting(false);
     }
   };
 
-  useEffect(() => {
-    if (!open) return;
-    const currentBusIds = form.getFieldValue("bus_ids");
-    if (tripValue && (!currentBusIds || currentBusIds.length === 0)) {
-      const defaults = tripDefaultBusMap.get(tripValue) || [];
-      if (defaults.length) {
-        form.setFieldsValue({ bus_ids: defaults });
-      }
+  const handleOk = () => {
+    if (!editingRound && activeTab === "import") {
+      handleUpload("");
+    } else {
+      onSubmit();
     }
-  }, [open, tripValue, form, tripDefaultBusMap]);
+  };
 
-  const passengersForTrip = useMemo(
-    () => tripPassengersMap.get(tripValue || "") || [],
-    [tripPassengersMap, tripValue],
-  );
+  const handleFilePreview = (f: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: "binary" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        // Skip header row
+        const rows = json.slice(1).filter((r: any) => r && r.length >= 4);
+        const parsed = rows.map((r: any, idx: number) => ({
+          key: idx,
+          name: r[1] || "",
+          location: r[2] || "",
+          sequence: r[3] || "",
+          estimateTime: r[4] || "",
+        }));
+        setPreviewData(parsed);
+      } catch {
+        message.error("Không thể đọc file Excel");
+      }
+    };
+    reader.readAsBinaryString(f);
+  };
 
-  const tripLabel = useMemo(
-    () => {
-      const trip = trips.find((t) => t.id === tripValue);
-      return trip?.name || "Trip";
-    },
-    [trips, tripValue],
+  const manualFormContent = (
+    <Row gutter={16}>
+      <Col span={12}>
+        <Form.Item
+          label="Tên chặng"
+          name="name"
+          rules={[{ required: activeTab === "manual", message: "Nhập tên chặng" }]}
+        >
+          <Input placeholder="Ví dụ: Tập huấn tại Cam Ranh" />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item
+          label="Địa điểm"
+          name="location"
+          rules={[{ required: activeTab === "manual", message: "Nhập địa điểm" }]}
+        >
+          <Input placeholder="Địa điểm" />
+        </Form.Item>
+      </Col>
+
+    </Row>
   );
 
   return (
     <Modal
       open={open}
       onCancel={onCancel}
-      onOk={onSubmit}
-      confirmLoading={confirmLoading}
-      title={editingRound ? "Sửa round" : "Tạo round mới"}
+      onOk={handleOk}
+      confirmLoading={confirmLoading || importing}
+      title={editingRound ? "Sửa chặng" : "Tạo chặng mới"}
       okText={editingRound ? "Cập nhật" : "Tạo"}
       cancelText="Hủy"
       destroyOnClose
+      okButtonProps={{ disabled: (!editingRound && activeTab === "import" && (!file || !tripValue)) }}
+      width={700}
     >
-      <Form
-        layout="vertical"
-        form={form}
-        initialValues={{ status: "planned" }}
-      >
-        {!editingRound && (
-          <div className="mb-5 p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex flex-col items-center justify-center gap-3">
-            <Typography.Text className="text-slate-600 text-sm">
-              Bạn có thể thêm nhiều chặng cùng lúc bằng cách import file Excel.
-            </Typography.Text>
-            <div className="flex items-center gap-2">
-              <Upload accept=".xlsx,.xls" showUploadList={false} customRequest={customRequest}>
-                <Button
-                  icon={<UploadOutlined />}
-                  size="small"
-                  className="border-blue-300 text-blue-600 hover:bg-blue-100"
-                  onClick={(e) => {
-                    if (!tripValue) {
-                      e.preventDefault();
-                      message.warning("Vui lòng chọn một trip ở dưới trước khi import");
-                    }
-                  }}
-                >
-                  Import từ Excel
-                </Button>
-              </Upload>
-              <Typography.Text type="secondary" className="text-xs">hoặc</Typography.Text>
-              <a onClick={handleDownloadTemplate} className="text-blue-600 underline hover:text-blue-800 text-sm font-medium">
-                tải file mẫu
-              </a>
-            </div>
-          </div>
-        )}
-        <Form.Item
-          label="Thuộc Trip"
-          name="trip"
-          rules={[{ required: true, message: "Chọn trip" }]}
-        >
-          <Select
-            placeholder="Chọn trip"
-            options={(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-              value: t.id,
-              label: t.name,
-            }))}
-          />
-        </Form.Item>
-        <Form.Item
-          label="Tên round"
-          name="name"
-          rules={[{ required: true, message: "Nhập tên round" }]}
-        >
-          <Input placeholder="Ví dụ: Tập huấn tại Cam Ranh" />
-        </Form.Item>
-        <Form.Item
-          label="Địa điểm"
-          name="location"
-          rules={[{ required: true, message: "Nhập địa điểm" }]}
-        >
-          <Input placeholder="Địa điểm" />
-        </Form.Item>
-        <Form.Item
-          label="Thứ tự"
-          name="sequence"
-          rules={[{ required: true, message: "Nhập thứ tự" }]}
-        >
-          <Input type="number" min={1} />
-        </Form.Item>
-        <Form.Item label="Xe cho round" name="bus_ids">
-          <Select
-            mode="multiple"
-            allowClear
-            placeholder="Chọn xe cho round"
-            options={busOptions}
-          />
-        </Form.Item>
-        <Form.Item
-          label="Thời gian dự kiến"
-          name="estimate_time"
-          rules={[{ required: true, message: "Chọn thời gian dự kiến" }]}
-        >
-          <DatePicker showTime className="w-full" format="YYYY-MM-DD HH:mm" />
-        </Form.Item>
-        <Form.Item label="Thời gian thực tế" name="actual_time">
-          <DatePicker showTime className="w-full" format="YYYY-MM-DD HH:mm" />
-        </Form.Item>
-        {tripValue ? (
-          <div
-            className="text-sm font-semibold text-emerald-600 cursor-pointer"
-            onClick={() => setShowPassengersModal(true)}
+      <Form layout="vertical" form={form}>
+        <Col span={24}>
+          <Form.Item
+            label="Thuộc chuyến"
+            name="trip"
+            rules={[{ required: true, message: "Chọn trip" }]}
           >
-            Xem danh sách hành khách của trip
-          </div>
-        ) : null}
-        <Form.Item
-          label="Trạng thái"
-          name="status"
-          rules={[{ required: true }]}
-        >
-          <Select
-            options={Object.entries(statusMeta).map(([value, meta]) => ({
-              value,
-              label: meta.label,
-            }))}
+            <Select
+              placeholder="Chọn chuyến"
+              options={(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
+                value: t.id,
+                label: t.name,
+              }))}
+            />
+          </Form.Item>
+        </Col>
+
+        {!editingRound ? (
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              {
+                key: "manual",
+                label: "Tạo thủ công",
+                children: manualFormContent,
+              },
+              {
+                key: "import",
+                label: "Import từ Excel",
+                children: (
+                  <div className="mt-2 mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <Text strong>File Excel</Text>
+                      <a onClick={handleDownloadTemplate} className="text-blue-600 hover:text-blue-800 text-sm">
+                        Tải file mẫu
+                      </a>
+                    </div>
+                    {!file ? (
+                      <Dragger
+                        accept=".xlsx,.xls"
+                        beforeUpload={(f) => {
+                          setFile(f);
+                          handleFilePreview(f);
+                          return false;
+                        }}
+                        fileList={[]}
+                      >
+                        <p className="ant-upload-drag-icon">
+                          <InboxOutlined />
+                        </p>
+                        <p className="ant-upload-text">Nhấn hoặc kéo thả file Excel vào đây</p>
+                        <p className="ant-upload-hint">Chỉ hỗ trợ file định dạng .xlsx, .xls</p>
+                      </Dragger>
+                    ) : (
+                      <div className="border border-blue-100 rounded-lg p-4 bg-slate-50">
+                        <div className="flex justify-between items-center mb-3">
+                          <Text strong className="text-blue-600">Đã chọn: {file.name}</Text>
+                          <Button size="small" onClick={() => { setFile(null); setPreviewData([]); }}>
+                            Chọn file khác
+                          </Button>
+                        </div>
+                        <Table
+                          size="small"
+                          dataSource={previewData}
+                          pagination={{ pageSize: 5 }}
+                          columns={[
+                            { title: "Tên chặng", dataIndex: "name", ellipsis: true },
+                            { title: "Địa điểm", dataIndex: "location" },
+                            { title: "Thứ tự", dataIndex: "sequence", width: 80 },
+                            { title: "TG Dự kiến", dataIndex: "estimateTime", ellipsis: true },
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
           />
-        </Form.Item>
-      </Form>
-      <Modal
-        open={showPassengersModal}
-        onCancel={() => setShowPassengersModal(false)}
-        footer={null}
-        title={`Hành khách của ${tripLabel}`}
-      >
-        {passengersForTrip.length === 0 ? (
-          <div>Chưa có hành khách nào.</div>
         ) : (
-          <div className="max-h-72 overflow-auto space-y-2">
-            {passengersForTrip.map((p) => (
-              <div key={p.id} className="flex justify-between text-sm">
-                <span className="font-medium">{p.name}</span>
-                <span className="text-slate-500">{p.phone || "—"}</span>
-              </div>
-            ))}
-          </div>
+          manualFormContent
         )}
-      </Modal>
+      </Form>
     </Modal>
   );
 }
