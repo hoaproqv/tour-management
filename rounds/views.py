@@ -7,6 +7,12 @@ from django.db.models import Count, Max, Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 
+from core.permissions import (
+    IsAdminOrTourManagerOrReadOnly,
+    IsAdminOrTourManagerOrFleetLeadOrReadOnly,
+    TenantScopedMixin,
+)
+
 from rounds.models import Round, RoundBus
 from rounds.serializers import RoundBusSerializer, RoundSerializer
 
@@ -162,10 +168,10 @@ class RoundReorderView(generics.GenericAPIView):
         return Response({"detail": "Reordered successfully."}, status=status.HTTP_200_OK)
 
 
-class RoundListCreateView(generics.ListCreateAPIView):
+class RoundListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
 
     serializer_class = RoundSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = Round.objects.select_related("trip").prefetch_related(
@@ -173,11 +179,7 @@ class RoundListCreateView(generics.ListCreateAPIView):
             "round_buses__trip_bus",
             "round_buses__trip_bus__bus",
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "trip__tenant_id")
 
     @extend_schema(
         summary="List rounds",
@@ -208,9 +210,9 @@ class RoundListCreateView(generics.ListCreateAPIView):
         return response
 
 
-class RoundDetailView(generics.RetrieveUpdateDestroyAPIView):
+class RoundDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoundSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = Round.objects.select_related("trip").prefetch_related(
@@ -218,11 +220,7 @@ class RoundDetailView(generics.RetrieveUpdateDestroyAPIView):
             "round_buses__trip_bus",
             "round_buses__trip_bus__bus",
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "trip__tenant_id")
 
     @extend_schema(
         summary="Retrieve round",
@@ -263,17 +261,13 @@ class RoundDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-class RoundBusListCreateView(generics.ListCreateAPIView):
+class RoundBusListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = RoundBusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = RoundBus.objects.select_related("round", "trip_bus", "trip_bus__trip")
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip_bus__trip__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "trip_bus__trip__tenant_id")
 
     @extend_schema(
         summary="List round-bus assignments",
@@ -310,17 +304,13 @@ class RoundBusListCreateView(generics.ListCreateAPIView):
         sync_round_progress(obj.round, prev_status=obj.round.status)
 
 
-class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
+class RoundBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = RoundBusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrFleetLeadOrReadOnly]
 
     def get_queryset(self):
         qs = RoundBus.objects.select_related("round", "trip_bus", "trip_bus__trip")
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip_bus__trip__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "trip_bus__trip__tenant_id")
 
     @extend_schema(
         summary="Retrieve round-bus assignment",
@@ -389,7 +379,7 @@ class RoundBusDetailView(generics.RetrieveUpdateDestroyAPIView):
 ROUND_COLUMNS = ["STT", "Tên địa điểm", "Vị trí", "Thứ tự", "Thời gian dự kiến (YYYY-MM-DD HH:MM)"]
 
 
-class RoundImportView(generics.GenericAPIView):
+class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
     """POST /api/v1/rounds/import/?trip=<trip_id>"""
 
     permission_classes = [permissions.IsAuthenticated]
@@ -413,10 +403,7 @@ class RoundImportView(generics.GenericAPIView):
         from trips.models import Trip
         try:
             trip_qs = Trip.objects.all()
-            user = request.user
-            tenant_id = getattr(user, "tenant_id", None)
-            if tenant_id:
-                trip_qs = trip_qs.filter(tenant_id=tenant_id)
+            trip_qs = self.apply_tenant_filter(trip_qs, "tenant_id")
             trip = trip_qs.get(pk=trip_id)
         except Trip.DoesNotExist:
             return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -513,7 +500,7 @@ class RoundImportView(generics.GenericAPIView):
         return Response({"detail": f"Imported {imported_count} rounds successfully."}, status=status.HTTP_201_CREATED)
 
 
-class RoundExportView(generics.GenericAPIView):
+class RoundExportView(TenantScopedMixin, generics.GenericAPIView):
     """GET /api/v1/rounds/export/?trip=<trip_id>"""
 
     permission_classes = [permissions.IsAuthenticated]
@@ -533,10 +520,7 @@ class RoundExportView(generics.GenericAPIView):
         from trips.models import Trip
         try:
             trip_qs = Trip.objects.all()
-            user = request.user
-            tenant_id = getattr(user, "tenant_id", None)
-            if tenant_id:
-                trip_qs = trip_qs.filter(tenant_id=tenant_id)
+            trip_qs = self.apply_tenant_filter(trip_qs, "tenant_id")
             trip = trip_qs.get(pk=trip_id)
         except Trip.DoesNotExist:
             return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)

@@ -9,6 +9,8 @@ from django.db.models import Prefetch
 from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
+
+from core.permissions import IsAdminOrTourManagerOrReadOnly, TenantScopedMixin
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -65,9 +67,9 @@ def publish_transfer_to_mqtt(payload: dict):
         logger.error("Failed to publish transfer to MQTT: %s", exc)
 
 
-class PassengerListCreateView(generics.ListCreateAPIView):
+class PassengerListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = PassengerSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         trip_id = self.request.query_params.get("trip")
@@ -82,9 +84,7 @@ class PassengerListCreateView(generics.ListCreateAPIView):
             Prefetch("bus_assignments", queryset=assignment_qs),
             Prefetch("bus_assignments", queryset=PassengerBusAssignment.objects.select_related("trip"), to_attr="all_assignments"),
         )
-        user = self.request.user
-        if getattr(user, "tenant_id", None):
-            qs = qs.filter(tenant_id=user.tenant_id)
+        qs = self.apply_tenant_filter(qs, "tenant_id")
         if trip_id:
             qs = qs.filter(bus_assignments__trip_id=trip_id)
         return qs.distinct()
@@ -100,7 +100,7 @@ class PassengerListCreateView(generics.ListCreateAPIView):
         return ctx
 
     def perform_create(self, serializer):
-        serializer.save(tenant=getattr(self.request.user, "tenant", None))
+        self.enforce_tenant_on_create(serializer, "tenant")
 
     @extend_schema(
         summary="List passengers",
@@ -122,9 +122,9 @@ class PassengerListCreateView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class PassengerDetailView(generics.RetrieveUpdateDestroyAPIView):
+class PassengerDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PassengerSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         trip_id = self.request.query_params.get("trip")
@@ -139,9 +139,7 @@ class PassengerDetailView(generics.RetrieveUpdateDestroyAPIView):
             Prefetch("bus_assignments", queryset=assignment_qs),
             Prefetch("bus_assignments", queryset=PassengerBusAssignment.objects.select_related("trip"), to_attr="all_assignments"),
         )
-        user = self.request.user
-        if getattr(user, "tenant_id", None):
-            qs = qs.filter(tenant_id=user.tenant_id)
+        qs = self.apply_tenant_filter(qs, "tenant_id")
         if trip_id:
             qs = qs.filter(bus_assignments__trip_id=trip_id)
         return qs.distinct()
@@ -195,9 +193,9 @@ class PassengerDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-class PassengerTransferListCreateView(generics.ListCreateAPIView):
+class PassengerTransferListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = PassengerTransferSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
     pagination_class = None
 
     def get_queryset(self):
@@ -207,10 +205,7 @@ class PassengerTransferListCreateView(generics.ListCreateAPIView):
             "to_trip_bus",
             "trip",
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(passenger__tenant_id=tenant_id)
+        qs = self.apply_tenant_filter(qs, "passenger__tenant_id")
         trip = self.request.query_params.get("trip")
         if trip:
             qs = qs.filter(trip_id=trip)
@@ -248,9 +243,9 @@ class PassengerTransferListCreateView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
+class PassengerTransferDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PassengerTransferSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = PassengerTransfer.objects.select_related(
@@ -259,11 +254,7 @@ class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
             "to_trip_bus",
             "trip",
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(passenger__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "passenger__tenant_id")
 
     def perform_update(self, serializer):
         instance = serializer.save()
@@ -315,9 +306,9 @@ class PassengerTransferDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-class PassengerAssignmentListCreateView(generics.ListCreateAPIView):
+class PassengerAssignmentListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = PassengerAssignmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
     pagination_class = None
 
     def get_queryset(self):
@@ -326,10 +317,7 @@ class PassengerAssignmentListCreateView(generics.ListCreateAPIView):
             "trip_bus",
             "trip",
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip__tenant_id=tenant_id)
+        qs = self.apply_tenant_filter(qs, "trip__tenant_id")
         trip = self.request.query_params.get("trip")
         if trip:
             qs = qs.filter(trip_id=trip)
@@ -358,9 +346,9 @@ class PassengerAssignmentListCreateView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class PassengerAssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
+class PassengerAssignmentDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PassengerAssignmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = PassengerBusAssignment.objects.select_related(
@@ -368,11 +356,7 @@ class PassengerAssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
             "trip_bus",
             "trip",
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "trip__tenant_id")
 
     @extend_schema(
         summary="Retrieve passenger-bus assignment",
@@ -398,7 +382,7 @@ class PassengerAssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 # Import / Export
 # ---------------------------------------------------------------------------
 
-class PassengerImportCheckView(APIView):
+class PassengerImportCheckView(TenantScopedMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser]
 
@@ -411,9 +395,8 @@ class PassengerImportCheckView(APIView):
         if not uploaded_file:
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
         
-        user = request.user
-        tenant = getattr(user, "tenant", None)
-        if not tenant:
+        tenant_id = self.get_user_tenant()
+        if not tenant_id:
             return Response({"detail": "Cần có tenant để check."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
@@ -447,7 +430,7 @@ class PassengerImportCheckView(APIView):
                 
                 conflict_passenger = None
                 if row_data["phone"]:
-                    conflict_passenger = Passenger.objects.filter(tenant=tenant, phone=row_data["phone"]).first()
+                    conflict_passenger = Passenger.objects.filter(tenant_id=tenant_id, phone=row_data["phone"]).first()
                 
                 if conflict_passenger and conflict_passenger.name != name:
                     conflicts.append({
@@ -467,7 +450,7 @@ class PassengerImportCheckView(APIView):
         })
 
 
-class PassengerImportView(APIView):
+class PassengerImportView(TenantScopedMixin, APIView):
     """POST /api/v1/passengers/import/
 
     Multipart form with:
@@ -519,14 +502,14 @@ class PassengerImportView(APIView):
                     {"detail": "Provide trip_id or trip_name + trip_start_date + trip_end_date."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            user_tenant = getattr(user, "tenant", None)
-            if not user_tenant:
+            tenant_id = self.get_user_tenant()
+            if not tenant_id:
                 return Response(
                     {"detail": "Cần có tenant để tạo tour mới. Vui lòng chọn tour có sẵn."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             trip = Trip.objects.create(
-                tenant=user_tenant,
+                tenant_id=tenant_id,
                 name=trip_name,
                 start_date=trip_start,
                 end_date=trip_end,
@@ -534,8 +517,8 @@ class PassengerImportView(APIView):
             )
 
         # Always derive tenant from the trip — works for any user (incl. superusers)
-        tenant = trip.tenant
-        if not tenant:
+        tenant_id = trip.tenant_id
+        if not tenant_id:
             return Response(
                 {"detail": "Tour này chưa được gán công ty. Vui lòng cập nhật lại tour."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -595,18 +578,18 @@ class PassengerImportView(APIView):
 
                     # Dedup by phone within tenant (or by name if no phone)
                     passenger = None
-                    if phone and tenant:
+                    if phone and tenant_id:
                         passenger = Passenger.objects.filter(
-                            tenant=tenant, phone=phone
+                            tenant_id=tenant_id, phone=phone
                         ).first()
-                    if not passenger and tenant:
+                    if not passenger and tenant_id:
                         passenger = Passenger.objects.filter(
-                            tenant=tenant, name=name
+                            tenant_id=tenant_id, name=name
                         ).first()
                         
                     if not passenger:
                         passenger = Passenger.objects.create(
-                            tenant=tenant,
+                            tenant_id=tenant_id,
                             name=name,
                             phone=phone,
                             note=note,
@@ -649,7 +632,7 @@ class PassengerImportView(APIView):
         )
 
 
-class PassengerExportView(APIView):
+class PassengerExportView(TenantScopedMixin, APIView):
     """GET /api/v1/passengers/export/?trip=<id>
 
     Returns a .xlsx file where each sheet is a TripBus (or ImportedBus if unmapped).
@@ -672,8 +655,7 @@ class PassengerExportView(APIView):
 
         try:
             trip_qs = Trip.objects.all()
-            if tenant:
-                trip_qs = trip_qs.filter(tenant=tenant)
+            trip_qs = self.apply_tenant_filter(trip_qs, "tenant_id")
             trip = trip_qs.get(pk=trip_id)
         except Trip.DoesNotExist:
             return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -786,7 +768,7 @@ class PassengerTemplateDownloadView(APIView):
         return response
 
 
-class ImportedBusListView(generics.ListAPIView):
+class ImportedBusListView(TenantScopedMixin, generics.ListAPIView):
     """GET /api/v1/imported-buses/?trip=<id>"""
 
     serializer_class = ImportedBusSerializer
@@ -794,11 +776,8 @@ class ImportedBusListView(generics.ListAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        user = self.request.user
-        tenant = getattr(user, "tenant", None)
         qs = ImportedBus.objects.select_related("trip", "mapped_bus", "mapped_trip_bus")
-        if tenant:
-            qs = qs.filter(trip__tenant=tenant)
+        qs = self.apply_tenant_filter(qs, "trip__tenant_id")
         trip_id = self.request.query_params.get("trip")
         if trip_id:
             qs = qs.filter(trip_id=trip_id)
@@ -813,7 +792,7 @@ class ImportedBusListView(generics.ListAPIView):
         return super().get(request, *args, **kwargs)
 
 
-class ImportedBusMapView(APIView):
+class ImportedBusMapView(TenantScopedMixin, APIView):
     """PATCH /api/v1/imported-buses/<pk>/map/
 
     Body: { bus_id, manager_id }
@@ -831,13 +810,9 @@ class ImportedBusMapView(APIView):
         tags=["ImportedBuses"],
     )
     def patch(self, request, pk, *args, **kwargs):
-        user = request.user
-        tenant = getattr(user, "tenant", None)
-
         try:
             qs = ImportedBus.objects.select_related("trip")
-            if tenant:
-                qs = qs.filter(trip__tenant=tenant)
+            qs = self.apply_tenant_filter(qs, "trip__tenant_id")
             imported_bus = qs.get(pk=pk)
         except ImportedBus.DoesNotExist:
             return Response({"detail": "ImportedBus not found."}, status=status.HTTP_404_NOT_FOUND)

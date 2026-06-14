@@ -17,7 +17,7 @@ import { Button, Menu, Modal, type MenuProps } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useGetAccountInfo } from "../hooks/useAuth";
-import { isFleetLead, isDriver, isAdminLike } from "../utils/helper";
+import { isFleetLead, isDriver, isAdminLike, isTourManagerLike } from "../utils/helper";
 import { ROUTES } from "../utils/routers";
 
 import type { IUser } from "../utils/types";
@@ -99,6 +99,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const hideManagement = isFleetLead(currentUser) || isDriver(currentUser);
   const isAdmin = isAdminLike(currentUser);
+  const isTourManager = isTourManagerLike(currentUser);
 
   const menuItems = useMemo(() => {
     if (isAdmin) {
@@ -106,11 +107,26 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         (item) => item?.key === ROUTES.TENANT || item?.key === ROUTES.ACCOUNT,
       );
     }
+    if (isTourManager) {
+      return baseMenuItems.filter(
+        (item) =>
+          item?.key === ROUTES.DASHBOARD ||
+          item?.key === ROUTES.PASSENGER ||
+          item?.key === ROUTES.TRIP ||
+          item?.key === ROUTES.ROUND ||
+          item?.key === ROUTES.BUS ||
+          item?.key === "about",
+      );
+    }
     if (!hideManagement) return baseMenuItems;
     return baseMenuItems.filter(
-      (item) => item?.key !== ROUTES.ACCOUNT && item?.key !== ROUTES.TENANT,
+      (item) =>
+        item?.key === ROUTES.DASHBOARD ||
+        item?.key === ROUTES.TRANSACTIONS ||
+        item?.key === ROUTES.ROUND ||
+        item?.key === "about",
     );
-  }, [hideManagement, isAdmin]);
+  }, [hideManagement, isAdmin, isTourManager]);
 
   const findSelectedKey = () => {
     if (location.pathname.startsWith(ROUTES.ROUND)) return ROUTES.ROUND;

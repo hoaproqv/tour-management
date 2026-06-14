@@ -2,18 +2,21 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, filters
 from rest_framework.views import APIView
 
+from core.permissions import IsAdminOrTourManagerOrReadOnly, TenantScopedMixin
+
 from fleet.models import Bus
 from fleet.serializers import BusSerializer
 
 
-class BusListCreateView(generics.ListCreateAPIView):
+class BusListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = BusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ["registration_number", "bus_code", "description"]
 
     def get_queryset(self):
-        return Bus.objects.all().order_by("registration_number")
+        qs = Bus.objects.all().order_by("registration_number")
+        return self.apply_tenant_filter(qs, "tenant_id")
 
     @extend_schema(
         summary="List buses",
@@ -34,13 +37,17 @@ class BusListCreateView(generics.ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
+    def perform_create(self, serializer):
+        self.enforce_tenant_on_create(serializer, "tenant")
 
-class BusDetailView(generics.RetrieveUpdateDestroyAPIView):
+
+class BusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = BusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
-        return Bus.objects.all().order_by("registration_number")
+        qs = Bus.objects.all().order_by("registration_number")
+        return self.apply_tenant_filter(qs, "tenant_id")
 
     @extend_schema(
         summary="Retrieve bus",
@@ -84,7 +91,7 @@ class BusDetailView(generics.RetrieveUpdateDestroyAPIView):
 BUS_COLUMNS = ["STT", "Biển số", "Mã xe", "Sức chứa", "Mô tả"]
 
 
-class BusImportView(APIView):
+class BusImportView(TenantScopedMixin, APIView):
     """POST /api/v1/buses/import/"""
 
     permission_classes = [permissions.IsAuthenticated]
@@ -131,12 +138,15 @@ class BusImportView(APIView):
                 if not registration_number or not bus_code or not capacity.isdigit():
                     continue
 
+                tenant_id = self.get_user_tenant()
+                
                 Bus.objects.update_or_create(
                     registration_number=registration_number,
                     defaults={
                         "bus_code": bus_code,
                         "capacity": int(capacity),
-                        "description": description
+                        "description": description,
+                        "tenant_id": tenant_id
                     }
                 )
                 imported_count += 1
@@ -145,7 +155,7 @@ class BusImportView(APIView):
         return Response({"detail": f"Imported {imported_count} buses successfully."}, status=status.HTTP_201_CREATED)
 
 
-class BusExportView(APIView):
+class BusExportView(TenantScopedMixin, APIView):
     """GET /api/v1/buses/export/"""
 
     permission_classes = [permissions.IsAuthenticated]
@@ -165,7 +175,8 @@ class BusExportView(APIView):
         ws.title = "Buses"
         ws.append(BUS_COLUMNS)
 
-        buses = Bus.objects.all().order_by("registration_number")
+        qs = Bus.objects.all().order_by("registration_number")
+        buses = self.apply_tenant_filter(qs, "tenant_id")
         for idx, bus in enumerate(buses, start=1):
             ws.append([
                 idx,

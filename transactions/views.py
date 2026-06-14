@@ -6,6 +6,9 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
+
+from core.permissions import IsAdminOrFleetLeadOrReadOnly, get_role_name, TenantScopedMixin
 
 from transactions.models import Transaction
 from transactions.serializers import TransactionSerializer
@@ -55,18 +58,15 @@ def publish_transaction_to_mqtt(transaction_data):
         logger.error(f"Failed to publish to MQTT: {e}")
 
 
-class TransactionListCreateView(generics.ListCreateAPIView):
+class TransactionListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = TransactionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrFleetLeadOrReadOnly]
 
     def get_queryset(self):
         qs = Transaction.objects.select_related(
             "passenger", "round_bus", "round_bus__trip_bus", "round_bus__round"
         )
-        user = self.request.user
-        if getattr(user, "tenant_id", None):
-            qs = qs.filter(passenger__tenant_id=user.tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "passenger__tenant_id")
 
     @extend_schema(
         summary="List transactions",
@@ -88,6 +88,12 @@ class TransactionListCreateView(generics.ListCreateAPIView):
         tags=["Transactions"],
     )
     def post(self, request, *args, **kwargs):
+        role = get_role_name(request.user)
+        if role == "driver":
+            raise PermissionDenied("Lái xe không có quyền tạo điểm danh.")
+            
+        # Optional: Here we could add a check if fleet_lead is assigned to the bus.
+        # But for now we just rely on UI hiding and basic role checks.
         response = super().post(request, *args, **kwargs)
 
         # Publish to MQTT after successful creation
@@ -97,18 +103,15 @@ class TransactionListCreateView(generics.ListCreateAPIView):
         return response
 
 
-class TransactionDetailView(generics.RetrieveUpdateDestroyAPIView):
+class TransactionDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TransactionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrFleetLeadOrReadOnly]
 
     def get_queryset(self):
         qs = Transaction.objects.select_related(
             "passenger", "round_bus", "round_bus__trip_bus", "round_bus__round"
         )
-        user = self.request.user
-        if getattr(user, "tenant_id", None):
-            qs = qs.filter(passenger__tenant_id=user.tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "passenger__tenant_id")
 
     @extend_schema(
         summary="Retrieve transaction",
@@ -130,6 +133,9 @@ class TransactionDetailView(generics.RetrieveUpdateDestroyAPIView):
         tags=["Transactions"],
     )
     def put(self, request, *args, **kwargs):
+        role = get_role_name(request.user)
+        if role == "driver":
+            raise PermissionDenied("Lái xe không có quyền sửa điểm danh.")
         response = super().put(request, *args, **kwargs)
 
         # Publish to MQTT after successful update
@@ -149,6 +155,9 @@ class TransactionDetailView(generics.RetrieveUpdateDestroyAPIView):
         tags=["Transactions"],
     )
     def patch(self, request, *args, **kwargs):
+        role = get_role_name(request.user)
+        if role == "driver":
+            raise PermissionDenied("Lái xe không có quyền sửa điểm danh.")
         response = super().patch(request, *args, **kwargs)
 
         # Publish to MQTT after successful update
@@ -164,4 +173,7 @@ class TransactionDetailView(generics.RetrieveUpdateDestroyAPIView):
         tags=["Transactions"],
     )
     def delete(self, request, *args, **kwargs):
+        role = get_role_name(request.user)
+        if role == "driver":
+            raise PermissionDenied("Lái xe không có quyền xóa điểm danh.")
         return super().delete(request, *args, **kwargs)

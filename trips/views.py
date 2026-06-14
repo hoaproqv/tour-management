@@ -2,40 +2,24 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 from rest_framework.exceptions import ValidationError
 
+from core.permissions import IsAdminOrTourManagerOrReadOnly, TenantScopedMixin
+
 from trips.models import Trip, TripBus
 from trips.serializers import TripBusSerializer, TripSerializer
 
 
-class TripListCreateView(generics.ListCreateAPIView):
+class TripListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = TripSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = Trip.objects.select_related("tenant").prefetch_related(
             "trip_buses__manager", "trip_buses__driver"
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "tenant_id")
 
     def perform_create(self, serializer):
-        user = self.request.user
-        user_tenant = getattr(user, "tenant", None)
-        requested_tenant = serializer.validated_data.get("tenant")
-
-        # Prevent tenant spoofing for tenant-bound users
-        if user_tenant and requested_tenant and user_tenant != requested_tenant:
-            raise ValidationError("You cannot assign a different tenant")
-
-        tenant = user_tenant or requested_tenant
-        if tenant is None:
-            raise ValidationError(
-                "A tenant is required to create a trip. Provide tenant_id or assign a tenant to the user."
-            )
-
-        serializer.save(tenant=tenant)
+        self.enforce_tenant_on_create(serializer, "tenant")
 
     @extend_schema(
         summary="List trips",
@@ -57,19 +41,15 @@ class TripListCreateView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
+class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TripSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = Trip.objects.select_related("tenant").prefetch_related(
             "trip_buses__manager", "trip_buses__driver"
         )
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "tenant_id")
 
     @extend_schema(
         summary="Retrieve trip",
@@ -110,16 +90,13 @@ class TripDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-class TripBusListCreateView(generics.ListCreateAPIView):
+class TripBusListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = TripBusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = TripBus.objects.select_related("trip", "bus", "manager", "driver")
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip__tenant_id=tenant_id)
+        qs = self.apply_tenant_filter(qs, "trip__tenant_id")
         trip_param = self.request.query_params.get("trip")
         if trip_param:
             qs = qs.filter(trip_id=trip_param)
@@ -145,17 +122,13 @@ class TripBusListCreateView(generics.ListCreateAPIView):
         return super().post(request, *args, **kwargs)
 
 
-class TripBusDetailView(generics.RetrieveUpdateDestroyAPIView):
+class TripBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TripBusSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrTourManagerOrReadOnly]
 
     def get_queryset(self):
         qs = TripBus.objects.select_related("trip", "bus", "manager", "driver")
-        user = self.request.user
-        tenant_id = getattr(user, "tenant_id", None)
-        if tenant_id:
-            qs = qs.filter(trip__tenant_id=tenant_id)
-        return qs
+        return self.apply_tenant_filter(qs, "trip__tenant_id")
 
     @extend_schema(
         summary="Retrieve trip bus",
