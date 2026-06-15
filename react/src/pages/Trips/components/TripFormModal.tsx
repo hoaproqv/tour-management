@@ -7,17 +7,14 @@ import {
   Input,
   Modal,
   Row,
-  Select,
 } from "antd";
 import dayjs from "dayjs";
 
-import type { TenantItem } from "../../../api/tenants";
 import type { Trip } from "../../../api/trips";
 import type { FormInstance } from "antd";
 
 export interface TripFormValues {
   name: string;
-  tenant_id: string | number;
   description?: string;
   start_date: dayjs.Dayjs;
   end_date: dayjs.Dayjs;
@@ -29,9 +26,6 @@ interface TripFormModalProps {
   onSubmit: () => void;
   confirmLoading: boolean;
   form: FormInstance<TripFormValues>;
-  tenants: TenantItem[];
-  loadingTenants: boolean;
-  accountTenant?: string | number;
   editingTrip?: Trip | null;
 }
 
@@ -41,9 +35,6 @@ export default function TripFormModal({
   onSubmit,
   confirmLoading,
   form,
-  tenants,
-  loadingTenants,
-  accountTenant,
   editingTrip,
 }: TripFormModalProps) {
 
@@ -68,21 +59,7 @@ export default function TripFormModal({
           <Input placeholder="Ví dụ: Bách Khoa – Sân bay Nội Bài" />
         </Form.Item>
 
-        <Form.Item
-          label="Tenant"
-          name="tenant_id"
-          rules={[{ required: true, message: "Chọn tenant" }]}
-        >
-          <Select
-            loading={loadingTenants}
-            disabled={!!accountTenant}
-            placeholder="Chọn tenant"
-            options={tenants.map((tenant: TenantItem) => ({
-              value: tenant.id,
-              label: tenant.name,
-            }))}
-          />
-        </Form.Item>
+
 
         <Form.Item label="Mô tả" name="description">
           <Input.TextArea rows={4} placeholder="Nhập mô tả chi tiết về chuyến đi..." />

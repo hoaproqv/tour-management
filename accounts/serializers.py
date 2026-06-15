@@ -46,9 +46,9 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get("password")
         user = authenticate(username=username, password=password)
         if not user:
-            raise serializers.ValidationError("Invalid credentials")
+            raise serializers.ValidationError("Tên đăng nhập hoặc mật khẩu không chính xác")
         if not user.is_active:
-            raise serializers.ValidationError("User is inactive")
+            raise serializers.ValidationError("Tài khoản đã bị khóa hoặc chưa kích hoạt")
         attrs["user"] = user
         return attrs
 

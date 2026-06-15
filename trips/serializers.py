@@ -207,6 +207,11 @@ class TripSerializer(serializers.ModelSerializer):
 
 
 class TripBusSerializer(serializers.ModelSerializer):
+    registration_number = serializers.CharField(max_length=50, required=False)
+    bus_code = serializers.CharField(max_length=50, required=False)
+    capacity = serializers.IntegerField(required=False, min_value=1, max_value=100)
+    bus = serializers.PrimaryKeyRelatedField(queryset=Bus.objects.all(), required=False)
+
     class Meta:
         model = TripBus
         fields = [
@@ -220,6 +225,95 @@ class TripBusSerializer(serializers.ModelSerializer):
             "tour_guide_name",
             "tour_guide_tel",
             "description",
+            "registration_number",
+            "bus_code",
+            "capacity",
             "created_at",
             "updated_at",
         ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.bus:
+            data["registration_number"] = instance.bus.registration_number
+            data["bus_code"] = instance.bus.bus_code
+            data["capacity"] = instance.bus.capacity
+        return data
+
+    def validate(self, attrs):
+        trip = attrs.get("trip")
+        if not trip and self.instance:
+            trip = self.instance.trip
+
+        # Handle Bus Creation/Lookup for both create and update
+        reg_num = attrs.get("registration_number")
+        b_code = attrs.get("bus_code")
+        cap = attrs.get("capacity")
+        
+        if "registration_number" in attrs and reg_num:
+            bus, created = Bus.objects.get_or_create(
+                registration_number=reg_num,
+                defaults={
+                    "bus_code": b_code or reg_num,
+                    "capacity": cap or 45,
+                    "tenant_id": trip.tenant_id if trip else None
+                }
+            )
+            # If the bus exists but we provided new capacity/bus_code, we can optionally update it
+            if not created:
+                changed = False
+                if b_code and bus.bus_code != b_code:
+                    bus.bus_code = b_code
+                    changed = True
+                if cap is not None and bus.capacity != cap:
+                    bus.capacity = cap
+                    changed = True
+                if changed:
+                    bus.save(update_fields=["bus_code", "capacity"])
+
+            attrs["bus"] = bus
+        elif not attrs.get("bus") and not self.instance:
+            raise ValidationError("Must provide bus or registration_number.")
+
+        # Pop write-only bus fields from attrs so they don't get passed to TripBus creation
+        attrs.pop("registration_number", None)
+        attrs.pop("bus_code", None)
+        attrs.pop("capacity", None)
+
+        manager = attrs.get("manager")
+        if "manager" not in attrs and self.instance:
+            manager = self.instance.manager
+
+        driver = attrs.get("driver")
+        if "driver" not in attrs and self.instance:
+            driver = self.instance.driver
+
+        if trip:
+            qs = TripBus.objects.filter(trip=trip)
+            if self.instance:
+                qs = qs.exclude(id=self.instance.id)
+
+            if attrs.get("bus") and qs.filter(bus=attrs["bus"]).exists():
+                raise ValidationError(
+                    {"registration_number": "Xe này (biển số) đã được thêm vào chuyến đi này."}
+                )
+
+            if manager and qs.filter(manager=manager).exists():
+                raise ValidationError(
+                    {"manager": "Trưởng xe đã được gán cho xe khác trong chuyến đi này."}
+                )
+            if manager and manager.tenant_id != trip.tenant_id:
+                raise ValidationError(
+                    {"manager": "Trưởng xe phải thuộc cùng tenant với chuyến đi."}
+                )
+
+            if driver and qs.filter(driver=driver).exists():
+                raise ValidationError(
+                    {"driver": "Lái xe đã được gán cho xe khác trong chuyến đi này."}
+                )
+            if driver and driver.tenant_id != trip.tenant_id:
+                raise ValidationError(
+                    {"driver": "Lái xe phải thuộc cùng tenant với chuyến đi."}
+                )
+
+        return super().validate(attrs)

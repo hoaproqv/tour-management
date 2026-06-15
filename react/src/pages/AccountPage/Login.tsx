@@ -108,7 +108,7 @@ const Login = () => {
 
               <div className="flex items-center justify-between mb-6 text-sm">
                 <Link
-                  to={ROUTES.FORGET_PASSWORD}
+                  to="#"
                   className="text-sky-600 font-medium"
                 >
                   Quên mật khẩu?

@@ -40,12 +40,8 @@ import {
   type TripBus,
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
-import {
-  isAdminLike,
-  isFleetLead,
-  isTourManagerLike,
-  removeAccents,
-} from "../../utils/helper";
+import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
+import { isAdminLike, isFleetLead, removeAccents } from "../../utils/helper";
 
 import { BusPane } from "./components/BusPane";
 import { CrossCheckModal } from "./components/CrossCheckModal";
@@ -59,7 +55,7 @@ import type {
 import type { IUser } from "../../utils/types";
 
 const { Title, Text } = Typography;
-const STORAGE_KEY = "transaction-attendance-filters";
+const STORAGE_KEY = "transaction-state";
 const MQTT_FINALIZE_TOPIC =
   process.env.MQTT_FINALIZE_TOPIC || "round-finalize/#";
 const MQTT_TRANSFER_TOPIC =
@@ -68,7 +64,6 @@ const MQTT_TRANSFER_TOPIC =
 export default function TransactionManagement() {
   const queryClient = useQueryClient();
 
-  const [activeTripId, setActiveTripId] = useState<string>();
   const [activeTripBusId, setActiveTripBusId] = useState<string>();
   const [activeRoundId, setActiveRoundId] = useState<string>();
   const [search, setSearch] = useState("");
@@ -80,6 +75,31 @@ export default function TransactionManagement() {
   const { data: accountInfo } = useGetAccountInfo();
   const currentUser = accountInfo as IUser | undefined;
 
+  const {
+    data: tripsResponse,
+    isLoading: loadingTrips,
+    isFetching: fetchingTrips,
+  } = useQuery<PaginatedResponse<Trip>>({
+    queryKey: ["trips"],
+    queryFn: () => getTrips({ page: 1, limit: 1000 }),
+  });
+
+  const trips = useMemo(() => {
+    const arr = Array.isArray(tripsResponse?.data)
+      ? [...tripsResponse.data]
+      : [];
+    return arr.sort((a, b) => {
+      const timeA = a.created_at ? dayjs(a.created_at).valueOf() : 0;
+      const timeB = b.created_at ? dayjs(b.created_at).valueOf() : 0;
+      return timeB - timeA;
+    });
+  }, [tripsResponse]);
+
+  const [activeTripId, setActiveTripId] = useGlobalTripFilter(true) as [
+    string,
+    (_val: string) => void,
+  ];
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -90,22 +110,12 @@ export default function TransactionManagement() {
         activeTripBusId?: string;
         activeRoundId?: string;
       };
-      setActiveTripId(parsed.activeTripId);
-      setActiveTripBusId(parsed.activeTripBusId);
-      setActiveRoundId(parsed.activeRoundId);
+      if (parsed.activeTripBusId) setActiveTripBusId(parsed.activeTripBusId);
+      if (parsed.activeRoundId) setActiveRoundId(parsed.activeRoundId);
     } catch {
       // ignore parse errors
     }
   }, []);
-
-  const {
-    data: tripsResponse,
-    isLoading: loadingTrips,
-    isFetching: fetchingTrips,
-  } = useQuery<PaginatedResponse<Trip>>({
-    queryKey: ["trips"],
-    queryFn: () => getTrips({ page: 1, limit: 1000 }),
-  });
 
   const {
     data: passengersResponse,
@@ -177,13 +187,8 @@ export default function TransactionManagement() {
     enabled: Boolean(activeTripId),
   });
 
-  const trips = useMemo(
-    () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
-    [tripsResponse],
-  );
-
   const activeTrip = useMemo(
-    () => trips.find((t) => t.id === activeTripId),
+    () => trips.find((t) => String(t.id) === String(activeTripId)),
     [trips, activeTripId],
   );
 
@@ -221,9 +226,8 @@ export default function TransactionManagement() {
   );
 
   const isAdminUser = isAdminLike(currentUser);
-  const isTourManagerUser = isTourManagerLike(currentUser);
   const isFleetLeadUser = isFleetLead(currentUser);
-  const canManageAllBuses = isAdminUser || isTourManagerUser;
+  const canManageAllBuses = isAdminUser;
 
   const managedTripBusIds = useMemo(() => {
     const owned = new Set<string>();
@@ -284,9 +288,10 @@ export default function TransactionManagement() {
   const tripBusesByTrip = useMemo(() => {
     const map = new Map<string, TripBus[]>();
     tripBuses.forEach((tb) => {
-      const list = map.get(tb.trip) ?? [];
+      const tripIdStr = String(tb.trip);
+      const list = map.get(tripIdStr) ?? [];
       list.push(tb);
-      map.set(tb.trip, list);
+      map.set(tripIdStr, list);
     });
     return map;
   }, [tripBuses]);
@@ -318,7 +323,7 @@ export default function TransactionManagement() {
   const tripBusLabelMap = useMemo(() => {
     const map = new Map<string, string>();
     tripBuses.forEach((tb) => {
-      const label = busLabelMap.get(tb.bus) || "Bus";
+      const label = busLabelMap.get(String(tb.bus)) || "Bus";
       map.set(tb.id, label);
     });
     return map;
@@ -387,7 +392,9 @@ export default function TransactionManagement() {
   const transactionsForActiveRound = useMemo(() => {
     if (!activeRoundId) return [] as TransactionItem[];
     return transactions.filter(
-      (tx) => roundBusToRound.get(tx.round_bus) === activeRoundId,
+      (tx) =>
+        String(roundBusToRound.get(String(tx.round_bus))) ===
+        String(activeRoundId),
     );
   }, [transactions, activeRoundId, roundBusToRound]);
 
@@ -412,7 +419,7 @@ export default function TransactionManagement() {
     if (!activeTripId && trips.length) {
       setActiveTripId(trips[0].id);
     }
-  }, [trips, activeTripId]);
+  }, [trips, activeTripId, setActiveTripId]);
 
   const tripScopedRound = useMemo(
     () => roundsByTrip.get(activeTripId || "") || [],
@@ -518,14 +525,14 @@ export default function TransactionManagement() {
 
     if (
       !activeTripBusId ||
-      !tripScopedTripBuses.some((t) => t.id === activeTripBusId)
+      !tripScopedTripBuses.some((t) => String(t.id) === String(activeTripBusId))
     ) {
       setActiveTripBusId(tripScopedTripBuses[0]?.id);
     }
 
     if (
       !activeRoundId ||
-      !tripScopedRound.some((r) => r.id === activeRoundId)
+      !tripScopedRound.some((r) => String(r.id) === String(activeRoundId))
     ) {
       setActiveRoundId(tripScopedRound[0]?.id);
     }
@@ -946,8 +953,12 @@ export default function TransactionManagement() {
     return list.filter(
       (p) =>
         removeAccents(p.name).toLowerCase().includes(term) ||
-        removeAccents(p.phone || "").toLowerCase().includes(term) ||
-        removeAccents(p.note || "").toLowerCase().includes(term),
+        removeAccents(p.phone || "")
+          .toLowerCase()
+          .includes(term) ||
+        removeAccents(p.note || "")
+          .toLowerCase()
+          .includes(term),
     );
   }, [passengers, search]);
 
@@ -1260,7 +1271,7 @@ export default function TransactionManagement() {
 
   // Position of the currently viewed round within the trip
   const activeRoundIndex = tripRoundsSorted.findIndex(
-    (r) => r.id === activeRoundId,
+    (r) => String(r.id) === String(activeRoundId),
   );
   const roundPosition: "first" | "middle" | "last" = React.useMemo(() => {
     if (activeRoundIndex < 0 || tripRoundsSorted.length === 0) return "first";
@@ -1401,27 +1412,40 @@ export default function TransactionManagement() {
             {tripLockedForAttendance && (
               <div className="mt-2">
                 <Tag color="default">
-                  Trip đang ở trạng thái planned – chỉ xem sơ đồ round, chưa thể
-                  điểm danh.
+                  Chuyến đang ở trạng thái Lên kế hoạch – chỉ xem sơ đồ Chặng,
+                  chưa thể điểm danh.
                 </Tag>
               </div>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full md:w-auto">
-            <Select
-              placeholder="Chọn trip"
-              value={activeTripId}
-              onChange={(val) => setActiveTripId(val)}
-              options={trips.map((t) => ({ value: t.id, label: t.name }))}
-              loading={loadingTrips}
-              showSearch
-              optionFilterProp="label"
-            />
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <Input
               allowClear
               placeholder="Tìm tên / điện thoại / ghi chú"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-64"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 mb-4 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-slate-700 whitespace-nowrap">
+              Chuyến đi:
+            </span>
+            <Select
+              placeholder="Chọn chuyến đi"
+              value={activeTripId}
+              onChange={(val) => setActiveTripId(val)}
+              options={trips.map((t) => ({
+                value: String(t.id),
+                label: t.name,
+              }))}
+              loading={loadingTrips}
+              showSearch
+              optionFilterProp="label"
+              className="w-full sm:w-64"
             />
           </div>
         </div>
@@ -1442,8 +1466,8 @@ export default function TransactionManagement() {
               <Empty
                 description={
                   tripScopedTripBuses.length === 0
-                    ? "Chưa có xe cho trip này"
-                    : "Chưa cấu hình round-bus cho round này"
+                    ? "Chưa có xe cho Chuyến đi này"
+                    : "Chưa cấu hình Chặng - Xe khách cho Chuyến đi này"
                 }
               />
             ) : (

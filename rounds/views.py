@@ -376,7 +376,7 @@ class RoundBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIVie
         sync_round_progress(round_obj, prev_status=prev_round_status)
 
 
-ROUND_COLUMNS = ["STT", "Tên địa điểm", "Vị trí", "Thứ tự", "Thời gian dự kiến (YYYY-MM-DD HH:MM)"]
+ROUND_COLUMNS = ["STT", "Tên chặng", "Địa điểm", "Thời gian đến dự kiến (DD/MM/YYYY HH:MM)", "Thứ tự"]
 
 
 class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
@@ -456,23 +456,33 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
                 
                 name = str(row[1]).strip() if row[1] else ""
                 location = str(row[2]).strip() if row[2] else ""
-                sequence_str = str(row[3]).strip() if row[3] else ""
-                estimate_time_str = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+                estimate_time_val = row[3] if len(row) > 3 else None
+                sequence_str = str(row[4]).strip() if len(row) > 4 and row[4] else ""
 
-                estimate_time_val = row[4] if len(row) > 4 else None
                 if not name or not location or not sequence_str.isdigit() or not estimate_time_val:
                     continue
                     
                 sequence = int(sequence_str)
                 if isinstance(estimate_time_val, datetime.datetime):
                     estimate_time = estimate_time_val
-                else:
+                elif isinstance(estimate_time_val, (float, int)):
+                    import datetime
                     try:
-                        estimate_time = parse_datetime(str(estimate_time_val).strip())
-                        if not estimate_time:
-                            continue
-                    except ValueError:
-                        continue
+                        estimate_time = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=float(estimate_time_val))
+                    except (OverflowError, ValueError):
+                        estimate_time = None
+                else:
+                    time_str = str(estimate_time_val).strip()
+                    estimate_time = parse_datetime(time_str)
+                    if not estimate_time:
+                        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d/%m/%y %H:%M:%S", "%d/%m/%y %H:%M"):
+                            try:
+                                estimate_time = datetime.datetime.strptime(time_str, fmt)
+                                break
+                            except ValueError:
+                                pass
+                if not estimate_time:
+                    continue
 
                 existing_round = Round.objects.filter(trip=trip, location=location).first()
                 if existing_round:
@@ -536,13 +546,13 @@ class RoundExportView(TenantScopedMixin, generics.GenericAPIView):
 
         rounds = Round.objects.filter(trip=trip).order_by("sequence")
         for idx, rnd in enumerate(rounds, start=1):
-            estimate_time_str = rnd.estimate_time.strftime("%Y-%m-%d %H:%M") if rnd.estimate_time else ""
+            estimate_time_str = rnd.estimate_time.strftime("%d/%m/%Y %H:%M") if rnd.estimate_time else ""
             ws.append([
                 idx,
                 rnd.name,
                 rnd.location,
-                rnd.sequence,
-                estimate_time_str
+                estimate_time_str,
+                rnd.sequence
             ])
 
         buf = io.BytesIO()

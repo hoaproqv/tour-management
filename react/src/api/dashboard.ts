@@ -25,6 +25,19 @@ export interface DashboardOverview {
   buses: StatusBreakdown;
   recent_trips: RecentTrip[];
   recent_transactions: RecentTransaction[];
+  tenant_info?: {
+    id: number;
+    name: string;
+    phone: string;
+    address: string;
+    description: string;
+  };
+  admin_overview?: {
+    tenants: { total: number };
+    users: { total: number; active: number; inactive: number };
+    recent_tenants: Array<{ id: number; name: string; created_at: string }>;
+    recent_users: Array<{ id: number; name: string; email: string; role: string | null; tenant_name: string | null; created_at: string }>;
+  };
 }
 
 const EMPTY_BREAKDOWN: StatusBreakdown = {
@@ -54,5 +67,7 @@ export const getDashboardOverview = async (): Promise<DashboardOverview> => {
     buses: normalizeBreakdown(payload.buses ?? EMPTY_BREAKDOWN),
     recent_trips: payload.recent_trips ?? [],
     recent_transactions: payload.recent_transactions ?? [],
+    tenant_info: payload.tenant_info,
+    admin_overview: payload.admin_overview,
   };
 };

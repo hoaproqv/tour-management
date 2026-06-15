@@ -172,6 +172,9 @@ export function BusPane({
         <div>
           <div className="font-semibold text-slate-900">{row.passenger.name}</div>
           <div className="text-xs text-slate-500">{row.passenger.phone || "—"}</div>
+          {row.passenger.extra_info ? (
+            <div className="text-xs text-sky-600">{row.passenger.extra_info}</div>
+          ) : null}
           {row.passenger.note ? (
             <div className="text-xs text-slate-500">{row.passenger.note}</div>
           ) : null}

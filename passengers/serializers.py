@@ -7,6 +7,8 @@ from passengers.models import ImportedBus, Passenger, PassengerBusAssignment, Pa
 class PassengerSerializer(serializers.ModelSerializer):
     assigned_trip_bus = serializers.SerializerMethodField(read_only=True)
     trips = serializers.SerializerMethodField(read_only=True)
+    trip_id = serializers.IntegerField(write_only=True, required=False)
+    trip_bus_id = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = Passenger
@@ -15,10 +17,13 @@ class PassengerSerializer(serializers.ModelSerializer):
             "assigned_trip_bus",
             "name",
             "phone",
+            "extra_info",
             "note",
             "trips",
             "created_at",
             "updated_at",
+            "trip_id",
+            "trip_bus_id",
         ]
         read_only_fields = ["assigned_trip_bus", "trips", "created_at", "updated_at"]
 
@@ -53,9 +58,36 @@ class PassengerSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         tenant = self.context.get("tenant")
+        trip_id = validated_data.pop("trip_id", None)
+        trip_bus_id = validated_data.pop("trip_bus_id", None)
+
+        if not trip_id:
+            raise ValidationError({"trip_id": "Chuyến đi là bắt buộc."})
+
+        from trips.models import Trip, TripBus
+        try:
+            trip = Trip.objects.get(id=trip_id, tenant=tenant)
+        except Trip.DoesNotExist:
+            raise ValidationError({"trip_id": "Chuyến đi không tồn tại."})
+
+        trip_bus = None
+        if trip_bus_id:
+            try:
+                trip_bus = TripBus.objects.get(id=trip_bus_id, trip=trip)
+            except TripBus.DoesNotExist:
+                raise ValidationError({"trip_bus_id": "Xe khách không hợp lệ cho chuyến đi này."})
+
         if tenant:
             validated_data["tenant"] = tenant
-        return super().create(validated_data)
+            
+        passenger = super().create(validated_data)
+        
+        PassengerBusAssignment.objects.create(
+            passenger=passenger,
+            trip=trip,
+            trip_bus=trip_bus
+        )
+        return passenger
 
 
 class PassengerTransferSerializer(serializers.ModelSerializer):

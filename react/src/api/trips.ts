@@ -11,6 +11,8 @@ export interface Trip {
   end_date: string;
   status: "planned" | "doing" | "done";
   description: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type TripPayload = {
@@ -19,7 +21,6 @@ export type TripPayload = {
   end_date: string;
   status: "planned" | "doing" | "done";
   description: string;
-  tenant_id?: string | number;
   bus_ids?: Array<string | number>;
   bus_assignments?: Array<{
     bus: string | number;
@@ -30,10 +31,13 @@ export type TripPayload = {
 
 export interface TripBus {
   id: string;
-  manager: string;
-  driver: string | null;
-  bus: string;
-  trip: string;
+  manager: string | number;
+  driver: string | number | null;
+  bus: string | number;
+  trip: string | number;
+  registration_number: string;
+  bus_code: string;
+  capacity: number;
   driver_name: string;
   driver_tel: string;
   tour_guide_name: string;
@@ -78,6 +82,7 @@ export interface Passenger {
   assigned_trip_bus: string | null;
   name: string;
   phone: string;
+  extra_info?: string;
   note: string;
   trips?: Array<{ id: string; name: string }>;
   created_at: string;
@@ -87,7 +92,10 @@ export interface Passenger {
 export type PassengerPayload = Omit<
   Passenger,
   "id" | "created_at" | "updated_at" | "assigned_trip_bus"
->;
+> & {
+  trip_id?: string;
+  trip_bus_id?: string;
+};
 
 export interface RoundBusItem {
   id: string;
@@ -242,6 +250,19 @@ export const getTripBuses = async (
   );
   return normalizePaginated<TripBus>(res, { page, limit });
 };
+
+export const updateTripBus = async (
+  id: string,
+  payload: Partial<TripBus>,
+) => patchData(`/trip-buses/${id}/`, payload);
+
+export const createTripBus = async (payload: Partial<TripBus>) =>
+  postData("/trip-buses/", payload);
+
+export const deleteTripBus = async (id: string) => deleteData(`/trip-buses/${id}/`);
+
+export const bulkDeleteTripBuses = async (ids: number[]) =>
+  postData("/trip-buses/bulk-delete/", { ids });
 
 export const getRounds = async (
   params: PaginatedParams = {},
@@ -477,7 +498,7 @@ export const getImportedBuses = async (
 
 export const mapImportedBus = async (
   id: string,
-  payload: { bus_id: string; manager_id: string },
+  payload: { trip_bus_id: string },
 ) => patchData(`/imported-buses/${id}/map/`, payload);
 
 export const downloadPassengerTemplate = async (): Promise<Blob> => {
@@ -533,6 +554,28 @@ export const exportRounds = async (tripId: string): Promise<Blob> => {
 
 export const downloadRoundTemplate = async (): Promise<Blob> => {
   const response = await axiosInstance.get("/rounds/import/template/", {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+
+// Trip Buses Import/Export
+export const importTripBuses = async (tripId: string, formData: FormData): Promise<any> => {
+  const response = await axiosInstance.post(`/trip-buses/import/?trip=${tripId}`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
+};
+
+export const exportTripBuses = async (tripId: string): Promise<Blob> => {
+  const response = await axiosInstance.get(`/trip-buses/export/?trip=${tripId}`, {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+};
+
+export const downloadTripBusTemplate = async (): Promise<Blob> => {
+  const response = await axiosInstance.get("/trip-buses/import/template/", {
     responseType: "blob",
   });
   return response.data as Blob;

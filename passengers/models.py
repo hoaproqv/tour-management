@@ -11,6 +11,7 @@ class Passenger(models.Model):
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=30, blank=True)
     note = models.TextField(blank=True)
+    extra_info = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -78,7 +79,7 @@ class PassengerBusAssignment(models.Model):
     )
     trip_bus = models.ForeignKey(
         "trips.TripBus",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="passenger_assignments",
         null=True,
         blank=True,

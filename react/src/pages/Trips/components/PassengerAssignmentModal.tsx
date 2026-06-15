@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-import { SearchOutlined, MinusCircleOutlined, SwapRightOutlined } from "@ant-design/icons";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Empty, List, Modal, Space, Spin, Tag, message, Input } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
+import { Button, Card, Empty, List, Modal, Space, Spin, Tag, Input } from "antd";
 
 function removeVietnameseTones(str: string) {
   if (!str) return "";
@@ -28,13 +28,9 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 import {
-  deletePassengerAssignment,
   getPassengerAssignments,
   getPassengers,
-  upsertPassengerAssignment,
-  type Passenger,
   type PassengerAssignment,
-  type TripBus,
 } from "../../../api/trips";
 
 import { type EnrichedTrip } from "./types";
@@ -53,16 +49,13 @@ export default function PassengerAssignmentModal({
   onClose,
   busLabelMap,
 }: PassengerAssignmentModalProps) {
-  const queryClient = useQueryClient();
   const [selectedTripBusId, setSelectedTripBusId] = useState<string>();
   
   const [searchBus, setSearchBus] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
-  const [searchAll, setSearchAll] = useState("");
 
   const debouncedSearchBus = useDebounce(searchBus, 300);
   const debouncedSearchAssigned = useDebounce(searchAssigned, 300);
-  const debouncedSearchAll = useDebounce(searchAll, 300);
 
   const busesForTrip = useMemo(() => trip?.buses ?? [], [trip]);
 
@@ -153,65 +146,19 @@ export default function PassengerAssignmentModal({
     return list.sort((a, b) => a.name.localeCompare(b.name));
   }, [assignmentByPassenger, passengers, selectedTripBus, debouncedSearchAssigned]);
 
-  const filteredAllPassengers = useMemo(() => {
-    let list = [...passengers];
-    if (debouncedSearchAll) {
-      const lowerSearch = removeVietnameseTones(debouncedSearchAll);
-      list = list.filter(p => 
-        removeVietnameseTones(p.name).includes(lowerSearch) || 
-        removeVietnameseTones(p.phone || "").includes(lowerSearch)
-      );
-    }
-    return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [passengers, debouncedSearchAll]);
+  // Remove filteredAllPassengers, assignMutation and handleAssign
 
-  const assignMutation = useMutation({
-    mutationFn: async ({
-      passenger,
-      tripBus,
-      assignmentId,
-    }: {
-      passenger: Passenger;
-      tripBus: TripBus | null;
-      assignmentId?: string;
-    }) => {
-      if (tripBus) {
-        return upsertPassengerAssignment({
-          passenger: passenger.id,
-          trip_bus: tripBus.id,
-        });
-      }
-      if (assignmentId) {
-        return deletePassengerAssignment(assignmentId);
-      }
-      return Promise.resolve();
-    },
-    onSuccess: async () => {
-      message.success("Đã cập nhật xe cho hành khách");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["passengers"] }),
-        queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
-        queryClient.invalidateQueries({ queryKey: ["passengers", { trip: trip?.id }] }),
-      ]);
-    },
-    onError: () => message.error("Cập nhật xe thất bại"),
-  });
-
-  const handleAssign = (passenger: Passenger, tripBus: TripBus | null) => {
-    const assignment = assignmentByPassenger.get(passenger.id);
-    assignMutation.mutate({ passenger, tripBus, assignmentId: assignment?.id });
-  };
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
       footer={null}
-      width={1100}
+      width={800}
       title={
         trip
-          ? `Phân xe cho hành khách - ${trip.name}`
-          : "Phân xe cho hành khách"
+          ? `Xem Hành khách - ${trip.name}`
+          : "Xem Hành khách"
       }
       destroyOnClose
     >
@@ -220,10 +167,10 @@ export default function PassengerAssignmentModal({
           <Spin />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* ===== CỘT XE ===== */}
           <Card
-            title="Xe của trip"
+            title="Danh sách xe"
             className="h-full"
             styles={{ body: { padding: 12 } }}
             extra={
@@ -239,7 +186,7 @@ export default function PassengerAssignmentModal({
             }
           >
             {filteredBuses.length === 0 && (
-              <Empty description="Không tìm thấy xe" />
+              <Empty description="Không có xe nào" />
             )}
 
             <Space direction="vertical" className="w-full">
@@ -270,8 +217,8 @@ export default function PassengerAssignmentModal({
           <Card
             title={
               selectedTripBus
-                ? `Khách của ${tripBusLabelMap.get(selectedTripBus.id)}`
-                : "Chọn xe"
+                ? `Hành khách trên ${tripBusLabelMap.get(selectedTripBus.id)}`
+                : "Chọn xe để xem"
             }
             className="h-full flex flex-col"
             styles={{ body: { padding: 0, minHeight: 360, flex: 1, display: 'flex', flexDirection: 'column' }, header: { padding: '0 12px' } }}
@@ -294,7 +241,7 @@ export default function PassengerAssignmentModal({
               )}
 
               {selectedTripBus && passengersForSelected.length === 0 && (
-                <Empty description="Không tìm thấy hành khách" className="mt-8" />
+                <Empty description="Không có hành khách nào trên xe này" className="mt-8" />
               )}
 
               {selectedTripBus && passengersForSelected.length > 0 && (
@@ -303,109 +250,15 @@ export default function PassengerAssignmentModal({
                   split={false}
                   renderItem={(p) => (
                     <List.Item className="!p-0 !mb-1.5 border border-slate-100 rounded-md overflow-hidden bg-slate-50">
-                      <div className="flex justify-between items-center w-full px-2 py-1.5">
-                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                      <div className="flex justify-between items-center w-full px-3 py-2">
+                        <div className="flex flex-col min-w-0 flex-1">
                           <span className="font-medium text-[13px] leading-snug truncate text-slate-800">{p.name}</span>
-                          {p.phone && <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap">- {p.phone}</span>}
-                          {p.note && <Tag className="!m-0 !text-[10px] !leading-3 border-transparent bg-slate-200 text-slate-600 shrink-0" color="default">{p.note}</Tag>}
+                          {p.phone && <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap mt-0.5">{p.phone}</span>}
+                          {p.note && <Tag className="!m-0 !mt-1 !text-[10px] !leading-3 border-transparent bg-slate-200 text-slate-600 shrink-0 self-start" color="default">{p.note}</Tag>}
                         </div>
-                        <Button
-                          danger
-                          type="text"
-                          size="small"
-                          className="flex-shrink-0 ml-1"
-                          icon={<MinusCircleOutlined />}
-                          onClick={() => handleAssign(p, null)}
-                          loading={assignMutation.isPending}
-                          title="Bỏ gán khỏi xe này"
-                        />
                       </div>
                     </List.Item>
                   )}
-                />
-              )}
-            </div>
-          </Card>
-
-          {/* ===== CỘT TẤT CẢ HÀNH KHÁCH ===== */}
-          <Card
-            title={`Tất cả hành khách (${passengers.length})`}
-            className="h-full flex flex-col"
-            styles={{ body: { padding: 0, minHeight: 360, flex: 1, display: 'flex', flexDirection: 'column' }, header: { padding: '0 12px' } }}
-            extra={
-              <Input
-                placeholder="Tìm khách..."
-                prefix={<SearchOutlined className="text-gray-400" />}
-                value={searchAll}
-                onChange={(e) => setSearchAll(e.target.value)}
-                size="small"
-                style={{ width: 140 }}
-                allowClear
-              />
-            }
-          >
-            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 250px)' }}>
-              {filteredAllPassengers.length === 0 && (
-                <Empty description="Không tìm thấy hành khách" className="mt-8" />
-              )}
-
-              {filteredAllPassengers.length > 0 && (
-                <List
-                  dataSource={filteredAllPassengers}
-                  split={false}
-                  renderItem={(p) => {
-                    const assignment = assignmentByPassenger.get(p.id);
-                    const currentTripBusLabel = assignment
-                      ? tripBusLabelMap.get(assignment.trip_bus)
-                      : undefined;
-
-                    const isInSelected =
-                      selectedTripBus &&
-                      assignment?.trip_bus === selectedTripBus.id;
-
-                    const selectedLabel = selectedTripBus ? tripBusLabelMap.get(selectedTripBus.id) : '';
-
-                    return (
-                      <List.Item className="!p-0 !mb-1.5 border border-slate-100 rounded-md overflow-hidden">
-                        <div className="flex flex-col w-full">
-                          {/* Info Row */}
-                          <div className="w-full px-2 py-1 bg-white">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-medium text-[13px] leading-snug truncate text-slate-800">{p.name}</span>
-                              {p.phone && <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap">- {p.phone}</span>}
-                            </div>
-                          </div>
-                          
-                          {/* Action Row */}
-                          <div className="w-full bg-slate-50 border-t border-slate-100 px-2 py-1 flex justify-between items-center">
-                            <div className="shrink-0 pr-2">
-                              {currentTripBusLabel ? (
-                                <Tag color="processing" className="!m-0 text-[10px] leading-[14px] px-1 border-blue-200">
-                                  {currentTripBusLabel}
-                                </Tag>
-                              ) : (
-                                <Tag className="!m-0 text-[10px] leading-[14px] px-1 text-slate-400 bg-slate-50 border-slate-200">Chưa gán</Tag>
-                              )}
-                            </div>
-                            <Button
-                              type="primary"
-                              ghost
-                              size="small"
-                              className="text-[11px] h-[22px] px-2 py-0"
-                              icon={!isInSelected && <SwapRightOutlined className="text-[10px]" />}
-                              disabled={!selectedTripBus || isInSelected || undefined}
-                              onClick={() => handleAssign(p, selectedTripBus)}
-                              loading={assignMutation.isPending}
-                            >
-                              {isInSelected
-                                ? "Đã ở xe này"
-                                : `Gán vào ${selectedLabel || 'xe'}`}
-                            </Button>
-                          </div>
-                        </div>
-                      </List.Item>
-                    );
-                  }}
                 />
               )}
             </div>

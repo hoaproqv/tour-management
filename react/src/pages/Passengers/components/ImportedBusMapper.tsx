@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { CheckCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -16,15 +16,11 @@ import {
 } from "antd";
 
 import {
-  getBuses,
+  getTripBuses,
   getImportedBuses,
   mapImportedBus,
-  type BusItem,
   type ImportedBus,
 } from "../../../api/trips";
-import { useGetAccountInfo } from "../../../hooks/useAuth";
-
-import type { IUser } from "../../../utils/types";
 
 const { Text, Title } = Typography;
 
@@ -42,12 +38,10 @@ export default function ImportedBusMapper({
   onDone,
 }: Props) {
   const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
   const [selections, setSelections] = useState<
-    Record<string, { busId?: string; managerId?: string }>
+    Record<string, { tripBusId?: string }>
   >({});
-
-  const { data: accountInfo } = useGetAccountInfo();
-  const currentUser = accountInfo as IUser | undefined;
 
   const { data: importedBuses = [], isLoading } = useQuery({
     queryKey: ["imported-buses", tripId],
@@ -55,32 +49,39 @@ export default function ImportedBusMapper({
     enabled: Boolean(tripId),
   });
 
-  const { data: busesResponse } = useQuery({
-    queryKey: ["buses"],
-    queryFn: () => getBuses({ page: 1, limit: 1000 }),
+  const { data: tripBusesResponse } = useQuery({
+    queryKey: ["trip-buses", { trip: tripId }],
+    queryFn: () => getTripBuses({ trip: tripId, page: 1, limit: 1000 }),
+    enabled: Boolean(tripId),
   });
-  const buses = React.useMemo(
-    () => (Array.isArray(busesResponse?.data) ? busesResponse.data : []),
-    [busesResponse],
+  const tripBuses = React.useMemo(
+    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    [tripBusesResponse],
   );
 
-  const mapMutation = useMutation({
-    mutationFn: ({
-      id,
-      busId,
-      managerId,
-    }: {
-      id: string;
-      busId: string;
-      managerId: string;
-    }) => mapImportedBus(id, { bus_id: busId, manager_id: managerId }),
+  const bulkMapMutation = useMutation({
+    mutationFn: async () => {
+      const promises = [];
+      for (const ib of importedBuses) {
+        const sel = selections[ib.id] || {};
+        const tripBusId = sel.tripBusId;
+        
+        if (tripBusId && String(tripBusId) !== String(ib.mapped_trip_bus)) {
+          promises.push(mapImportedBus(ib.id, { trip_bus_id: tripBusId }));
+        }
+      }
+      if (promises.length === 0) return Promise.resolve();
+      return Promise.all(promises);
+    },
     onSuccess: async () => {
       message.success("Đã gán xe thành công");
+      setIsEditing(false);
       await queryClient.invalidateQueries({
         queryKey: ["imported-buses", tripId],
       });
       await queryClient.invalidateQueries({ queryKey: ["trip-buses"] });
       await queryClient.invalidateQueries({ queryKey: ["passengers"] });
+      if (onDone) onDone();
     },
     onError: (err: unknown) => {
       const m = err instanceof Error ? err.message : "Gán xe thất bại";
@@ -88,20 +89,20 @@ export default function ImportedBusMapper({
     },
   });
 
-  const handleMap = (ib: ImportedBus) => {
-    const sel = selections[ib.id] || {};
-    const busId = sel.busId;
-    const managerId =
-      sel.managerId || (currentUser ? String(currentUser.id) : undefined);
-    if (!busId) {
-      message.warning("Vui lòng chọn xe");
-      return;
+  const handleSave = () => {
+    // Validate capacities
+    for (const ib of importedBuses) {
+      const sel = selections[ib.id] || {};
+      const tripBusId = sel.tripBusId;
+      if (tripBusId && String(tripBusId) !== String(ib.mapped_trip_bus)) {
+        const selectedTripBus = tripBuses.find((tb) => String(tb.id) === String(tripBusId));
+        if (selectedTripBus && (selectedTripBus.capacity || 0) < ib.passenger_count) {
+          message.error(`Sức chứa của xe ${selectedTripBus.registration_number || selectedTripBus.bus_code} (${selectedTripBus.capacity}) không đủ cho ${ib.sheet_name} (${ib.passenger_count} khách)`);
+          return;
+        }
+      }
     }
-    if (!managerId) {
-      message.warning("Không xác định được người quản lý");
-      return;
-    }
-    mapMutation.mutate({ id: ib.id, busId, managerId });
+    bulkMapMutation.mutate();
   };
 
   const unmappedCount = importedBuses.filter((b) => !b.is_mapped).length;
@@ -135,61 +136,65 @@ export default function ImportedBusMapper({
         ),
     },
     {
-      title: "Xe thực tế (chọn từ DB)",
-      key: "bus_select",
-      width: 260,
+      title: "Xe khách trong chuyến đi",
+      key: "tripBusId",
+      width: 300,
       render: (_: unknown, record: ImportedBus) => {
-        const busId = record.mapped_bus;
-        const bus = buses.find((b: BusItem) => String(b.id) === String(busId));
-        if (record.is_mapped || readOnly) {
+        const currentMappedTripBusId = record.mapped_trip_bus;
+        const currentMappedTripBus = tripBuses.find((tb) => String(tb.id) === String(currentMappedTripBusId));
+        
+        if (!isEditing || readOnly) {
           return (
             <Text type={record.is_mapped ? "secondary" : undefined}>
-              {bus ? (
-                `${bus.registration_number} (${bus.capacity} chỗ)`
-              ) : busId ? (
-                `Bus #${busId}`
+              {currentMappedTripBus ? (
+                `${currentMappedTripBus.registration_number || currentMappedTripBus.bus_code} (${currentMappedTripBus.capacity || 0} chỗ)`
+              ) : currentMappedTripBusId ? (
+                `Bus #${currentMappedTripBusId}`
               ) : (
                 <Text type="secondary">Chưa gán</Text>
               )}
             </Text>
           );
         }
+
+        const selectedTripBusId = selections[record.id] !== undefined ? selections[record.id].tripBusId : (currentMappedTripBusId ? String(currentMappedTripBusId) : undefined);
+
+        // Compute which buses are used by other rows
+        const usedByOthers = new Set<string>();
+        importedBuses.forEach((ib) => {
+          if (ib.id !== record.id) {
+            const ibSelected = selections[ib.id] !== undefined ? selections[ib.id].tripBusId : (ib.mapped_trip_bus ? String(ib.mapped_trip_bus) : undefined);
+            if (ibSelected) {
+              usedByOthers.add(ibSelected);
+            }
+          }
+        });
+
         return (
           <Select
             showSearch
+            allowClear
             optionFilterProp="label"
             placeholder="Chọn xe..."
             className="w-full"
-            value={selections[record.id]?.busId}
+            value={selectedTripBusId}
             onChange={(v) =>
               setSelections((prev) => ({
                 ...prev,
-                [record.id]: { ...prev[record.id], busId: v },
+                [record.id]: { ...prev[record.id], tripBusId: v },
               }))
             }
-            options={buses.map((b: BusItem) => ({
-              value: String(b.id),
-              label: `${b.registration_number} — ${b.bus_code} (${b.capacity} chỗ)`,
-            }))}
+            options={tripBuses.map((tb) => {
+              const tbId = String(tb.id);
+              const isUsed = usedByOthers.has(tbId);
+              const capacityFull = (tb.capacity || 0) < record.passenger_count;
+              return {
+                value: tbId,
+                label: `${tb.registration_number || tb.bus_code} (${tb.capacity || 0} chỗ)`,
+                disabled: isUsed || capacityFull,
+              };
+            })}
           />
-        );
-      },
-    },
-    {
-      title: "",
-      key: "action",
-      width: 100,
-      render: (_: unknown, record: ImportedBus) => {
-        if (record.is_mapped || readOnly) return null;
-        return (
-          <Button
-            type="primary"
-            size="small"
-            loading={mapMutation.isPending}
-            onClick={() => handleMap(record)}
-          >
-            Gán xe
-          </Button>
         );
       },
     },
@@ -200,7 +205,7 @@ export default function ImportedBusMapper({
 
   return (
     <Card
-      className="mt-6 border-amber-300"
+      className="border-amber-300"
       styles={{ header: { background: "#fffbeb" } }}
       title={
         <Space>
@@ -216,11 +221,27 @@ export default function ImportedBusMapper({
         </Space>
       }
       extra={
-        onDone && allMapped && !readOnly ? (
-          <Button type="primary" size="small" onClick={onDone}>
-            Hoàn tất
-          </Button>
-        ) : null
+        !readOnly && (
+          <Space>
+            {isEditing ? (
+              <>
+                <Button onClick={() => setIsEditing(false)}>Hủy</Button>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  loading={bulkMapMutation.isPending}
+                  onClick={handleSave}
+                >
+                  Hoàn tất
+                </Button>
+              </>
+            ) : (
+              <Button type="primary" icon={<EditOutlined />} onClick={() => setIsEditing(true)}>
+                Sửa
+              </Button>
+            )}
+          </Space>
+        )
       }
     >
       {readOnly ? (
@@ -230,12 +251,12 @@ export default function ImportedBusMapper({
           className="mb-4"
           message="Chuyến đi đã bắt đầu — không thể thay đổi gán xe."
         />
-      ) : !allMapped ? (
+      ) : isEditing ? (
         <Alert
           type="info"
           showIcon
           className="mb-4"
-          message="Chọn xe thực tế (biển số) cho từng xe được import từ file Excel. Sau khi gán, hành khách sẽ được phân vào xe đó."
+          message="Chọn xe khách trong chuyến đi cho từng nhóm khách từ file Excel. Sau khi gán, hành khách sẽ được phân vào xe đó. Bấm Hoàn tất để lưu."
         />
       ) : null}
 

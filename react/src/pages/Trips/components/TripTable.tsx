@@ -123,7 +123,7 @@ export default function TripTable({
                   </Tooltip>
                 </Popconfirm>
               )}
-              <Tooltip title="Sắp xếp xe cho hành khách">
+              <Tooltip title="Xem Hành khách">
                 <Button
                   type="text"
                   icon={<TeamOutlined />}
@@ -139,7 +139,7 @@ export default function TripTable({
                   style={{ color: "#f59e0b" }}
                 />
               </Tooltip>
-              <Tooltip title="Quản lý xe">
+              <Tooltip title="Xem Xe khách">
                 <Button
                   type="text"
                   icon={<CarOutlined />}

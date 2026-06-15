@@ -1,4 +1,4 @@
-import type { Passenger, TransactionItem } from "../../api/trips";
+import type { Passenger, TransactionItem } from "../../../api/trips";
 
 export type RowStatus =
   | "pending"

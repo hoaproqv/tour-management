@@ -42,6 +42,11 @@ export default function PassengerTable({
         render: (val: string) => val || "—",
       },
       {
+        title: "Thông tin thêm",
+        dataIndex: "extra_info",
+        render: (val: string) => val || "—",
+      },
+      {
         title: "Ghi chú",
         dataIndex: "note",
         render: (val: string) => val || "—",

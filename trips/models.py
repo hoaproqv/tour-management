@@ -39,6 +39,8 @@ class TripBus(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="managed_buses",
+        null=True,
+        blank=True,
     )
     driver = models.ForeignKey(
         settings.AUTH_USER_MODEL,

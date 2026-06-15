@@ -49,7 +49,7 @@ class RegisterView(BaseAPIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
-            return self.error("Invalid data", errors=serializer.errors)
+            return self.error("Dữ liệu không hợp lệ", errors=serializer.errors)
         user = serializer.save()
         return self.success(UserSerializer(user).data, status.HTTP_201_CREATED)
 
@@ -271,14 +271,14 @@ class LoginView(BaseAPIView):
                     "data": LoginResponseSerializer(),
                 },
             ),
-            400: {"description": "Invalid credentials"},
+            400: {"description": "Tên đăng nhập hoặc mật khẩu không chính xác"},
         },
         tags=["Auth"],
     )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
-            return self.error("Invalid credentials", errors=serializer.errors)
+            return self.error("Tên đăng nhập hoặc mật khẩu không chính xác", errors=serializer.errors)
         user = serializer.validated_data["user"]
         refresh = RefreshToken.for_user(user)
         tokens = {"access": str(refresh.access_token), "refresh": str(refresh)}
@@ -321,8 +321,8 @@ class MeView(BaseAPIView):
                 ),
             },
         ),
-        400: {"description": "Missing refresh token"},
-        401: {"description": "Invalid refresh token"},
+        400: {"description": "Thiếu mã làm mới (refresh token)"},
+        401: {"description": "Mã làm mới (refresh token) không hợp lệ"},
     },
     tags=["Auth"],
 )
@@ -332,14 +332,14 @@ def refresh_token(request):
     """Refresh JWT token"""
     refresh_token_value = request.data.get("refresh")
     if not refresh_token_value:
-        return BaseAPIView().error("Missing refresh token")
+        return BaseAPIView().error("Thiếu mã làm mới (refresh token)")
     try:
         refresh = RefreshToken(refresh_token_value)
         data = {"access": str(refresh.access_token), "refresh": str(refresh)}
         return BaseAPIView().success({"tokens": data})
     except Exception:
         return BaseAPIView().error(
-            "Invalid refresh token", status_code=status.HTTP_401_UNAUTHORIZED
+            "Mã làm mới (refresh token) không hợp lệ", status_code=status.HTTP_401_UNAUTHORIZED
         )
 
 

@@ -46,14 +46,14 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     label: "Người dùng",
   },
   {
-    key: ROUTES.PASSENGER,
-    icon: <UserOutlined style={{ color: "#fff" }} />,
-    label: "Hành khách",
-  },
-  {
     key: ROUTES.TRIP,
     icon: <CompassOutlined style={{ color: "#fff" }} />,
     label: "Chuyến đi",
+  },
+  {
+    key: ROUTES.BUS,
+    icon: <BusIcon style={{ color: "#fff" }} />,
+    label: "Xe khách",
   },
   {
     key: ROUTES.ROUND,
@@ -61,9 +61,9 @@ const baseMenuItems: Required<MenuProps>["items"] = [
     label: "Chặng",
   },
   {
-    key: ROUTES.BUS,
-    icon: <BusIcon style={{ color: "#fff" }} />,
-    label: "Xe khách",
+    key: ROUTES.PASSENGER,
+    icon: <UserOutlined style={{ color: "#fff" }} />,
+    label: "Hành khách",
   },
   {
     key: ROUTES.TRANSACTIONS,
@@ -104,7 +104,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const menuItems = useMemo(() => {
     if (isAdmin) {
       return baseMenuItems.filter(
-        (item) => item?.key === ROUTES.TENANT || item?.key === ROUTES.ACCOUNT,
+        (item) => item?.key === ROUTES.DASHBOARD || item?.key === ROUTES.TENANT || item?.key === ROUTES.ACCOUNT,
       );
     }
     if (isTourManager) {
@@ -115,6 +115,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           item?.key === ROUTES.TRIP ||
           item?.key === ROUTES.ROUND ||
           item?.key === ROUTES.BUS ||
+          item?.key === ROUTES.TRANSACTIONS ||
           item?.key === "about",
       );
     }

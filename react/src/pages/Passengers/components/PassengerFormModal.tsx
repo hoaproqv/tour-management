@@ -1,16 +1,26 @@
 import React from "react";
 
 import { UploadOutlined } from "@ant-design/icons";
-import { Form, Input, Modal, Button, Typography } from "antd";
+import { useQuery } from "@tanstack/react-query";
+import { Form, Input, Modal, Button, Typography, Select } from "antd";
 
-import { type Passenger, type PassengerPayload } from "../../../api/trips";
+import {
+  downloadPassengerTemplate,
+  getTripBuses,
+  type Passenger,
+  type Trip,
+} from "../../../api/trips";
 
 import type { FormInstance } from "antd/es/form";
 
-export type PassengerFormValues = Pick<
-  PassengerPayload,
-  "name" | "phone" | "note"
->;
+export interface PassengerFormValues {
+  name: string;
+  phone?: string;
+  extra_info?: string;
+  note?: string;
+  trip_id?: string;
+  trip_bus_id?: string;
+}
 
 type PassengerFormModalProps = {
   open: boolean;
@@ -20,6 +30,7 @@ type PassengerFormModalProps = {
   form: FormInstance<PassengerFormValues>;
   editingPassenger?: Passenger | null;
   onOpenImport?: () => void;
+  trips: Trip[];
 };
 
 export default function PassengerFormModal({
@@ -30,7 +41,32 @@ export default function PassengerFormModal({
   form,
   editingPassenger,
   onOpenImport,
+  trips,
 }: PassengerFormModalProps) {
+  const selectedTripId = Form.useWatch("trip_id", form);
+
+  const { data: tripBusesResponse } = useQuery({
+    queryKey: ["trip-buses", { trip: selectedTripId }],
+    queryFn: () => getTripBuses({ trip: selectedTripId, page: 1, limit: 1000 }),
+    enabled: open && Boolean(selectedTripId) && !editingPassenger,
+  });
+
+  const tripBuses = Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [];
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const blob = await downloadPassengerTemplate();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "passenger_import_template.xlsx";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      // Ignore error
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -63,21 +99,75 @@ export default function PassengerFormModal({
               >
                 Import từ Excel
               </Button>
+              <Typography.Text type="secondary" className="text-xs">
+                hoặc
+              </Typography.Text>
+              <a
+                onClick={handleDownloadTemplate}
+                className="text-blue-600 underline hover:text-blue-800 text-sm font-medium"
+              >
+                Tải template
+              </a>
             </div>
           </div>
         )}
+
+        {!editingPassenger && (
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              name="trip_id"
+              label="Chuyến đi"
+              rules={[{ required: true, message: "Vui lòng chọn chuyến đi" }]}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="Chọn chuyến đi"
+                options={trips.map((t) => ({ value: String(t.id), label: t.name }))}
+                onChange={() => form.setFieldValue("trip_bus_id", undefined)}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="trip_bus_id"
+              label="Gán vào xe (Tùy chọn)"
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="Chọn xe"
+                allowClear
+                disabled={!selectedTripId}
+                options={tripBuses.map((tb) => ({
+                  value: String(tb.id),
+                  label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${tb.capacity || 0} chỗ)`,
+                }))}
+              />
+            </Form.Item>
+          </div>
+        )}
+
         <Form.Item
-          label="Tên"
           name="name"
-          rules={[{ required: true, message: "Nhập tên" }]}
+          label="Họ và tên"
+          rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
         >
-          <Input placeholder="Họ và tên" />
+          <Input placeholder="Nhập họ tên hành khách" autoFocus={!!editingPassenger} />
         </Form.Item>
-        <Form.Item label="Điện thoại" name="phone">
-          <Input placeholder="Số điện thoại" />
+
+        <Form.Item name="phone" label="Số điện thoại">
+          <Input placeholder="Nhập số điện thoại (nếu có)" />
         </Form.Item>
-        <Form.Item label="Ghi chú" name="note">
-          <Input.TextArea rows={3} placeholder="Ghi chú" />
+
+        <Form.Item name="extra_info" label="Thông tin thêm (Tuỳ chọn)">
+          <Input placeholder="Ví dụ: Phòng ban, vị trí, công ty..." />
+        </Form.Item>
+
+        <Form.Item name="note" label="Ghi chú">
+          <Input.TextArea
+            rows={3}
+            placeholder="Ví dụ: Ăn chay, đón tại sảnh..."
+          />
         </Form.Item>
       </Form>
     </Modal>

@@ -123,11 +123,7 @@ export default function TripManagement() {
 
 
   useEffect(() => {
-    if (accountInfo?.tenant) {
-      form.setFieldsValue({ tenant_id: accountInfo.tenant });
-    } else if (!form.getFieldValue("tenant_id") && tenants.length > 0) {
-      form.setFieldsValue({ tenant_id: tenants[0].id });
-    }
+    // Không cần set tenant_id nữa vì backend tự xử lý
   }, [accountInfo, tenants, form]);
 
   const rounds = useMemo(
@@ -236,7 +232,6 @@ export default function TripManagement() {
     setEditingTrip(trip);
     form.setFieldsValue({
       name: trip.name,
-      tenant_id: trip.tenant || tenants[0]?.id,
       description: trip.description,
       start_date: dayjs(trip.start_date),
       end_date: dayjs(trip.end_date),
@@ -255,7 +250,6 @@ export default function TripManagement() {
           status: editingTrip ? editingTrip.status : "planned",
           start_date: values.start_date.format("YYYY-MM-DD"),
           end_date: values.end_date.format("YYYY-MM-DD"),
-          tenant_id: Number(values.tenant_id),
           bus_assignments: [],
         };
         if (editingTrip) {
@@ -376,9 +370,6 @@ export default function TripManagement() {
           updateTripMutation.status === "pending"
         }
         form={form}
-        tenants={tenants}
-        loadingTenants={loadingTenants}
-        accountTenant={accountInfo?.tenant ?? undefined}
         editingTrip={editingTrip}
       />
     </div>

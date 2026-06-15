@@ -26,7 +26,7 @@ from trips.models import Trip, TripBus
 
 logger = logging.getLogger(__name__)
 
-PASSENGER_COLUMNS = ["STT", "Họ và tên", "Số điện thoại", "Ghi chú"]
+PASSENGER_COLUMNS = ["STT", "Họ và tên", "Số điện thoại", "Thông tin thêm", "Ghi chú"]
 
 
 def publish_transfer_to_mqtt(payload: dict):
@@ -409,6 +409,9 @@ class PassengerImportCheckView(TenantScopedMixin, APIView):
         conflicts = []
         
         for sheet_name in wb.sheetnames:
+            if sheet_name == "Quản lý xe":
+                continue
+            
             ws = wb[sheet_name]
             rows = list(ws.iter_rows(values_only=True))
             data_rows = rows[1:] if rows else []
@@ -417,13 +420,15 @@ class PassengerImportCheckView(TenantScopedMixin, APIView):
                 if not row or not any(row): continue
                 name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
                 phone = str(row[2]).strip() if len(row) > 2 and row[2] else ""
-                note = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                extra_info = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                note = str(row[4]).strip() if len(row) > 4 and row[4] else ""
                 
                 if not name: continue
                 
                 row_data = {
                     "name": name,
                     "phone": phone if phone.lower() != 'none' else "",
+                    "extra_info": extra_info if extra_info.lower() != 'none' else "",
                     "note": note if note.lower() != 'none' else "",
                     "sheet_name": sheet_name
                 }
@@ -537,6 +542,9 @@ class PassengerImportView(TenantScopedMixin, APIView):
 
         with transaction.atomic():
             for seq, sheet_name in enumerate(wb.sheetnames, start=1):
+                if sheet_name == "Quản lý xe":
+                    continue
+                    
                 ws = wb[sheet_name]
                 rows = list(ws.iter_rows(values_only=True))
 
@@ -570,21 +578,22 @@ class PassengerImportView(TenantScopedMixin, APIView):
                     name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
                     phone = str(row[2]).strip() if len(row) > 2 and row[2] else ""
                     phone = phone if phone.lower() != 'none' else ""
-                    note = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                    extra_info = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                    extra_info = extra_info if extra_info.lower() != 'none' else ""
+                    note = str(row[4]).strip() if len(row) > 4 and row[4] else ""
                     note = note if note.lower() != 'none' else ""
 
                     if not name:
                         continue
 
-                    # Dedup by phone within tenant (or by name if no phone)
                     passenger = None
                     if phone and tenant_id:
                         passenger = Passenger.objects.filter(
-                            tenant_id=tenant_id, phone=phone
+                            tenant_id=tenant_id, phone=phone, bus_assignments__trip=trip
                         ).first()
                     if not passenger and tenant_id:
                         passenger = Passenger.objects.filter(
-                            tenant_id=tenant_id, name=name
+                            tenant_id=tenant_id, name=name, bus_assignments__trip=trip
                         ).first()
                         
                     if not passenger:
@@ -592,6 +601,7 @@ class PassengerImportView(TenantScopedMixin, APIView):
                             tenant_id=tenant_id,
                             name=name,
                             phone=phone,
+                            extra_info=extra_info,
                             note=note,
                         )
                     else:
@@ -601,10 +611,17 @@ class PassengerImportView(TenantScopedMixin, APIView):
                             passenger.name = name
                             passenger.save(update_fields=["name"])
                             
-                        # Update note if provided and previously blank
+                        # Update note/extra_info if provided and previously blank
+                        fields_to_update = []
                         if note and not passenger.note:
                             passenger.note = note
-                            passenger.save(update_fields=["note"])
+                            fields_to_update.append("note")
+                        if extra_info and not passenger.extra_info:
+                            passenger.extra_info = extra_info
+                            fields_to_update.append("extra_info")
+                            
+                        if fields_to_update:
+                            passenger.save(update_fields=fields_to_update)
 
                     # Upsert assignment to imported_bus (draft)
                     PassengerBusAssignment.objects.update_or_create(
@@ -677,7 +694,7 @@ class PassengerExportView(TenantScopedMixin, APIView):
             sheet_title = sheet_title[:31]
             ws = wb.create_sheet(title=sheet_title)
             ws.append(PASSENGER_COLUMNS)
-
+            ws.column_dimensions['C'].number_format = '@'
             assignments = (
                 PassengerBusAssignment.objects.filter(trip=trip, trip_bus=tb)
                 .select_related("passenger")
@@ -685,7 +702,9 @@ class PassengerExportView(TenantScopedMixin, APIView):
             )
             for idx, a in enumerate(assignments, start=1):
                 p = a.passenger
-                ws.append([idx, p.name, p.phone, p.note])
+                row_idx = idx + 1
+                ws.append([idx, p.name, p.phone, p.extra_info, p.note])
+                ws.cell(row=row_idx, column=3).number_format = '@'
 
         # --- Sheets from ImportedBus (unmapped draft buses) ---
         unmapped_buses = ImportedBus.objects.filter(
@@ -696,6 +715,7 @@ class PassengerExportView(TenantScopedMixin, APIView):
             sheet_title = ib.sheet_name[:31]
             ws = wb.create_sheet(title=sheet_title)
             ws.append(PASSENGER_COLUMNS)
+            ws.column_dimensions['C'].number_format = '@'
 
             assignments = (
                 PassengerBusAssignment.objects.filter(trip=trip, imported_bus=ib)
@@ -704,7 +724,9 @@ class PassengerExportView(TenantScopedMixin, APIView):
             )
             for idx, a in enumerate(assignments, start=1):
                 p = a.passenger
-                ws.append([idx, p.name, p.phone, p.note])
+                row_idx = idx + 1
+                ws.append([idx, p.name, p.phone, p.extra_info, p.note])
+                ws.cell(row=row_idx, column=3).number_format = '@'
 
         # Fallback sheet for passengers with no bus assignment
         unassigned = (
@@ -717,9 +739,12 @@ class PassengerExportView(TenantScopedMixin, APIView):
         if unassigned.exists():
             ws = wb.create_sheet(title="Chưa gán xe")
             ws.append(PASSENGER_COLUMNS)
+            ws.column_dimensions['C'].number_format = '@'
             for idx, a in enumerate(unassigned, start=1):
                 p = a.passenger
-                ws.append([idx, p.name, p.phone, p.note])
+                row_idx = idx + 1
+                ws.append([idx, p.name, p.phone, p.extra_info, p.note])
+                ws.cell(row=row_idx, column=3).number_format = '@'
 
         if not wb.sheetnames:
             wb.create_sheet(title="Sheet1")
@@ -752,9 +777,19 @@ class PassengerTemplateDownloadView(APIView):
         import openpyxl
 
         wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Xe 1"
-        ws.append(PASSENGER_COLUMNS)
+        
+        ws_xe1 = wb.active
+        ws_xe1.title = "Xe 1"
+        ws_xe1.append(PASSENGER_COLUMNS)
+        ws_xe1.column_dimensions['C'].number_format = '@'
+        for row in range(2, 500):
+            ws_xe1.cell(row=row, column=3).number_format = '@'
+        
+        ws_xe2 = wb.create_sheet(title="Xe 2")
+        ws_xe2.append(PASSENGER_COLUMNS)
+        ws_xe2.column_dimensions['C'].number_format = '@'
+        for row in range(2, 500):
+            ws_xe2.cell(row=row, column=3).number_format = '@'
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -795,17 +830,17 @@ class ImportedBusListView(TenantScopedMixin, generics.ListAPIView):
 class ImportedBusMapView(TenantScopedMixin, APIView):
     """PATCH /api/v1/imported-buses/<pk>/map/
 
-    Body: { bus_id, manager_id }
-    Creates a TripBus record and updates all passenger assignments.
+    Body: { trip_bus_id }
+    Maps an imported bus sheet to an existing TripBus and updates all passenger assignments.
     """
 
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
-        summary="Map imported bus to real Bus entity",
+        summary="Map imported bus to a TripBus",
         description=(
-            "Assign a real Bus (by bus_id) and manager to a draft ImportedBus. "
-            "This creates a TripBus record and moves all passenger assignments to it."
+            "Assign an existing TripBus (by trip_bus_id) to a draft ImportedBus. "
+            "This moves all passenger assignments to it."
         ),
         tags=["ImportedBuses"],
     )
@@ -817,50 +852,22 @@ class ImportedBusMapView(TenantScopedMixin, APIView):
         except ImportedBus.DoesNotExist:
             return Response({"detail": "ImportedBus not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        bus_id = request.data.get("bus_id")
-        manager_id = request.data.get("manager_id")
+        trip_bus_id = request.data.get("trip_bus_id")
 
-        if not bus_id or not manager_id:
+        if not trip_bus_id:
             return Response(
-                {"detail": "bus_id and manager_id are required."},
+                {"detail": "trip_bus_id is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        from fleet.models import Bus
         try:
-            bus = Bus.objects.get(pk=bus_id)
-        except Bus.DoesNotExist:
-            return Response({"detail": "Bus not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        try:
-            manager = User.objects.get(pk=manager_id)
-        except User.DoesNotExist:
-            return Response({"detail": "Manager user not found."}, status=status.HTTP_404_NOT_FOUND)
+            trip_bus = TripBus.objects.get(pk=trip_bus_id, trip=imported_bus.trip)
+        except TripBus.DoesNotExist:
+            return Response({"detail": "TripBus not found in this trip."}, status=status.HTTP_404_NOT_FOUND)
 
         with transaction.atomic():
-            # Check if TripBus already exists
-            trip_bus, created = TripBus.objects.get_or_create(
-                trip=imported_bus.trip,
-                bus=bus,
-                defaults={
-                    "manager": manager,
-                    "driver_name": "",
-                    "driver_tel": "",
-                    "tour_guide_name": "",
-                    "tour_guide_tel": "",
-                    "description": imported_bus.sheet_name,
-                },
-            )
-            if not created:
-                # Update manager if different
-                if trip_bus.manager_id != manager.id:
-                    trip_bus.manager = manager
-                    trip_bus.save(update_fields=["manager"])
-
             # Update imported_bus record
-            imported_bus.mapped_bus = bus
+            imported_bus.mapped_bus = trip_bus.bus
             imported_bus.mapped_trip_bus = trip_bus
             imported_bus.save(update_fields=["mapped_bus", "mapped_trip_bus"])
 

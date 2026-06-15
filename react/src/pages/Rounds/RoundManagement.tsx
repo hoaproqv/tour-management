@@ -6,7 +6,12 @@ import {
   FileExcelOutlined,
   MenuOutlined,
 } from "@ant-design/icons";
-import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   SortableContext,
@@ -51,6 +56,7 @@ import {
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
 import { canManageCatalog, removeAccents } from "../../utils/helper";
 
 import RoundFormModal, {
@@ -75,8 +81,10 @@ interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
 }
 
 const DraggableRow = ({ children, ...props }: RowProps) => {
-  const isPlaceholder = props.className?.includes("ant-table-placeholder") || !props["data-row-key"];
-  
+  const isPlaceholder =
+    props.className?.includes("ant-table-placeholder") ||
+    !props["data-row-key"];
+
   const {
     attributes,
     listeners,
@@ -96,7 +104,9 @@ const DraggableRow = ({ children, ...props }: RowProps) => {
     ...props.style,
     transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
     transition,
-    ...(isDragging ? { position: "relative", zIndex: 9999, background: "#fafafa" } : {}),
+    ...(isDragging
+      ? { position: "relative", zIndex: 9999, background: "#fafafa" }
+      : {}),
   };
 
   return (
@@ -121,7 +131,6 @@ const DraggableRow = ({ children, ...props }: RowProps) => {
 export default function RoundManagement() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [tripFilter, setTripFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<RoundItem["status"] | "all">(
     "all",
   );
@@ -130,7 +139,7 @@ export default function RoundManagement() {
   const [localRounds, setLocalRounds] = useState<RoundItem[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  
+
   const [form] = Form.useForm<RoundFormValues>();
   const queryClient = useQueryClient();
   const { data: accountInfo } = useGetAccountInfo();
@@ -151,16 +160,16 @@ export default function RoundManagement() {
     queryFn: () => getRounds({ page: 1, limit: 1000 }),
   });
 
-  const trips = useMemo(
-    () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
-    [tripsResponse],
-  );
+  const trips = useMemo(() => {
+    const arr = Array.isArray(tripsResponse?.data) ? [...tripsResponse.data] : [];
+    return arr.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [tripsResponse]);
 
-  useEffect(() => {
-    if (trips.length > 0 && !tripFilter) {
-      setTripFilter(trips[0].id);
-    }
-  }, [trips, tripFilter]);
+  const [tripFilter, setTripFilter] = useGlobalTripFilter(trips, true);
 
   const rounds = useMemo(
     () => (Array.isArray(roundsResponse?.data) ? roundsResponse.data : []),
@@ -171,14 +180,6 @@ export default function RoundManagement() {
     () =>
       Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
     [tripBusesResponse],
-  );
-
-  const tripMap = useMemo(
-    () =>
-      new Map(
-        (Array.isArray(trips) ? trips : []).map((t: Trip) => [t.id, t.name]),
-      ),
-    [trips],
   );
 
   const tripDefaultBusMap = useMemo(() => {
@@ -194,7 +195,7 @@ export default function RoundManagement() {
   const filteredRounds = useMemo(() => {
     const term = removeAccents(debouncedSearch).trim().toLowerCase();
     const filtered = (Array.isArray(rounds) ? rounds : []).filter((round) => {
-      const matchTrip = round.trip === tripFilter;
+      const matchTrip = String(round.trip) === String(tripFilter);
       const matchStatus =
         statusFilter === "all" ? true : round.status === statusFilter;
       const matchTerm = term
@@ -215,7 +216,7 @@ export default function RoundManagement() {
       activationConstraint: {
         distance: 5,
       },
-    })
+    }),
   );
 
   const reorderMutation = useMutation({
@@ -233,18 +234,21 @@ export default function RoundManagement() {
   const onDragEnd = ({ active, over }: any) => {
     if (active.id !== over?.id) {
       setLocalRounds((prev) => {
-        const activeIndex = prev.findIndex((i) => i.id === active.id);
-        const overIndex = prev.findIndex((i) => i.id === over?.id);
+        const activeIndex = prev.findIndex((i) => String(i.id) === String(active.id));
+        const overIndex = prev.findIndex((i) => String(i.id) === String(over?.id));
         const newArr = arrayMove(prev, activeIndex, overIndex);
-        
+
         const updatedArr = newArr.map((item, index) => ({
           ...item,
           sequence: index + 1,
         }));
-        
-        const payload = updatedArr.map(i => ({ id: i.id, sequence: i.sequence }));
+
+        const payload = updatedArr.map((i) => ({
+          id: i.id,
+          sequence: i.sequence,
+        }));
         reorderMutation.mutate(payload);
-        
+
         return updatedArr;
       });
     }
@@ -308,9 +312,10 @@ export default function RoundManagement() {
       }
       setEditingRound(round);
       form.setFieldsValue({
-        trip: round.trip,
+        trip: String(round.trip),
         name: round.name,
         location: round.location,
+        estimate_time: round.estimate_time ? dayjs(round.estimate_time) : undefined,
       });
       setShowCreate(true);
     },
@@ -325,7 +330,12 @@ export default function RoundManagement() {
           trip: values.trip,
           name: values.name,
           location: values.location,
-          sequence: editingRound ? editingRound.sequence : localRounds.length + 1,
+          estimate_time: values.estimate_time
+            ? values.estimate_time.format()
+            : null,
+          sequence: editingRound
+            ? editingRound.sequence
+            : localRounds.length + 1,
           bus_ids: tripDefaultBusMap.get(values.trip) || [],
         };
         if (editingRound) {
@@ -346,26 +356,34 @@ export default function RoundManagement() {
   const columns = useMemo(() => {
     const base = [
       {
+        title: "Sắp xếp",
         key: "drag-handle",
         width: 50,
+        align: "center" as const,
         render: () => null, // Renders the drag handle inside DraggableRow
       },
       {
-        title: "Chuyến đi",
-        dataIndex: "trip",
-        render: (val: string) => tripMap.get(val) || "—",
+        title: "Thứ tự",
+        width: 50,
+        align: "center" as const,
+        dataIndex: "sequence",
       },
       {
-        title: "Tên",
+        title: "Tên chặng",
         dataIndex: "name",
+        width: 150,
+        ellipsis: true,
+        render: (val: string) => (
+          <Tooltip title={val}>
+            <div className="truncate w-full" style={{ maxWidth: 130 }}>
+              {val}
+            </div>
+          </Tooltip>
+        ),
       },
       {
         title: "Địa điểm",
         dataIndex: "location",
-      },
-      {
-        title: "Thứ tự",
-        dataIndex: "sequence",
       },
       {
         title: "Ước tính",
@@ -408,7 +426,7 @@ export default function RoundManagement() {
             <Popconfirm
               title="Xóa chặng này?"
               description="Thao tác này không thể hoàn tác."
-              onConfirm={() => deleteRoundMutate(record.id)}
+              onConfirm={() => deleteRoundMutate(String(record.id))}
               okText="Xóa"
               cancelText="Hủy"
             >
@@ -425,7 +443,7 @@ export default function RoundManagement() {
         ),
       },
     ];
-  }, [canManage, deleteRoundMutate, deleteStatus, openEdit, tripMap]);
+  }, [canManage, deleteRoundMutate, deleteStatus, openEdit]);
 
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
@@ -450,18 +468,7 @@ export default function RoundManagement() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full sm:w-64"
             />
-            <Select
-              value={tripFilter}
-              onChange={(val) => setTripFilter(val)}
-              className="w-full sm:w-48"
-              options={[
-                ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-                  value: t.id,
-                  label: t.name,
-                })),
-              ]}
-              placeholder="Chọn chuyến"
-            />
+
             <Select
               value={statusFilter}
               onChange={(val) => setStatusFilter(val)}
@@ -511,59 +518,91 @@ export default function RoundManagement() {
           </div>
         </div>
 
-        {canManage && (
-          <div className="flex justify-end mt-4 mb-2">
-            {isSelectionMode ? (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setIsSelectionMode(false);
-                    setSelectedRowKeys([]);
-                  }}
-                >
-                  Hủy
-                </Button>
-                {selectedRowKeys.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 mb-4 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-slate-700 whitespace-nowrap">
+              Chuyến đi:
+            </span>
+            <Select
+              value={tripFilter}
+              onChange={(val) => setTripFilter(val)}
+              className="w-full sm:w-64"
+              showSearch
+              optionFilterProp="label"
+              options={[
+                ...trips.map((t: Trip) => ({
+                  value: String(t.id),
+                  label: t.name,
+                })),
+              ]}
+              placeholder="Chọn chuyến"
+            />
+          </div>
+
+          {canManage && (
+            <div className="flex justify-end">
+              {isSelectionMode ? (
+                <div className="flex gap-2">
                   <Button
-                    danger
-                    icon={<DeleteOutlined />}
                     onClick={() => {
-                      Modal.confirm({
-                        title: "Xóa nhiều chặng?",
-                        content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} chặng đã chọn?`,
-                        okText: "Xóa",
-                        cancelText: "Hủy",
-                        onOk: async () => {
-                          const hide = message.loading("Đang xóa...", 0);
-                          try {
-                            await bulkDeleteRounds(selectedRowKeys as string[]);
-                            message.success(`Đã xóa ${selectedRowKeys.length} chặng`);
-                            setSelectedRowKeys([]);
-                            setIsSelectionMode(false);
-                            await queryClient.invalidateQueries({ queryKey: ["rounds"] });
-                          } catch {
-                            message.error("Lỗi khi xóa chặng");
-                          } finally {
-                            hide();
-                          }
-                        },
-                      });
+                      setIsSelectionMode(false);
+                      setSelectedRowKeys([]);
                     }}
                   >
-                    Xóa đã chọn ({selectedRowKeys.length})
+                    Hủy
                   </Button>
-                )}
-              </div>
-            ) : (
-              <Button danger onClick={() => setIsSelectionMode(true)}>
-                Xóa nhiều
-              </Button>
-            )}
-          </div>
-        )}
+                  {selectedRowKeys.length > 0 && (
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => {
+                        Modal.confirm({
+                          title: "Xóa nhiều chặng?",
+                          content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} chặng đã chọn?`,
+                          okText: "Xóa",
+                          cancelText: "Hủy",
+                          onOk: async () => {
+                            const hide = message.loading("Đang xóa...", 0);
+                            try {
+                              await bulkDeleteRounds(
+                                selectedRowKeys as string[],
+                              );
+                              message.success(
+                                `Đã xóa ${selectedRowKeys.length} chặng`,
+                              );
+                              setSelectedRowKeys([]);
+                              setIsSelectionMode(false);
+                              await queryClient.invalidateQueries({
+                                queryKey: ["rounds"],
+                              });
+                            } catch {
+                              message.error("Lỗi khi xóa chặng");
+                            } finally {
+                              hide();
+                            }
+                          },
+                        });
+                      }}
+                    >
+                      Xóa đã chọn ({selectedRowKeys.length})
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button danger onClick={() => setIsSelectionMode(true)}>
+                  Xóa nhiều
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
-        <Card className="mt-6" styles={{ body: { padding: 0 } }}>
-          <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+        <Card styles={{ body: { padding: 0 } }}>
+          <DndContext
+            sensors={sensors}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={onDragEnd}
+          >
             <SortableContext
               items={localRounds.map((i) => i.id)}
               strategy={verticalListSortingStrategy}
@@ -576,7 +615,8 @@ export default function RoundManagement() {
                   isSelectionMode
                     ? {
                         selectedRowKeys,
-                        onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
+                        onChange: (newSelectedRowKeys) =>
+                          setSelectedRowKeys(newSelectedRowKeys),
                       }
                     : undefined
                 }

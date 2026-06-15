@@ -20,8 +20,10 @@ import {
 } from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
 import { canManageCatalog, removeAccents } from "../../utils/helper";
 
+import AssignPassengerBusModal from "./components/AssignPassengerBusModal";
 import ImportedBusMapper from "./components/ImportedBusMapper";
 import ImportPassengerModal from "./components/ImportPassengerModal";
 import PassengerFormModal, {
@@ -36,9 +38,12 @@ const { Title, Text } = Typography;
 export default function PassengerManagement() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
-  const [tripFilter, setTripFilter] = useState<string | "all">("all");
+
+
+
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showAssignBus, setShowAssignBus] = useState(false);
   const [importResult, setImportResult] =
     useState<ImportPassengerResult | null>(null);
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(
@@ -58,13 +63,24 @@ export default function PassengerManagement() {
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
 
+  const trips = useMemo(() => {
+    const arr = Array.isArray(tripsResponse?.data) ? [...tripsResponse.data] : [];
+    return arr.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [tripsResponse]);
+
+  const [tripFilter, setTripFilter] = useGlobalTripFilter(false);
+
   const { data: passengersResponse, isLoading } = useQuery({
     queryKey: ["passengers", tripFilter],
     queryFn: () =>
       getPassengers({
         page: 1,
         limit: 1000,
-        ...(tripFilter !== "all" ? { trip: tripFilter } : {}),
+        ...(tripFilter !== "all" && tripFilter ? { trip: tripFilter } : {}),
       }),
     enabled: tripFilter === "all" || Boolean(tripFilter),
   });
@@ -73,13 +89,8 @@ export default function PassengerManagement() {
   const { data: importedBusesForTrip = [] } = useQuery({
     queryKey: ["imported-buses", tripFilter],
     queryFn: () => getImportedBuses(tripFilter as string),
-    enabled: tripFilter !== "all",
+    enabled: tripFilter !== "all" && Boolean(tripFilter),
   });
-
-  const trips = useMemo(
-    () => (Array.isArray(tripsResponse?.data) ? tripsResponse.data : []),
-    [tripsResponse],
-  );
 
   const passengers = useMemo(
     () =>
@@ -90,7 +101,7 @@ export default function PassengerManagement() {
   const tripMap = useMemo(
     () =>
       new Map(
-        (Array.isArray(trips) ? trips : []).map((t: Trip) => [t.id, t.name]),
+        (Array.isArray(trips) ? trips : []).map((t: Trip) => [String(t.id), t.name]),
       ),
     [trips],
   );
@@ -98,13 +109,11 @@ export default function PassengerManagement() {
   // Current selected trip (for status check)
   const selectedTrip = useMemo(
     () =>
-      tripFilter !== "all"
+      tripFilter !== "all" && tripFilter
         ? trips.find((t) => String(t.id) === String(tripFilter))
         : undefined,
     [trips, tripFilter],
   );
-  const tripIsActive =
-    selectedTrip?.status === "doing" || selectedTrip?.status === "done";
 
   const filteredPassengers = useMemo(() => {
     const term = removeAccents(debouncedSearch).trim().toLowerCase();
@@ -163,6 +172,9 @@ export default function PassengerManagement() {
     }
     setEditingPassenger(null);
     form.resetFields();
+    if (tripFilter !== "all" && tripFilter) {
+      form.setFieldsValue({ trip_id: String(tripFilter) });
+    }
     setShowCreate(true);
   };
 
@@ -175,6 +187,7 @@ export default function PassengerManagement() {
     form.setFieldsValue({
       name: passenger.name,
       phone: passenger.phone,
+      extra_info: passenger.extra_info,
       note: passenger.note,
     });
     setShowCreate(true);
@@ -189,11 +202,14 @@ export default function PassengerManagement() {
         const payload: PassengerPayload = {
           name: values.name,
           phone: values.phone || "",
+          extra_info: values.extra_info || "",
           note: values.note || "",
         };
         if (editingPassenger) {
           updateMutation.mutate({ id: editingPassenger.id, payload });
         } else {
+          payload.trip_id = values.trip_id;
+          payload.trip_bus_id = values.trip_bus_id;
           createMutation.mutate(payload);
         }
         handleCancel();
@@ -207,7 +223,7 @@ export default function PassengerManagement() {
   };
 
   const handleExport = async () => {
-    if (tripFilter === "all") {
+    if (tripFilter === "all" || !tripFilter) {
       message.warning("Vui lòng chọn một trip cụ thể để export");
       return;
     }
@@ -258,23 +274,7 @@ export default function PassengerManagement() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full sm:w-64"
             />
-            <Select
-              value={tripFilter}
-              onChange={(val) => {
-                setTripFilter(val);
-                if (importResult && val !== importResult.trip_id) {
-                  setImportResult(null);
-                }
-              }}
-              className="w-full sm:w-52"
-              options={[
-                { value: "all", label: "Tất cả chuyến" },
-                ...(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
-                  value: t.id,
-                  label: t.name,
-                })),
-              ]}
-            />
+
             <Button
               icon={<DownloadOutlined />}
               loading={exportLoading}
@@ -288,65 +288,112 @@ export default function PassengerManagement() {
               Export
             </Button>
             {canManage && (
-              <Button
-                type="primary"
-                onClick={openCreate}
-                className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
-              >
-                + Tạo mới
-              </Button>
+              <>
+                <Button
+                  type="primary"
+                  onClick={() => setShowAssignBus(true)}
+                  disabled={tripFilter === "all" || !selectedTrip}
+                  title={tripFilter === "all" ? "Chọn chuyến đi để sắp xếp xe" : "Sắp xếp xe cho hành khách"}
+                  className="bg-green-600 hover:bg-green-700 shadow-sm px-5 border-none text-white disabled:bg-slate-300 disabled:text-slate-500"
+                >
+                  Sắp xếp xe
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={openCreate}
+                  className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
+                >
+                  + Tạo mới
+                </Button>
+              </>
             )}
           </div>
         </div>
 
-        {canManage && (
-          <div className="flex justify-end mt-4 mb-2">
-            {isSelectionMode ? (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setIsSelectionMode(false);
-                    setSelectedRowKeys([]);
-                  }}
-                >
-                  Hủy
-                </Button>
-                {selectedRowKeys.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 mb-4 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-slate-700 whitespace-nowrap">Chuyến đi:</span>
+            <Select
+              value={tripFilter}
+              onChange={(val) => {
+                setTripFilter(val);
+                if (importResult && val !== importResult.trip_id) {
+                  setImportResult(null);
+                }
+              }}
+              className="w-full sm:w-64"
+              showSearch
+              optionFilterProp="label"
+              options={[
+                ...trips.map((t) => ({
+                  label: t.name,
+                  value: String(t.id),
+                })),
+              ]}
+            />
+          </div>
+
+          {canManage && (
+            <div className="flex justify-end">
+              {isSelectionMode ? (
+                <div className="flex gap-2">
                   <Button
-                    danger
-                    icon={<DeleteOutlined />}
                     onClick={() => {
-                      Modal.confirm({
-                        title: "Xóa nhiều hành khách?",
-                        content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} hành khách đã chọn?`,
-                        okText: "Xóa",
-                        cancelText: "Hủy",
-                        onOk: async () => {
-                          const hide = message.loading("Đang xóa...", 0);
-                          try {
-                            await bulkDeletePassengers(selectedRowKeys as string[]);
-                            message.success(`Đã xóa ${selectedRowKeys.length} hành khách`);
-                            setSelectedRowKeys([]);
-                            setIsSelectionMode(false);
-                            await queryClient.invalidateQueries({ queryKey: ["passengers"] });
-                          } catch {
-                            message.error("Lỗi khi xóa hành khách");
-                          } finally {
-                            hide();
-                          }
-                        },
-                      });
+                      setIsSelectionMode(false);
+                      setSelectedRowKeys([]);
                     }}
                   >
-                    Xóa đã chọn ({selectedRowKeys.length})
+                    Hủy
                   </Button>
-                )}
-              </div>
-            ) : (
-              <Button danger onClick={() => setIsSelectionMode(true)}>
-                Xóa nhiều
-              </Button>
-            )}
+                  {selectedRowKeys.length > 0 && (
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => {
+                        Modal.confirm({
+                          title: "Xóa nhiều hành khách?",
+                          content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} hành khách đã chọn?`,
+                          okText: "Xóa",
+                          cancelText: "Hủy",
+                          onOk: async () => {
+                            const hide = message.loading("Đang xóa...", 0);
+                            try {
+                              await bulkDeletePassengers(selectedRowKeys as string[]);
+                              message.success(`Đã xóa ${selectedRowKeys.length} hành khách`);
+                              setSelectedRowKeys([]);
+                              setIsSelectionMode(false);
+                              await queryClient.invalidateQueries({ queryKey: ["passengers"] });
+                            } catch {
+                              message.error("Lỗi khi xóa hành khách");
+                            } finally {
+                              hide();
+                            }
+                          },
+                        });
+                      }}
+                    >
+                      Xóa đã chọn ({selectedRowKeys.length})
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button danger onClick={() => setIsSelectionMode(true)}>
+                  Xóa nhiều
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Imported Bus Mapper */}
+        {tripFilter !== "all" && importedBusesForTrip.length > 0 && selectedTrip?.status === "planned" && canManage && (
+          <div className="mb-4">
+            <ImportedBusMapper
+              tripId={tripFilter as string}
+              tripName={selectedTrip?.name || importResult?.trip_name}
+              readOnly={false}
+              onDone={() => setImportResult(null)}
+            />
           </div>
         )}
 
@@ -362,16 +409,6 @@ export default function PassengerManagement() {
           onEdit={openEdit}
         />
       </div>
-
-      {/* Imported Bus Mapper — always shown based on API data when a trip is selected */}
-      {tripFilter !== "all" && importedBusesForTrip.length > 0 && (
-        <ImportedBusMapper
-          tripId={tripFilter as string}
-          tripName={selectedTrip?.name || importResult?.trip_name}
-          readOnly={tripIsActive}
-          onDone={() => setImportResult(null)}
-        />
-      )}
 
       <ImportPassengerModal
         open={showImport}
@@ -389,10 +426,17 @@ export default function PassengerManagement() {
         }
         form={form}
         editingPassenger={editingPassenger}
+        trips={trips}
         onOpenImport={() => {
           setShowCreate(false);
           setShowImport(true);
         }}
+      />
+
+      <AssignPassengerBusModal
+        open={showAssignBus}
+        onClose={() => setShowAssignBus(false)}
+        trip={selectedTrip || null}
       />
     </div>
   );

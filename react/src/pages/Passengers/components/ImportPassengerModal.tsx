@@ -126,7 +126,7 @@ export default function ImportPassengerModal({
     try {
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      return wb.SheetNames.map((name: string) => {
+      return wb.SheetNames.filter((name: string) => name !== "Quản lý xe").map((name: string) => {
         const ws = wb.Sheets[name];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
         const dataRows = rows.slice(1).filter(
@@ -287,13 +287,18 @@ export default function ImportPassengerModal({
             className="mb-4"
             message="Định dạng file"
             description={
-              <span>
-                Mỗi <strong>sheet</strong> là một xe. Mỗi hàng là một hành khách
-                với các cột: <Tag>STT</Tag>
-                <Tag>Họ và tên</Tag>
-                <Tag>Số điện thoại</Tag>
-                <Tag>Ghi chú</Tag>
-              </span>
+              <div className="space-y-1">
+                <p>
+                  Mỗi <strong>sheet</strong> là một xe. Tên Bảng (Sheet) chứa danh sách hành khách chính là Mã xe.
+                </p>
+                <p>
+                  Mỗi hàng là một hành khách với các cột: <Tag>STT</Tag>
+                  <Tag>Họ và tên</Tag>
+                  <Tag>Số điện thoại</Tag>
+                  <Tag>Thông tin thêm</Tag>
+                  <Tag>Ghi chú</Tag>
+                </p>
+              </div>
             }
           />
           <div className="flex justify-end mb-4">
