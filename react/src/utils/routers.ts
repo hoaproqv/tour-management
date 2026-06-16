@@ -9,5 +9,7 @@ export const ROUTES = {
   ACCOUNT: "/view/account",
   TENANT: "/view/tenant",
   TRANSACTIONS: "/view/transactions",
+  PROFILE: "/view/profile",
+  GUIDE: "/view/guide",
   NOT_FOUND: "*",
 };

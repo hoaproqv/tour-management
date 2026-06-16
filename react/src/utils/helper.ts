@@ -19,7 +19,12 @@ export const isAdminLike = (account?: Partial<IUser> | null) => {
 };
 
 export const isTourManagerLike = (account?: Partial<IUser> | null) => {
-  return getRoleSlug(account) === "tour_manager";
+  const roleSlug = getRoleSlug(account);
+  return roleSlug === "tour_manager" || roleSlug === "company_manager";
+};
+
+export const isCompanyManager = (account?: Partial<IUser> | null) => {
+  return getRoleSlug(account) === "company_manager";
 };
 
 export const isFleetLead = (account?: Partial<IUser> | null) => {

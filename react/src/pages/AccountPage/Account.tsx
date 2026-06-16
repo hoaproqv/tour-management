@@ -36,16 +36,23 @@ const roleMeta: Record<
   string,
   { label: string; color: string; permissions: string }
 > = {
+  company_manager: {
+    label: "Quản lý công ty",
+    color: "purple",
+    permissions:
+      "Quyền như Quản lý chuyến đi và thêm quyền tạo các user cho công ty đó.",
+  },
   tour_manager: {
     label: "Quản lý chuyến đi",
     color: "geekblue",
-    permissions: "Thêm/sửa/xoá Xe, Chuyến, Chặng, Hành khách.",
+    permissions:
+      "Thêm/sửa/xoá Xe, Chuyến, Chặng, Hành khách. Xem điểm danh hành khách.",
   },
   fleet_lead: {
     label: "Trưởng xe",
     color: "cyan",
     permissions:
-      "Điểm danh hành khách của xe mình, điểm danh lên/xuống xe và chốt điểm danh.",
+      "Điểm danh hành khách (lên/xuống xe) và chốt danh sách cho xe được phân công.",
   },
   driver: {
     label: "Lái xe",
@@ -94,6 +101,13 @@ export const Account = () => {
     );
   }, [currentUser]);
 
+  const isCompanyManager = useMemo(() => {
+    const roleSlug = (currentUser?.role_name || "").toString().toLowerCase();
+    return roleSlug === "company_manager";
+  }, [currentUser]);
+
+  const canManageUsers = isAdmin || isCompanyManager;
+
   const usersQuery = useQuery({
     queryKey: [
       "users",
@@ -124,7 +138,7 @@ export const Account = () => {
   const rolesQuery = useQuery({
     queryKey: ["roles"],
     queryFn: () => getRoles(),
-    enabled: isAdmin,
+    enabled: canManageUsers,
   });
 
   const users = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data]);
@@ -139,8 +153,11 @@ export const Account = () => {
 
   const formRoleOptions = useMemo(() => {
     const allowed = new Set(["tour_manager", "fleet_lead", "driver"]);
+    if (isAdmin) {
+      allowed.add("company_manager");
+    }
     return allRoleOptions.filter((role) => allowed.has(String(role.name)));
-  }, [allRoleOptions]);
+  }, [allRoleOptions, isAdmin]);
 
   const createUserMutation = useMutation({
     mutationFn: (payload: IUserPayload) => createUser(payload),
@@ -208,7 +225,7 @@ export const Account = () => {
         record.tenant_name || record.tenant || "—",
     },
     {
-      title: "Role",
+      title: "Vai trò",
       dataIndex: "role_name",
       render: (roleName: string) => renderRoleTag(roleName),
     },
@@ -256,8 +273,8 @@ export const Account = () => {
   ];
 
   const openCreateModal = () => {
-    if (!isAdmin) {
-      message.warning("Chỉ admin mới được thêm user.");
+    if (!canManageUsers) {
+      message.warning("Bạn không có quyền thêm user.");
       return;
     }
     form.resetFields();
@@ -266,8 +283,8 @@ export const Account = () => {
   };
 
   const openEditModal = (user: IUser) => {
-    if (!isAdmin) {
-      message.warning("Chỉ admin mới được sửa user.");
+    if (!canManageUsers) {
+      message.warning("Bạn không có quyền sửa user.");
       return;
     }
     setEditingUser(user);
@@ -323,12 +340,16 @@ export const Account = () => {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex-1 min-w-[250px] pr-4">
             <p className="text-sm uppercase tracking-[0.25em] text-sky-700 font-semibold">
-              User Management
+              {isCompanyManager ? "Employee Management" : "User Management"}
             </p>
             <Title level={2} style={{ margin: 0 }}>
-              Quản lý Người dùng
+              {isCompanyManager ? "Quản lý Nhân viên" : "Quản lý Người dùng"}
             </Title>
-            <Text type="secondary">Quản lý tài khoản và vai trò.</Text>
+            <Text type="secondary">
+              {isCompanyManager
+                ? "Quản lý nhân viên của công ty."
+                : "Quản lý tài khoản và vai trò."}
+            </Text>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             <Input
@@ -341,7 +362,7 @@ export const Account = () => {
               }}
               className="w-full sm:w-52"
             />
-            {isAdmin && (
+            {canManageUsers && (
               <>
                 <Select
                   value={roleFilter}
@@ -351,34 +372,36 @@ export const Account = () => {
                   }}
                   className="w-full sm:w-32"
                   options={[
-                    { value: "all", label: "Tất cả Role" },
+                    { value: "all", label: "Tất cả vai trò" },
                     ...allRoleOptions.map((r: any) => ({
                       value: r.id,
                       label: roleMeta[r.name]?.label || r.name,
                     })),
                   ]}
                 />
-                <Select
-                  value={tenantFilter}
-                  onChange={(val) => {
-                    setTenantFilter(val);
-                    setPagination((prev) => ({ ...prev, page: 1 }));
-                  }}
-                  className="w-full sm:w-48"
-                  options={[
-                    { value: "all", label: "Tất cả Tenant" },
-                    ...tenants.map((t: any) => ({
-                      value: t.id,
-                      label: t.name,
-                    })),
-                  ]}
-                />
+                {isAdmin && (
+                  <Select
+                    value={tenantFilter}
+                    onChange={(val) => {
+                      setTenantFilter(val);
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                    }}
+                    className="w-full sm:w-48"
+                    options={[
+                      { value: "all", label: "Tất cả Tenant" },
+                      ...tenants.map((t: any) => ({
+                        value: t.id,
+                        label: t.name,
+                      })),
+                    ]}
+                  />
+                )}
                 <Button
                   type="primary"
                   icon={<UserAddOutlined />}
                   onClick={openCreateModal}
                 >
-                  + Thêm User
+                  + Thêm {isCompanyManager ? "Nhân viên" : "User"}
                 </Button>
               </>
             )}
@@ -387,20 +410,15 @@ export const Account = () => {
 
         <Alert
           className="mt-5"
-          message="Quyền theo role"
+          message="Quyền theo vai trò"
           description={
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">
               {Object.entries(roleMeta).map(([key, meta]) => (
-                <div key={key} className="flex items-start gap-2">
+                <div key={key} className="flex flex-col items-start gap-1">
                   {renderRoleTag(key)}
-                  <div>
-                    <p className="font-semibold text-slate-800 text-sm">
-                      {meta.label}
-                    </p>
-                    <p className="text-xs text-slate-600 leading-snug">
-                      {meta.permissions}
-                    </p>
-                  </div>
+                  <p className="text-xs text-slate-600 leading-snug mt-1">
+                    {meta.permissions}
+                  </p>
                 </div>
               ))}
             </div>
@@ -409,7 +427,7 @@ export const Account = () => {
           showIcon
         />
 
-        {isAdmin && (
+        {canManageUsers && (
           <div className="flex justify-end mt-4 mb-2">
             {isSelectionMode ? (
               <div className="flex gap-2">
@@ -434,7 +452,9 @@ export const Account = () => {
                         onOk: async () => {
                           const hide = message.loading("Đang xóa...", 0);
                           try {
-                            await bulkDeleteUsers(selectedRowKeys as (string | number)[]);
+                            await bulkDeleteUsers(
+                              selectedRowKeys as (string | number)[],
+                            );
                             message.success(
                               `Đã xóa ${selectedRowKeys.length} user`,
                             );
@@ -501,34 +521,50 @@ export const Account = () => {
         confirmLoading={
           createUserMutation.isPending || updateUserMutation.isPending
         }
-        okText={editingUser ? "Cập nhật" : "Tạo user"}
+        okText={
+          editingUser
+            ? "Cập nhật"
+            : isCompanyManager
+              ? "Tạo nhân viên"
+              : "Tạo user"
+        }
         cancelText="Hủy"
-        title={editingUser ? "Cập nhật user" : "Thêm user mới"}
+        title={
+          editingUser
+            ? isCompanyManager
+              ? "Cập nhật nhân viên"
+              : "Cập nhật user"
+            : isCompanyManager
+              ? "Thêm nhân viên mới"
+              : "Thêm user mới"
+        }
       >
         <Form layout="vertical" form={form} name="create-user-form">
           <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-4">
-            <Form.Item
-              label="Chọn công ty"
-              name="tenant"
-              rules={[{ required: true, message: "Chọn công ty" }]}
-            >
-              <Select
-                placeholder="Chọn công ty"
-                loading={tenantsQuery.isLoading}
-                options={tenants.map((tenant: TenantItem) => ({
-                  value: tenant.id,
-                  label: tenant.name,
-                }))}
-              />
-            </Form.Item>
+            {isAdmin && (
+              <Form.Item
+                label="Chọn công ty"
+                name="tenant"
+                rules={[{ required: true, message: "Chọn công ty" }]}
+              >
+                <Select
+                  placeholder="Chọn công ty"
+                  loading={tenantsQuery.isLoading}
+                  options={tenants.map((tenant: TenantItem) => ({
+                    value: tenant.id,
+                    label: tenant.name,
+                  }))}
+                />
+              </Form.Item>
+            )}
 
             <Form.Item
-              label="Role"
+              label="Vai trò"
               name="role"
               rules={[{ required: true, message: "Chọn vai trò" }]}
             >
               <Select
-                placeholder="Chọn role"
+                placeholder="Chọn vai trò"
                 loading={rolesQuery.isLoading}
                 options={formRoleOptions.map((role: IRoleItem) => ({
                   value: role.id,

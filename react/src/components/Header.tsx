@@ -24,10 +24,10 @@ function Header() {
     {
       key: "profile",
       label: (
-        <Link to={ROUTES.ACCOUNT}>
+        <Link to={ROUTES.PROFILE}>
           <Space>
             <UserOutlined />
-            Thông tin tài khoản
+            Thông tin cá nhân
           </Space>
         </Link>
       ),

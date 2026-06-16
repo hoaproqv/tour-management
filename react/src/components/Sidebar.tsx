@@ -13,7 +13,7 @@ import Icon, {
   ApartmentOutlined,
   CloseOutlined,
 } from "@ant-design/icons";
-import { Button, Menu, Modal, type MenuProps } from "antd";
+import { Button, Menu, type MenuProps } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useGetAccountInfo } from "../hooks/useAuth";
@@ -73,12 +73,12 @@ const baseMenuItems: Required<MenuProps>["items"] = [
   {
     key: ROUTES.TRANSACTIONS,
     icon: <WalletOutlined style={{ color: "#fff" }} />,
-    label: "Tiến trình chuyến đi",
+    label: "Điểm danh hành khách",
   },
   {
-    key: "about",
+    key: ROUTES.GUIDE,
     icon: <InfoCircleOutlined style={{ color: "#fff" }} />,
-    label: "Về chúng tôi",
+    label: "Hướng dẫn sử dụng",
   },
 ];
 
@@ -107,16 +107,19 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const isTourManager = isTourManagerLike(currentUser);
 
   const menuItems = useMemo(() => {
+    let items = baseMenuItems;
+    const roleSlug = (currentUser?.role_name || currentUser?.role || "").toString().toLowerCase();
+    const isCompanyManager = roleSlug === "company_manager";
+
     if (isAdmin) {
-      return baseMenuItems.filter(
+      items = baseMenuItems.filter(
         (item) =>
           item?.key === ROUTES.DASHBOARD ||
           item?.key === ROUTES.TENANT ||
           item?.key === ROUTES.ACCOUNT,
       );
-    }
-    if (isTourManager) {
-      return baseMenuItems.filter(
+    } else if (isCompanyManager) {
+      items = baseMenuItems.filter(
         (item) =>
           item?.key === ROUTES.DASHBOARD ||
           item?.key === ROUTES.PASSENGER ||
@@ -124,18 +127,39 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           item?.key === ROUTES.ROUND ||
           item?.key === ROUTES.BUS ||
           item?.key === ROUTES.TRANSACTIONS ||
-          item?.key === "about",
+          item?.key === ROUTES.ACCOUNT ||
+          item?.key === ROUTES.GUIDE,
+      );
+      // Change label to "Nhân viên" for company manager
+      items = items.map(item => {
+        if (item?.key === ROUTES.ACCOUNT) {
+          return { ...item, label: "Nhân viên" };
+        }
+        return item;
+      });
+    } else if (isTourManager) {
+      items = baseMenuItems.filter(
+        (item) =>
+          item?.key === ROUTES.DASHBOARD ||
+          item?.key === ROUTES.PASSENGER ||
+          item?.key === ROUTES.TRIP ||
+          item?.key === ROUTES.ROUND ||
+          item?.key === ROUTES.BUS ||
+          item?.key === ROUTES.TRANSACTIONS ||
+          item?.key === ROUTES.GUIDE,
+      );
+    } else if (hideManagement) {
+      items = baseMenuItems.filter(
+        (item) =>
+          item?.key === ROUTES.DASHBOARD ||
+          item?.key === ROUTES.TRANSACTIONS ||
+          item?.key === ROUTES.ROUND ||
+          item?.key === ROUTES.GUIDE,
       );
     }
-    if (!hideManagement) return baseMenuItems;
-    return baseMenuItems.filter(
-      (item) =>
-        item?.key === ROUTES.DASHBOARD ||
-        item?.key === ROUTES.TRANSACTIONS ||
-        item?.key === ROUTES.ROUND ||
-        item?.key === "about",
-    );
-  }, [hideManagement, isAdmin, isTourManager]);
+    
+    return items;
+  }, [hideManagement, isAdmin, isTourManager, currentUser]);
 
   const findSelectedKey = () => {
     if (location.pathname.startsWith(ROUTES.ROUND)) return ROUTES.ROUND;
@@ -146,31 +170,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     if (location.pathname.startsWith(ROUTES.TRANSACTIONS))
       return ROUTES.TRANSACTIONS;
     if (location.pathname.startsWith(ROUTES.ACCOUNT)) return ROUTES.ACCOUNT;
+    if (location.pathname.startsWith(ROUTES.GUIDE)) return ROUTES.GUIDE;
     return ROUTES.DASHBOARD;
   };
 
   const handleMenuClick: MenuProps["onClick"] = (e) => {
-    if (e.key === "about") {
-      Modal.info({
-        title: "Về chúng tôi",
-        content: (
-          <div className="mt-4">
-            <p className="text-slate-600">
-              Đây là đồ án tốt nghiệp văn bằng 2 của sinh viên{" "}
-              <strong>Hàn Minh Hòa</strong>.
-            </p>
-            <p className="text-slate-600 mt-2">
-              Hệ thống được phát triển với mục đích quản lý xe khách và hành
-              khách du lịch một cách hiệu quả.
-            </p>
-          </div>
-        ),
-        maskClosable: true,
-        okText: "Đóng",
-        centered: true,
-      });
-      return;
-    }
     navigate(e.key);
   };
 

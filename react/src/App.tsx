@@ -12,8 +12,10 @@ import LoginPage from "./pages/AccountPage/Login";
 import RegisterPage from "./pages/AccountPage/Register";
 import BusManagement from "./pages/Bus/BusManagement";
 import DashboardPage from "./pages/Dashboard";
+import GuidePage from "./pages/GuidePage/GuidePage";
 import NotFoundPage from "./pages/NotFound";
 import PassengerManagement from "./pages/Passengers/PassengerManagement";
+import Profile from "./pages/ProfilePage/Profile";
 import RoundManagement from "./pages/Rounds/RoundManagement";
 import TenantManagement from "./pages/Tenants/TenantManagement";
 import TransactionManagement from "./pages/Transactions/TransactionManagement";
@@ -43,6 +45,8 @@ function App() {
             />
             <Route path={ROUTES.TENANT} element={<TenantManagement />} />
             <Route path={ROUTES.ACCOUNT} element={<Account />} />
+            <Route path={ROUTES.PROFILE} element={<Profile />} />
+            <Route path={ROUTES.GUIDE} element={<GuidePage />} />
             <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
           </Route>
         </Route>

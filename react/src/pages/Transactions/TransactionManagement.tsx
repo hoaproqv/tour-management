@@ -16,7 +16,7 @@ import dayjs from "dayjs";
 
 import { type TransactionItem } from "../../api/trips";
 import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
-import { isFleetLead } from "../../utils/helper";
+import { isTourManagerLike } from "../../utils/helper";
 
 import { BusPane } from "./components/BusPane";
 import { CrossCheckModal } from "./components/CrossCheckModal";
@@ -330,6 +330,10 @@ export default function TransactionManagement() {
 
   const statusTag = (row: PassengerRow) => {
     const tags: React.ReactNode[] = [];
+    const activeRoundIndex = tripRoundsSorted.findIndex(
+      (r) => String(r.id) === String(activeRoundId),
+    );
+    const isLastRound = tripRoundsSorted.length > 0 && activeRoundIndex === tripRoundsSorted.length - 1;
 
     if (row.status === "checkedInHere") {
       const timeStr = row.transaction?.check_in
@@ -342,10 +346,17 @@ export default function TransactionManagement() {
         : "";
       tags.push(<Tag color="green">Đã điểm danh{timeStr}</Tag>);
     } else if (row.status === "checkedOut") {
-      const timeStr = row.transaction?.check_out
-        ? ` (xuống ${dayjs(row.transaction.check_out).format("HH:mm")})`
-        : "";
-      tags.push(<Tag color="orange">Chưa lên xe{timeStr}</Tag>);
+      if (isLastRound) {
+        const timeStr = row.transaction?.check_out
+          ? ` lúc ${dayjs(row.transaction.check_out).format("HH:mm")}`
+          : "";
+        tags.push(<Tag color="orange">Đã xuống xe{timeStr}</Tag>);
+      } else {
+        const timeStr = row.transaction?.check_out
+          ? ` (xuống ${dayjs(row.transaction.check_out).format("HH:mm")})`
+          : "";
+        tags.push(<Tag color="orange">Chưa lên xe{timeStr}</Tag>);
+      }
     } else {
       tags.push(<Tag>Chưa lên xe</Tag>);
     }
@@ -807,7 +818,7 @@ export default function TransactionManagement() {
                 {tripStatusInfo.status === "planned" &&
                   !tripStatusInfo.isOverdue &&
                   tripStatusInfo.isStarted &&
-                  isFleetLead(currentUser) && (
+                  isTourManagerLike(currentUser) && (
                     <Button
                       type="primary"
                       style={{

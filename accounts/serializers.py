@@ -178,3 +178,20 @@ class RefreshTokenSerializer(serializers.Serializer):
 
 class CsrfSerializer(serializers.Serializer):
     csrf = serializers.CharField()
+
+
+class UserMeUpdateSerializer(serializers.ModelSerializer):
+    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ["name", "email", "phone"]
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+class CheckPasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True)
+

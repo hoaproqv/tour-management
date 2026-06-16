@@ -1,4 +1,4 @@
-import { fetchData, postData } from "./api";
+import { fetchData, postData, putData } from "./api";
 
 import type { ILoginFormData, IRegisterFormData, IUser } from "../utils/types";
 
@@ -79,4 +79,21 @@ export const forgotPassword = async (username: number, email: string) => {
   throw new Error(
     `Forgot password API is not available yet (username=${username}, email=${email})`,
   );
+};
+
+export const updateProfile = async (data: Partial<IUser>) => {
+  const response = await putData(`${API_URL}/me`, data);
+  const updatedUser = unwrapSuccess<IUser>(response);
+  localStorage.setItem("account", JSON.stringify(updatedUser));
+  return updatedUser;
+};
+
+export const changePassword = async (data: any) => {
+  const response = await putData(`${API_URL}/change-password`, data);
+  return unwrapSuccess<string>(response);
+};
+
+export const checkPassword = async (data: any) => {
+  const response = await postData(`${API_URL}/check-password`, data);
+  return unwrapSuccess<boolean>(response);
 };
