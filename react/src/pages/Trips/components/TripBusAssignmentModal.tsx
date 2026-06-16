@@ -96,8 +96,13 @@ export default function TripBusAssignmentModal({
                             Trưởng xe
                           </div>
                           <div className="text-[15px] font-medium text-slate-800">
-                            {managerUser ? managerUser.name : "—"}
+                            {managerUser?.name || tb.manager_name || "—"}
                           </div>
+                          {(managerUser?.phone || tb.manager_tel) && (
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {managerUser?.phone || tb.manager_tel}
+                            </div>
+                          )}
                         </div>
 
                         {/* Driver */}
@@ -106,8 +111,13 @@ export default function TripBusAssignmentModal({
                             Lái xe
                           </div>
                           <div className="text-[15px] font-medium text-slate-800">
-                            {driverUser ? driverUser.name : "—"}
+                            {driverUser?.name || tb.driver_name || "—"}
                           </div>
+                          {(driverUser?.phone || tb.driver_tel) && (
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              {driverUser?.phone || tb.driver_tel}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

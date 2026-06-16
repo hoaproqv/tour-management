@@ -263,10 +263,11 @@ export default function RoundFormModal({
           <Form.Item
             label="Thuộc chuyến"
             name="trip"
-            rules={[{ required: true, message: "Chọn trip" }]}
+            rules={[{ required: true, message: "Chọn chuyến đi" }]}
           >
             <Select
-              placeholder="Chọn chuyến"
+              placeholder="Chọn chuyến đi"
+              notFoundContent="Không có chuyến đi"
               options={(Array.isArray(trips) ? trips : []).map((t: Trip) => ({
                 value: String(t.id),
                 label: t.name,

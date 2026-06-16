@@ -48,6 +48,7 @@ class RoundBus(models.Model):
         on_delete=models.CASCADE,
         related_name="round_buses",
     )
+    checkout_finalized_at = models.DateTimeField(null=True, blank=True)
     finalized_at = models.DateTimeField(null=True, blank=True)
     finalized_by = models.ForeignKey(
         "accounts.User",
@@ -56,6 +57,7 @@ class RoundBus(models.Model):
         blank=True,
         related_name="finalized_round_buses",
     )
+    snapshot_data = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

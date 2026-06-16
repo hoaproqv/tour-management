@@ -40,16 +40,19 @@ export default function TripFilterSelector({
     options.unshift({ value: "all", label: "Tất cả chuyến đi" });
   }
 
+  const displayValue = options.some(opt => String(opt.value) === String(value)) ? value : undefined;
+
   return (
     <Select
       className={className}
-      value={value || (allowAll ? "all" : undefined)}
+      value={displayValue || (allowAll ? "all" : undefined)}
       onChange={(val) => onChange(val === "all" ? "all" : val)}
       options={options}
       loading={isLoading}
       showSearch
       optionFilterProp="label"
       placeholder="Chọn chuyến đi"
+      notFoundContent="Không có chuyến đi"
     />
   );
 }

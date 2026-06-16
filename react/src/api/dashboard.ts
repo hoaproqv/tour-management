@@ -11,12 +11,12 @@ export interface RecentTrip {
   start_date: string;
 }
 
-export interface RecentTransaction {
+export interface ArrivingLocation {
   id: number;
-  passenger_name: string;
+  trip_name: string;
   round_name: string;
-  bus_number: string;
-  check_in: string;
+  location: string;
+  updated_at: string;
 }
 
 export interface DashboardOverview {
@@ -24,7 +24,7 @@ export interface DashboardOverview {
   passengers: StatusBreakdown;
   buses: StatusBreakdown;
   recent_trips: RecentTrip[];
-  recent_transactions: RecentTransaction[];
+  arriving_locations: ArrivingLocation[];
   tenant_info?: {
     id: number;
     name: string;
@@ -66,7 +66,7 @@ export const getDashboardOverview = async (): Promise<DashboardOverview> => {
     passengers: normalizeBreakdown(payload.passengers ?? EMPTY_BREAKDOWN),
     buses: normalizeBreakdown(payload.buses ?? EMPTY_BREAKDOWN),
     recent_trips: payload.recent_trips ?? [],
-    recent_transactions: payload.recent_transactions ?? [],
+    arriving_locations: payload.arriving_locations ?? [],
     tenant_info: payload.tenant_info,
     admin_overview: payload.admin_overview,
   };

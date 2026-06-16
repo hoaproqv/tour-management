@@ -4,12 +4,15 @@ import { message } from "antd";
 import {
   createTransaction,
   updateTransaction,
+  bulkCheckOutTransactions,
   upsertPassengerTransfer,
   deletePassengerTransfer,
   switchBus,
   undoTransfer,
   finalizeRoundBus,
+  finalizeRoundBusCheckout,
   updateTripPartial,
+  deleteTransaction,
   type TransactionItem,
   type PassengerTransfer,
 } from "../../../api/trips";
@@ -67,6 +70,49 @@ export function useTransactionsMutations({
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
     onError: () => message.error("Điểm danh xuống thất bại"),
+  });
+
+  const undoCheckInMutation = useMutation({
+    mutationFn: async (txn: TransactionItem) => {
+      return deleteTransaction(String(txn.id));
+    },
+    onSuccess: async () => {
+      message.success("Đã hủy điểm danh lên xe");
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+    onError: () => message.error("Hủy điểm danh lên thất bại"),
+  });
+
+  const undoCheckOutMutation = useMutation({
+    mutationFn: async (txn: TransactionItem) => {
+      return updateTransaction(txn.id, {
+        passenger: txn.passenger,
+        round_bus: txn.round_bus,
+        check_in: txn.check_in,
+        check_out: null,
+      });
+    },
+    onSuccess: async () => {
+      message.success("Đã hủy điểm danh xuống xe");
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+    onError: () => message.error("Hủy điểm danh xuống thất bại"),
+  });
+
+
+
+  const bulkCheckOutMutation = useMutation({
+    mutationFn: async ({ transactionIds, checkOutTime }: { transactionIds: (string | number)[]; checkOutTime: string }) => {
+      return bulkCheckOutTransactions({
+        transaction_ids: transactionIds,
+        check_out: checkOutTime,
+      });
+    },
+    onSuccess: async () => {
+      message.success("Đã điểm danh xuống xe hàng loạt");
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+    onError: () => message.error("Điểm danh xuống hàng loạt thất bại"),
   });
 
   const upsertTransferMutation = useMutation({
@@ -169,13 +215,41 @@ export function useTransactionsMutations({
   });
 
   const finalizeRoundBusMutation = useMutation({
-    mutationFn: async (roundBusId: string) =>
-      finalizeRoundBus(roundBusId, true),
+    mutationFn: async ({
+      roundBusId,
+      finalized,
+      snapshotData,
+    }: {
+      roundBusId: string;
+      finalized: boolean;
+      snapshotData?: any;
+    }) => {
+      return finalizeRoundBus(roundBusId, finalized, undefined, snapshotData);
+    },
     onSuccess: async () => {
-      message.success("Đã chốt điểm danh. Round này sẽ khoá chỉnh sửa.");
+      message.success("Đã cập nhật trạng thái xe");
+      await queryClient.invalidateQueries({ queryKey: ["round-buses"] });
+      await queryClient.invalidateQueries({ queryKey: ["trips"] });
+    },
+    onError: () => message.error("Cập nhật trạng thái xe thất bại"),
+  });
+
+  const finalizeRoundBusCheckoutMutation = useMutation({
+    mutationFn: async ({
+      roundBusId,
+      finalized,
+      snapshotData,
+    }: {
+      roundBusId: string;
+      finalized: boolean;
+      snapshotData?: any;
+    }) => {
+      return finalizeRoundBusCheckout(roundBusId, finalized, undefined, snapshotData);
+    },
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["round-buses"] });
     },
-    onError: () => message.error("Chốt điểm danh thất bại"),
+    onError: () => message.error("Cập nhật trạng thái xe thất bại"),
   });
 
   const startTripMutation = useMutation({
@@ -200,11 +274,15 @@ export function useTransactionsMutations({
   return {
     checkInMutation,
     checkOutMutation,
+    undoCheckInMutation,
+    undoCheckOutMutation,
+    bulkCheckOutMutation,
     upsertTransferMutation,
     deleteTransferMutation,
     switchBusMutation,
     undoTransferMutation,
     finalizeRoundBusMutation,
+    finalizeRoundBusCheckoutMutation,
     startTripMutation,
     isMutationBusy,
   };

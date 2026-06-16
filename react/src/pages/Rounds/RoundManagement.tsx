@@ -71,8 +71,8 @@ const statusMeta: Record<
   RoundItem["status"],
   { label: string; color: string }
 > = {
-  planned: { label: "Chưa xuất phát", color: "blue" },
-  doing: { label: "Đang đi", color: "orange" },
+  planned: { label: "Chưa đến", color: "blue" },
+  doing: { label: "Đang đến", color: "orange" },
   done: { label: "Đã hoàn thành", color: "green" },
 };
 
@@ -120,8 +120,9 @@ const DraggableRow = ({ children, ...props }: RowProps) => {
     <tr {...props} ref={setNodeRef} style={style} {...attributes}>
       {React.Children.map(children, (child) => {
         if ((child as React.ReactElement).key === "drag-handle") {
+          const isPlanned = localRounds.find((r) => String(r.id) === String(rowId))?.status === "planned";
           return React.cloneElement(child as React.ReactElement<any>, {
-            children: isFirstRound ? (
+            children: isFirstRound || !isPlanned ? (
               <MenuOutlined
                 style={{
                   touchAction: "none",
@@ -186,7 +187,7 @@ export default function RoundManagement() {
     });
   }, [tripsResponse]);
 
-  const [tripFilter, setTripFilter] = useGlobalTripFilter(trips, true);
+  const [tripFilter, setTripFilter] = useGlobalTripFilter(true);
 
   const rounds = useMemo(
     () => (Array.isArray(roundsResponse?.data) ? roundsResponse.data : []),
@@ -202,9 +203,10 @@ export default function RoundManagement() {
   const tripDefaultBusMap = useMemo(() => {
     const grouped = new Map<string, Array<string | number>>();
     tripBuses.forEach((tb: TripBus) => {
-      const list = grouped.get(tb.trip) ?? [];
+      const tripKey = String(tb.trip);
+      const list = grouped.get(tripKey) ?? [];
       list.push(tb.bus);
-      grouped.set(tb.trip, list);
+      grouped.set(tripKey, list);
     });
     return grouped;
   }, [tripBuses]);
@@ -252,6 +254,13 @@ export default function RoundManagement() {
     if (active.id !== over?.id) {
       setLocalRounds((prev) => {
         const activeItem = prev.find((i) => String(i.id) === String(active.id));
+
+        if (activeItem?.status !== "planned") {
+          message.warning(
+            "Không thể thay đổi thứ tự của chặng đã đến hoặc đang đến",
+          );
+          return prev;
+        }
 
         if (activeItem?.sequence === 1) {
           message.warning(
@@ -429,7 +438,8 @@ export default function RoundManagement() {
       {
         title: "Ước tính",
         dataIndex: "estimate_time",
-        render: (val: string) => dayjs(val).format("DD/MM/YYYY HH:mm"),
+        render: (val: string | null) =>
+          val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
       },
       {
         title: "Thực tế",
@@ -454,40 +464,46 @@ export default function RoundManagement() {
       {
         title: "Thao tác",
         dataIndex: "actions",
-        render: (_: unknown, record: RoundItem) => (
-          <Space>
-            <Tooltip title="Sửa">
-              <Button
-                type="text"
-                icon={<EditOutlined />}
-                onClick={() => openEdit(record)}
-                style={{ color: "#2563eb" }}
-              />
-            </Tooltip>
-            {record.sequence === 1 ? (
-              <Tooltip title="Không thể xóa chặng đầu tiên">
-                <Button type="text" disabled icon={<DeleteOutlined />} />
+        render: (_: unknown, record: RoundItem) => {
+          const isPlanned = record.status === "planned";
+          return (
+            <Space>
+              <Tooltip title={isPlanned ? "Sửa" : "Không thể sửa chặng đã đến hoặc đang đến"}>
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={() => openEdit(record)}
+                  style={{ color: isPlanned ? "#2563eb" : undefined }}
+                  disabled={!isPlanned}
+                />
               </Tooltip>
-            ) : (
-              <Popconfirm
-                title="Xóa chặng này?"
-                description="Thao tác này không thể hoàn tác."
-                onConfirm={() => deleteRoundMutate(String(record.id))}
-                okText="Xóa"
-                cancelText="Hủy"
-              >
-                <Tooltip title="Xóa">
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    loading={deleteStatus === "pending"}
-                  />
+              {record.sequence === 1 ? (
+                <Tooltip title="Không thể xóa chặng đầu tiên">
+                  <Button type="text" disabled icon={<DeleteOutlined />} />
                 </Tooltip>
-              </Popconfirm>
-            )}
-          </Space>
-        ),
+              ) : (
+                <Popconfirm
+                  title="Xóa chặng này?"
+                  description="Thao tác này không thể hoàn tác."
+                  onConfirm={() => deleteRoundMutate(String(record.id))}
+                  okText="Xóa"
+                  cancelText="Hủy"
+                  disabled={!isPlanned}
+                >
+                  <Tooltip title={isPlanned ? "Xóa" : "Không thể xóa chặng đã đến hoặc đang đến"}>
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      loading={deleteStatus === "pending"}
+                      disabled={!isPlanned}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              )}
+            </Space>
+          );
+        },
       },
     ];
   }, [canManage, deleteRoundMutate, deleteStatus, openEdit]);
@@ -571,18 +587,19 @@ export default function RoundManagement() {
               Chuyến đi:
             </span>
             <Select
-              value={tripFilter}
+              value={trips.some(t => String(t.id) === tripFilter) ? tripFilter : undefined}
               onChange={(val) => setTripFilter(val)}
               className="w-full sm:w-64"
               showSearch
               optionFilterProp="label"
+              notFoundContent="Không có chuyến đi"
               options={[
                 ...trips.map((t: Trip) => ({
                   value: String(t.id),
                   label: t.name,
                 })),
               ]}
-              placeholder="Chọn chuyến"
+              placeholder="Chọn chuyến đi"
             />
           </div>
 
@@ -665,6 +682,9 @@ export default function RoundManagement() {
                           selectedRowKeys,
                           onChange: (newSelectedRowKeys) =>
                             setSelectedRowKeys(newSelectedRowKeys),
+                          getCheckboxProps: (record) => ({
+                            disabled: record.status !== "planned" || record.sequence === 1,
+                          }),
                         }
                       : undefined
                   }
@@ -698,7 +718,7 @@ export default function RoundManagement() {
         form={form}
         trips={trips}
         editingRound={editingRound}
-        tripFilter={tripFilter}
+        tripFilter={tripFilter ?? undefined}
       />
     </div>
   );

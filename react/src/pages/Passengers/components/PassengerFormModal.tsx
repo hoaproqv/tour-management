@@ -140,6 +140,7 @@ export default function PassengerFormModal({
                 showSearch
                 optionFilterProp="label"
                 placeholder="Chọn chuyến đi"
+                notFoundContent="Không có chuyến đi"
                 options={trips.map((t) => ({ value: String(t.id), label: t.name }))}
                 onChange={() => form.setFieldValue("trip_bus_id", undefined)}
               />

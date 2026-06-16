@@ -299,16 +299,14 @@ export const Account = () => {
           is_active: true,
         };
         if (editingUser) {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { password, confirmPassword, ...rest } = values as any;
           updateUserMutation.mutate({
             id: editingUser.id,
             payload: {
-              name: rest.name?.trim(),
-              email: rest.email?.trim(),
-              phone: rest.phone?.trim(),
-              tenant: rest.tenant,
-              role: rest.role,
+              name: values.name?.trim(),
+              email: values.email?.trim(),
+              phone: values.phone?.trim(),
+              tenant: values.tenant,
+              role: values.role,
               is_active: editingUser.is_active,
             },
           });

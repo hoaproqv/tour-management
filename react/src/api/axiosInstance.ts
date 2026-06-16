@@ -32,8 +32,8 @@ const axiosInstance = axios.create({
 let refreshingPromise: Promise<string | null> | null = null;
 
 type QueueEntry = {
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
+  resolve: (_token: string) => void;
+  reject: (_err: unknown) => void;
 };
 const failedQueue: QueueEntry[] = [];
 

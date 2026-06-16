@@ -54,6 +54,7 @@ export function useTransactionsWebSocket() {
       round_bus?: string | number;
       trip?: string | number;
       finalized_at?: string | null;
+      checkout_finalized_at?: string | null;
       round?: string | number;
       trip_bus?: string | number;
     }) => {
@@ -69,7 +70,12 @@ export function useTransactionsWebSocket() {
           if (idx >= 0) {
             next[idx] = {
               ...next[idx],
-              finalized_at: incoming.finalized_at ?? null,
+              ...(incoming.finalized_at !== undefined && {
+                finalized_at: incoming.finalized_at,
+              }),
+              ...(incoming.checkout_finalized_at !== undefined && {
+                checkout_finalized_at: incoming.checkout_finalized_at,
+              }),
             };
           }
           return { ...prev, data: next };

@@ -377,14 +377,17 @@ export default function ImportPassengerModal({
             <Select
               showSearch
               optionFilterProp="label"
-              placeholder="Chọn trip..."
+              placeholder="Chọn chuyến đi"
               className="w-full"
+              notFoundContent="Không có chuyến đi"
               value={selectedTripId}
               onChange={(v) => setSelectedTripId(v)}
-              options={trips.map((t: Trip) => ({
-                value: t.id,
-                label: `${t.name} [${t.status === "planned" ? "Chưa xuất phát" : "Đang đi"}]`,
-              }))}
+              options={trips.map((t: Trip) => {
+                return {
+                  value: t.id,
+                  label: `${t.name} [${t.status === "done" ? "Đã hoàn thành" : t.status === "doing" ? "Đang đi" : "Chưa xuất phát"}]`,
+                };
+              })}
             />
           )}
 

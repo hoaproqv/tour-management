@@ -22,7 +22,10 @@ import {
   Modal,
 } from "antd";
 
-import { removeAccents } from "../../../utils/helper";
+import {
+  removeAccents,
+  compareVietnameseNames,
+} from "../../../utils/helper";
 
 import type { PassengerRow } from "./types";
 import type { TransactionItem } from "../../../api/trips";
@@ -40,11 +43,13 @@ interface BusPaneProps {
   statusTag: (_row: PassengerRow) => React.ReactNode;
   onOpenCrossCheck: () => void;
   /** Finalize check-in phase (first round: finalize whole, middle/last: finalize after checkin) */
-  onFinalize: (_roundBusId?: string) => void;
+  onFinalize: (_roundBusId?: string, _snapshotData?: any) => void;
   /** Finalize check-out phase for intermediate stops → opens check-in phase */
-  onFinalizeCheckout: (_roundBusId: string) => void;
+  onFinalizeCheckout: (_roundBusId: string, _snapshotData?: any) => void;
   onCheckIn: (_passengerId: string, _roundBusId?: string) => void;
   onCheckOut: (_txn?: TransactionItem) => void;
+  onUndoCheckIn: (_txn?: TransactionItem) => void;
+  onUndoCheckOut: (_txn?: TransactionItem) => void;
   onCheckOutAll: (_checkedInRows: PassengerRow[]) => void;
   busy: boolean;
   /** Position of this round within the trip's ordered stops */
@@ -67,6 +72,8 @@ export function BusPane({
   onFinalizeCheckout,
   onCheckIn,
   onCheckOut,
+  onUndoCheckIn,
+  onUndoCheckOut,
   onCheckOutAll,
   busy,
   roundPosition,
@@ -118,10 +125,29 @@ export function BusPane({
   };
 
   const presentUnfiltered = rows.filter((r) => r.status === "checkedInHere");
-  const othersUnfiltered = rows.filter((r) => r.status !== "checkedInHere");
+  const othersUnfiltered = rows.filter((r) => {
+    if (r.status === "checkedInHere") return false;
+    
+    if (r.transferredAway) {
+      if (r.status === "checkedInElsewhere") return true;
+      return false;
+    }
+    
+    return true;
+  });
 
-  const present = presentUnfiltered.filter((r) => filterRow(r, searchPresent));
-  const others = othersUnfiltered.filter((r) => filterRow(r, searchOthers));
+  const sortPassengers = (a: PassengerRow, b: PassengerRow) => {
+    if (a.transferredHere && !b.transferredHere) return -1;
+    if (!a.transferredHere && b.transferredHere) return 1;
+
+    return compareVietnameseNames(a.passenger.name, b.passenger.name);
+  };
+
+  const sortedPresentUnfiltered = [...presentUnfiltered].sort(sortPassengers);
+  const sortedOthersUnfiltered = [...othersUnfiltered].sort(sortPassengers);
+
+  const present = sortedPresentUnfiltered.filter((r) => filterRow(r, searchPresent));
+  const others = sortedOthersUnfiltered.filter((r) => filterRow(r, searchOthers));
 
   const pendingRows = rows.filter(
     (r) =>
@@ -165,6 +191,14 @@ export function BusPane({
           </Button>
         );
       }
+      if (row.status === "checkedOut" && row.transaction) {
+        return (
+          <div className="flex flex-col items-center gap-1">
+            <Text type="secondary" className="text-xs">Đã xuống xe</Text>
+            <Button type="link" danger size="small" className="p-0 h-auto text-xs" onClick={() => onUndoCheckOut(row.transaction)} loading={busy}>Hủy</Button>
+          </div>
+        );
+      }
       // Already checked out or not yet on bus — no action in this phase
       return (
         <Text type="secondary" className="text-xs">
@@ -175,6 +209,14 @@ export function BusPane({
 
     // ── Phase: check-in only (first round or checkin phase of middle round) ──
     if (row.status === "checkedInHere") {
+      if (row.transaction) {
+        return (
+          <div className="flex flex-col items-center gap-1">
+            <Text type="secondary" className="text-xs">Đã lên xe</Text>
+            <Button type="link" danger size="small" className="p-0 h-auto text-xs" onClick={() => onUndoCheckIn(row.transaction)} loading={busy}>Hủy</Button>
+          </div>
+        );
+      }
       // Already on bus in checkin phase — show nothing useful
       return (
         <Text type="secondary" className="text-xs">
@@ -343,10 +385,11 @@ export function BusPane({
           disabled={!canModifyAttendance || !allOut}
           icon={<ArrowDownOutlined />}
           onClick={() => {
+            const snapshotData = { rows };
             if (phase === "checkout-only") {
-              onFinalize(roundBusId);
+              onFinalize(roundBusId, snapshotData);
             } else {
-              onFinalizeCheckout(roundBusId);
+              onFinalizeCheckout(roundBusId, snapshotData);
             }
           }}
         >
@@ -369,7 +412,10 @@ export function BusPane({
             ? { background: "#16a34a", borderColor: "#16a34a" }
             : {}
         }
-        onClick={() => onFinalize(roundBusId)}
+        onClick={() => {
+          const snapshotData = { rows };
+          onFinalize(roundBusId, snapshotData);
+        }}
       >
         Chốt điểm danh lên
       </Button>

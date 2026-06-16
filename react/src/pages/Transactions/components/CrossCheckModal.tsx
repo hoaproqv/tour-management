@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from "react";
 
-import { CheckCircleOutlined, UndoOutlined, SearchOutlined, EyeOutlined } from "@ant-design/icons";
-import { Button, Empty, Modal, Space, Table, Tabs, Input, Badge, Tag, Typography } from "antd";
+import { SearchOutlined, EyeOutlined, SwapOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Empty,
+  Modal,
+  Space,
+  Table,
+  Tabs,
+  Input,
+  Badge,
+  Tag,
+  Typography,
+} from "antd";
 
 import { useDebounce } from "../../../hooks/useDebounce";
-import { removeAccents } from "../../../utils/helper";
+import { removeAccents, compareVietnameseNames } from "../../../utils/helper";
 
 import type { PassengerRow } from "./types";
 import type { TripBus } from "../../../api/trips";
@@ -22,7 +33,9 @@ interface CrossCheckModalProps {
   activeTripId?: string;
   statusTag: (_row: PassengerRow) => React.ReactNode;
   onPerform: (_passengerId: string) => void;
-  onUndo: (_passengerId: string, _sourceTripBusId: string) => void;
+  onUndo: (_passengerId: string) => void;
+  isCheckoutFinalizedForTripBus: (_tripBusId: string) => boolean;
+  isCheckinFinalizedForTripBus: (_tripBusId: string) => boolean;
 }
 
 export function CrossCheckModal({
@@ -37,6 +50,8 @@ export function CrossCheckModal({
   statusTag,
   onPerform,
   onUndo,
+  isCheckoutFinalizedForTripBus,
+  isCheckinFinalizedForTripBus,
 }: CrossCheckModalProps) {
   const [searchText, setSearchText] = useState("");
   const debouncedSearchText = useDebounce(searchText, 300);
@@ -64,7 +79,12 @@ export function CrossCheckModal({
             </div>
           )}
           <div>
-            <Text strong>Ghi chú:</Text> {passenger.note || <Text type="secondary" italic>Không có</Text>}
+            <Text strong>Ghi chú:</Text>{" "}
+            {passenger.note || (
+              <Text type="secondary" italic>
+                Không có
+              </Text>
+            )}
           </div>
         </div>
       ),
@@ -75,14 +95,27 @@ export function CrossCheckModal({
 
   if (!targetBusId) {
     return (
-      <Modal title="Điểm danh thành viên xe khác" open={open} onCancel={onClose} footer={null} width={860}>
+      <Modal
+        title="Điểm danh thành viên xe khác"
+        open={open}
+        onCancel={onClose}
+        footer={null}
+        width={860}
+      >
         <Empty description="Chọn xe cần nhận thành viên" />
       </Modal>
     );
   }
 
   return (
-    <Modal title="Điểm danh thành viên xe khác" open={open} onCancel={onClose} footer={null} width={860} destroyOnClose>
+    <Modal
+      title="Điểm danh thành viên xe khác"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={860}
+      destroyOnClose
+    >
       <div className="mb-4">
         <Input
           placeholder="Tìm kiếm hành khách (tên, số điện thoại)..."
@@ -101,25 +134,43 @@ export function CrossCheckModal({
               .filter((r) => {
                 if (!debouncedSearchText) return true;
                 const term = removeAccents(debouncedSearchText).toLowerCase();
-                const nameMatch = removeAccents(r.passenger.name).toLowerCase().includes(term);
-                const phoneMatch = r.passenger.phone && removeAccents(r.passenger.phone).toLowerCase().includes(term);
-                const noteMatch = r.passenger.note && removeAccents(r.passenger.note).toLowerCase().includes(term);
+                const nameMatch = removeAccents(r.passenger.name)
+                  .toLowerCase()
+                  .includes(term);
+                const phoneMatch =
+                  r.passenger.phone &&
+                  removeAccents(r.passenger.phone).toLowerCase().includes(term);
+                const noteMatch =
+                  r.passenger.note &&
+                  removeAccents(r.passenger.note).toLowerCase().includes(term);
                 return nameMatch || phoneMatch || noteMatch;
               })
               .sort((a, bRow) => {
-                const transferMap = passengerTransfers[activeTripId || ""] || {};
-                const aTransferredToTarget = transferMap[a.passenger.id] === targetBusId;
-                const bTransferredToTarget = transferMap[bRow.passenger.id] === targetBusId;
+                const transferMap =
+                  passengerTransfers[activeTripId || ""] || {};
+                const aTransferredToTarget =
+                  transferMap[a.passenger.id] === targetBusId;
+                const bTransferredToTarget =
+                  transferMap[bRow.passenger.id] === targetBusId;
 
                 if (aTransferredToTarget && !bTransferredToTarget) return -1;
                 if (!aTransferredToTarget && bTransferredToTarget) return 1;
 
                 const aIsPending = a.status === "pending" ? 0 : 1;
                 const bIsPending = bRow.status === "pending" ? 0 : 1;
-                return aIsPending - bIsPending;
+                if (aIsPending !== bIsPending) {
+                  return aIsPending - bIsPending;
+                }
+
+                return compareVietnameseNames(
+                  a.passenger.name,
+                  bRow.passenger.name,
+                );
               });
 
-            const presentCount = sourceRows.filter((r) => r.status === "checkedInHere").length;
+            const presentCount = sourceRows.filter(
+              (r) => r.status === "checkedInHere",
+            ).length;
             const othersCount = sourceRows.length - presentCount;
             const labelStr = tripBusLabelMap.get(String(b.id)) || "Bus";
             const sourceLabel = (
@@ -142,14 +193,23 @@ export function CrossCheckModal({
               </Space>
             );
 
+            const isCheckoutFinalized = isCheckoutFinalizedForTripBus(
+              String(b.id),
+            );
+            const isCheckinFinalized = isCheckinFinalizedForTripBus(
+              String(b.id),
+            );
+
             const columns = [
               {
-                title: "Hành khách",
+                title: "Thành viên",
                 dataIndex: "passenger",
                 render: (_: unknown, row: PassengerRow) => (
                   <div>
                     <div className="flex items-stretch justify-between min-h-[24px]">
-                      <div className="font-semibold text-slate-900 text-sm flex items-center">{row.passenger.name}</div>
+                      <div className="font-semibold text-slate-900 text-sm flex items-center">
+                        {row.passenger.name}
+                      </div>
                       <Button
                         type="text"
                         icon={<EyeOutlined className="text-slate-500" />}
@@ -184,33 +244,44 @@ export function CrossCheckModal({
                 dataIndex: "actions",
                 width: 250,
                 render: (_: unknown, row: PassengerRow) => {
-                  const transferMap = passengerTransfers[activeTripId || ""] || {};
+                  const transferMap =
+                    passengerTransfers[activeTripId || ""] || {};
                   const overrideBus = transferMap[row.passenger.id];
                   const hasTransferredToTarget = overrideBus === targetBusId;
-                  const isCheckedInTarget = String(row.txnBusId) === String(targetBusId);
+                  const hasTransferredElsewhere =
+                    overrideBus && overrideBus !== targetBusId;
+                  const isCheckedInTarget =
+                    String(row.txnBusId) === String(targetBusId);
 
                   if (hasTransferredToTarget) {
                     return (
                       <Space>
-                        {row.availableForCrossCheck && !isCheckedInTarget && (
-                          <Button
-                            type="primary"
-                            size="small"
-                            icon={<CheckCircleOutlined />}
-                            onClick={() => onPerform(row.passenger.id)}
-                          >
-                            Điểm danh sang xe này
-                          </Button>
-                        )}
+                        {row.availableForCrossCheck &&
+                          !isCheckedInTarget &&
+                          (isCheckinFinalized ? (
+                            <div className="text-xs text-red-600 italic leading-tight max-w-[120px]">
+                              Xe gốc đã chốt danh sách
+                            </div>
+                          ) : isCheckoutFinalized ? (
+                            <Button
+                              type="primary"
+                              size="small"
+                              className="h-auto p-1"
+                              icon={<SwapOutlined />}
+                              onClick={() => onPerform(row.passenger.id)}
+                            >
+                              Điểm danh sang xe này
+                            </Button>
+                          ) : (
+                            <div className="text-xs text-orange-600 italic leading-tight max-w-[120px]">
+                              Chờ xe gốc chốt điểm danh xuống
+                            </div>
+                          ))}
                         <Button
                           size="small"
-                          icon={<UndoOutlined />}
-                          onClick={() => onUndo(row.passenger.id, String(b.id))}
-                          style={{
-                            borderColor: "#f43f5e",
-                            color: "#f43f5e",
-                            backgroundColor: "#fff1f2",
-                          }}
+                          danger
+                          className="h-auto p-1"
+                          onClick={() => onUndo(row.passenger.id)}
                         >
                           Huỷ chuyển
                         </Button>
@@ -218,16 +289,35 @@ export function CrossCheckModal({
                     );
                   }
 
-                  return row.availableForCrossCheck ? (
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<CheckCircleOutlined />}
-                      onClick={() => onPerform(row.passenger.id)}
-                    >
-                      Điểm danh sang xe này
-                    </Button>
-                  ) : null;
+                  if (hasTransferredElsewhere) {
+                    return <Tag color="orange">Đã sang xe khác</Tag>;
+                  }
+
+                  return (
+                    <Space>
+                      {row.availableForCrossCheck &&
+                        !isCheckedInTarget &&
+                        (isCheckinFinalized ? (
+                          <div className="text-xs text-red-600 italic leading-tight max-w-[120px]">
+                            Xe gốc đã chốt danh sách
+                          </div>
+                        ) : isCheckoutFinalized ? (
+                          <Button
+                            type="primary"
+                            size="small"
+                            className="h-auto p-1"
+                            icon={<SwapOutlined />}
+                            onClick={() => onPerform(row.passenger.id)}
+                          >
+                            Điểm danh sang xe này
+                          </Button>
+                        ) : (
+                          <div className="text-xs text-orange-600 italic leading-tight max-w-[120px]">
+                            Chờ xe gốc chốt điểm danh xuống
+                          </div>
+                        ))}
+                    </Space>
+                  );
                 },
               },
             ];

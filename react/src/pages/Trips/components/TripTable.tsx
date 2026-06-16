@@ -31,22 +31,11 @@ export default function TripTable({
   onAssignPassengers,
   onDelete,
   canManage = true,
-  selectedRowKeys = [],
-  onSelectChange,
-  isSelectionMode,
 }: TripTableProps) {
   return (
     <Table
       size="small"
       rowKey="id"
-      rowSelection={
-        isSelectionMode && onSelectChange
-          ? {
-              selectedRowKeys,
-              onChange: onSelectChange,
-            }
-          : undefined
-      }
       dataSource={trips}
       loading={loading}
       pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
@@ -67,16 +56,24 @@ export default function TripTable({
         {
           title: "Mô tả",
           dataIndex: "description",
-          render: (val: string) => <span className="text-slate-600">{val || "—"}</span>,
+          render: (val: string) => (
+            <Tooltip title={val} placement="topLeft">
+              <div className="text-slate-600 truncate max-w-[150px] sm:max-w-[200px] md:max-w-[300px] lg:max-w-[400px]">
+                {val || "—"}
+              </div>
+            </Tooltip>
+          ),
         },
         {
           title: "Số xe",
           dataIndex: "busCount",
+          align: "center",
           render: (_: number, record: EnrichedTrip) => <Tag color="processing">{record.busCount}</Tag>,
         },
         {
-          title: "Số round",
+          title: "Số chặng",
           dataIndex: "roundCount",
+          align: "center",
           render: (_: number, record: EnrichedTrip) => <Tag color="geekblue">{record.roundCount}</Tag>,
         },
         {
@@ -113,12 +110,14 @@ export default function TripTable({
                   okText="Xóa"
                   cancelText="Hủy"
                   onConfirm={() => onDelete(record)}
+                  disabled={record.status !== "planned"}
                 >
-                  <Tooltip title="Xóa trip">
+                  <Tooltip title={record.status !== "planned" ? "Không thể xóa chuyến đi đã khởi hành" : "Xóa trip"}>
                     <Button
                       type="text"
                       danger
                       icon={<DeleteOutlined />}
+                      disabled={record.status !== "planned"}
                     />
                   </Tooltip>
                 </Popconfirm>

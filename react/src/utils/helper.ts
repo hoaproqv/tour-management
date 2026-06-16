@@ -42,3 +42,24 @@ export const removeAccents = (str: string): string => {
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D");
 };
+
+export const compareVietnameseNames = (nameA: string, nameB: string): number => {
+  const getSortKeys = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/);
+    const firstName = parts[parts.length - 1] || "";
+    const lastName = parts[0] || "";
+    const middleName = parts.slice(1, -1).join(" ");
+    return { firstName, middleName, lastName };
+  };
+
+  const keysA = getSortKeys(nameA);
+  const keysB = getSortKeys(nameB);
+
+  const cmpFirst = keysA.firstName.localeCompare(keysB.firstName, 'vi', { sensitivity: 'base' });
+  if (cmpFirst !== 0) return cmpFirst;
+
+  const cmpMiddle = keysA.middleName.localeCompare(keysB.middleName, 'vi', { sensitivity: 'base' });
+  if (cmpMiddle !== 0) return cmpMiddle;
+
+  return keysA.lastName.localeCompare(keysB.lastName, 'vi', { sensitivity: 'base' });
+};

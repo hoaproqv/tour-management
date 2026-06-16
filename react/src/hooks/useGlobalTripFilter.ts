@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getTrips } from "../api/trips";
 
 export function useGlobalTripFilter(allowAll: boolean = true) {
-  const { data: tripsResponse } = useQuery({
+  const { data: tripsResponse, isSuccess } = useQuery({
     queryKey: ["trips"],
     queryFn: () => getTrips({ page: 1, limit: 1000 }),
   });
@@ -25,35 +25,27 @@ export function useGlobalTripFilter(allowAll: boolean = true) {
   });
 
   useEffect(() => {
-    if (sortedTrips.length === 0) return;
+    if (!isSuccess) return;
 
-    const stored = localStorage.getItem("globalTripFilter");
-
-    if (stored === "all") {
-      if (allowAll) {
-        setTripFilterState("all");
-      } else {
-        const newestId = String(sortedTrips[0].id);
-        setTripFilterState(newestId);
-        localStorage.setItem("globalTripFilter", newestId);
+    if (sortedTrips.length === 0) {
+      if (tripFilter !== null && tripFilter !== "all") {
+        setTripFilterState(allowAll ? "all" : null);
       }
-    } else if (stored) {
-      const exists = sortedTrips.some((t) => String(t.id) === stored);
-      if (exists) {
-        setTripFilterState(stored);
-      } else {
-        const newestId = String(sortedTrips[0].id);
-        setTripFilterState(newestId);
-        localStorage.setItem("globalTripFilter", newestId);
-      }
-    } else {
-      if (!allowAll) {
-        const newestId = String(sortedTrips[0].id);
-        setTripFilterState(newestId);
-        localStorage.setItem("globalTripFilter", newestId);
-      }
+      return;
     }
-  }, [sortedTrips, allowAll]);
+
+    // Check if the current filter is still valid
+    let isValid = false;
+    if (tripFilter === "all" && allowAll) isValid = true;
+    if (sortedTrips.some((t) => String(t.id) === String(tripFilter))) isValid = true;
+
+    if (!isValid) {
+      // Default to the newest trip
+      const newestId = String(sortedTrips[0].id);
+      setTripFilterState(newestId);
+      localStorage.setItem("globalTripFilter", newestId);
+    }
+  }, [sortedTrips, allowAll, isSuccess, tripFilter]);
 
   const setTripFilter = (val: string | "all" | null) => {
     setTripFilterState(val);

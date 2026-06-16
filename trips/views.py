@@ -112,6 +112,10 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Trips"],
     )
     def delete(self, request, *args, **kwargs):
+        trip = self.get_object()
+        if trip.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể xóa chuyến đi đã khởi hành hoặc đã kết thúc.")
         return super().delete(request, *args, **kwargs)
 
 
@@ -144,6 +148,16 @@ class TripBusListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
         tags=["TripBuses"],
     )
     def post(self, request, *args, **kwargs):
+        trip_id = request.data.get("trip")
+        if trip_id:
+            from trips.models import Trip
+            from rest_framework.exceptions import PermissionDenied
+            try:
+                trip = Trip.objects.get(id=trip_id)
+                if trip.status != "planned":
+                    raise PermissionDenied("Không thể thêm xe khi chuyến đi đã khởi hành.")
+            except Trip.DoesNotExist:
+                pass
         return super().post(request, *args, **kwargs)
 
 
@@ -172,6 +186,10 @@ class TripBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView
         tags=["TripBuses"],
     )
     def put(self, request, *args, **kwargs):
+        trip_bus = self.get_object()
+        if trip_bus.trip.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể sửa xe khi chuyến đi đã khởi hành.")
         return super().put(request, *args, **kwargs)
 
     @extend_schema(
@@ -182,6 +200,10 @@ class TripBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView
         tags=["TripBuses"],
     )
     def patch(self, request, *args, **kwargs):
+        trip_bus = self.get_object()
+        if trip_bus.trip.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể sửa xe khi chuyến đi đã khởi hành.")
         return super().patch(request, *args, **kwargs)
 
     @extend_schema(
@@ -191,36 +213,11 @@ class TripBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView
         tags=["TripBuses"],
     )
     def delete(self, request, *args, **kwargs):
+        trip_bus = self.get_object()
+        if trip_bus.trip.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể xóa xe khi chuyến đi đã khởi hành.")
         return super().delete(request, *args, **kwargs)
-
-class TripBulkDeleteView(TripListCreateView):
-    from rest_framework import serializers
-    from drf_spectacular.utils import inline_serializer
-    from common.views import BaseAPIView
-
-    @extend_schema(
-        summary="Bulk delete trips",
-        description="Delete multiple trips by ID.",
-        request=inline_serializer("TripBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
-        responses={
-            200: inline_serializer(
-                "TripBulkDeleteResponse", 
-                fields={
-                    "success": serializers.BooleanField(), 
-                    "data": inline_serializer("TripBulkDeleteData", fields={"deleted": serializers.IntegerField()})
-                }
-            )
-        },
-        tags=["Trips"],
-    )
-    def post(self, request, *args, **kwargs):
-        from common.views import BaseAPIView
-        ids = request.data.get("ids", [])
-        if not ids:
-            return BaseAPIView().error("No ids provided")
-        qs = self.get_queryset().filter(id__in=ids)
-        deleted, _ = qs.delete()
-        return BaseAPIView().success({"deleted": deleted})
 
 class TripBusBulkDeleteView(TripBusListCreateView):
     from rest_framework import serializers
@@ -247,6 +244,12 @@ class TripBusBulkDeleteView(TripBusListCreateView):
         if not ids:
             return BaseAPIView().error("No ids provided")
         qs = self.get_queryset().filter(id__in=ids)
+        
+        for trip_bus in qs:
+            if trip_bus.trip.status != "planned":
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Không thể xóa xe khi chuyến đi đã khởi hành.")
+                
         deleted, _ = qs.delete()
         return BaseAPIView().success({"deleted": deleted})
 

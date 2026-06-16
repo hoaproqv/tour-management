@@ -117,6 +117,9 @@ def sync_round_progress(round_obj: Round, *, prev_status: str | None = None) -> 
             if next_round and next_round.status == Round.Status.PLANNED:
                 Round.objects.filter(pk=next_round.pk).update(status=Round.Status.DOING)
                 next_round.status = Round.Status.DOING
+            elif not next_round:
+                from trips.models import Trip
+                Trip.objects.filter(pk=round_obj.trip_id).update(status=Trip.Status.DONE)
 
     return round_obj
 
@@ -137,34 +140,55 @@ class RoundReorderView(generics.GenericAPIView):
     )
     def post(self, request, *args, **kwargs):
         from django.db import transaction
+        from rest_framework.response import Response
 
         items = request.data
         if not isinstance(items, list):
-            from rest_framework.response import Response
             return Response(
                 {"detail": "Expected a list of {id, sequence} objects."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         ids = [item.get("id") for item in items if item.get("id") is not None]
+        if not ids:
+            return Response({"detail": "Reordered successfully."}, status=status.HTTP_200_OK)
+
         rounds_qs = Round.objects.filter(pk__in=ids)
         round_map = {r.pk: r for r in rounds_qs}
+        
+        if not rounds_qs.exists():
+            return Response({"detail": "Reordered successfully."}, status=status.HTTP_200_OK)
+            
+        trip_id = rounds_qs.first().trip_id
+        
+        from django.db.models import Max
+        max_seq_aggr = Round.objects.filter(trip_id=trip_id).exclude(status=Round.Status.PLANNED).aggregate(Max('sequence'))
+        non_planned_max_seq = max_seq_aggr['sequence__max'] or 0
+
+        planned_items_to_update = []
+        for item in items:
+            rid = item.get("id")
+            new_seq = item.get("sequence")
+            if rid in round_map and new_seq is not None:
+                r = round_map[rid]
+                if r.status == Round.Status.PLANNED:
+                    if new_seq <= non_planned_max_seq:
+                        from rest_framework.exceptions import PermissionDenied
+                        raise PermissionDenied("Không thể đưa chặng chưa đến lên trước chặng đang đi hoặc đã đi qua.")
+                    planned_items_to_update.append(item)
 
         with transaction.atomic():
             # Step 1: push all to large temp values to avoid unique conflicts
-            for item in items:
+            for item in planned_items_to_update:
                 rid = item.get("id")
-                if rid in round_map:
-                    Round.objects.filter(pk=rid).update(sequence=999000 + rid)
+                Round.objects.filter(pk=rid).update(sequence=999000 + rid)
 
             # Step 2: apply the real new sequences
-            for item in items:
+            for item in planned_items_to_update:
                 rid = item.get("id")
                 new_seq = item.get("sequence")
-                if rid in round_map and new_seq is not None:
-                    Round.objects.filter(pk=rid).update(sequence=new_seq)
+                Round.objects.filter(pk=rid).update(sequence=new_seq)
 
-        from rest_framework.response import Response
         return Response({"detail": "Reordered successfully."}, status=status.HTTP_200_OK)
 
 
@@ -239,6 +263,10 @@ class RoundDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Rounds"],
     )
     def put(self, request, *args, **kwargs):
+        round_obj = self.get_object()
+        if round_obj.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể sửa chặng đã đến hoặc đang đến.")
         return super().put(request, *args, **kwargs)
 
     @extend_schema(
@@ -249,6 +277,10 @@ class RoundDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Rounds"],
     )
     def patch(self, request, *args, **kwargs):
+        round_obj = self.get_object()
+        if round_obj.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể sửa chặng đã đến hoặc đang đến.")
         return super().patch(request, *args, **kwargs)
 
     @extend_schema(
@@ -258,6 +290,10 @@ class RoundDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Rounds"],
     )
     def delete(self, request, *args, **kwargs):
+        round_obj = self.get_object()
+        if round_obj.status != "planned":
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Không thể xóa chặng đã đến hoặc đang đến.")
         return super().delete(request, *args, **kwargs)
 
 
@@ -352,11 +388,12 @@ class RoundBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIVie
 
     def perform_update(self, serializer):
         prev_finalized_at = getattr(serializer.instance, "finalized_at", None)
+        prev_checkout_finalized_at = getattr(serializer.instance, "checkout_finalized_at", None)
         round_obj = serializer.instance.round
         prev_round_status = getattr(round_obj, "status", None)
         obj = serializer.save()
         sync_round_progress(obj.round, prev_status=prev_round_status)
-        if prev_finalized_at != obj.finalized_at:
+        if prev_finalized_at != obj.finalized_at or prev_checkout_finalized_at != obj.checkout_finalized_at:
             payload = {
                 "round_bus": obj.id,
                 "round": obj.round_id,
@@ -364,6 +401,9 @@ class RoundBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIVie
                 "trip": getattr(obj.trip_bus, "trip_id", None),
                 "finalized_at": (
                     obj.finalized_at.isoformat() if obj.finalized_at else None
+                ),
+                "checkout_finalized_at": (
+                    obj.checkout_finalized_at.isoformat() if obj.checkout_finalized_at else None
                 ),
             }
             publish_round_finalize_to_mqtt(payload)
@@ -624,5 +664,11 @@ class RoundBulkDeleteView(RoundListCreateView):
         if not ids:
             return BaseAPIView().error("No ids provided")
         qs = self.get_queryset().filter(id__in=ids)
+        
+        for r in qs:
+            if r.status != "planned":
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Không thể xóa chặng đã đến hoặc đang đến.")
+                
         deleted, _ = qs.delete()
         return BaseAPIView().success({"deleted": deleted})

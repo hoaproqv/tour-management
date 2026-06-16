@@ -144,8 +144,10 @@ class RoundBusSerializer(serializers.ModelSerializer):
             "id",
             "trip_bus",
             "round",
+            "checkout_finalized_at",
             "finalized_at",
             "finalized_by",
+            "snapshot_data",
             "created_at",
             "updated_at",
         ]

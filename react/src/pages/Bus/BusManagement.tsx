@@ -288,8 +288,8 @@ export default function BusManagement() {
         render: (_: unknown, record: TripBus) => {
           const selectedTrip = trips.find((t) => String(t.id) === String(record.trip));
           if (selectedTrip) {
-            const statusColor = selectedTrip.status === "doing" ? "blue" : "default";
-            const statusLabel = selectedTrip.status === "doing" ? "Đang đi" : "Chưa xuất phát";
+            const statusColor = selectedTrip.status === "done" ? "success" : selectedTrip.status === "doing" ? "blue" : "default";
+            const statusLabel = selectedTrip.status === "done" ? "Đã hoàn thành" : selectedTrip.status === "doing" ? "Đang đi" : "Chưa xuất phát";
             return <Tag color={statusColor}>{statusLabel}</Tag>;
           }
           return <Tag color="success">Sẵn sàng</Tag>;
@@ -304,34 +304,41 @@ export default function BusManagement() {
       {
         title: "Thao tác",
         dataIndex: "actions",
-        render: (_: unknown, record: TripBus) => (
-          <Space>
-            <Tooltip title="Sửa">
-              <Button
-                type="text"
-                icon={<EditOutlined />}
-                onClick={() => openEdit(record)}
-                style={{ color: "#2563eb" }}
-              />
-            </Tooltip>
-            <Popconfirm
-              title="Xóa xe?"
-              description="Bạn có chắc chắn muốn xóa xe này?"
-              onConfirm={() => deleteBusMutate(record.id)}
-              okText="Xóa"
-              cancelText="Hủy"
-            >
-              <Tooltip title="Xóa">
+        render: (_: unknown, record: TripBus) => {
+          const selectedTrip = trips.find((t) => String(t.id) === String(record.trip));
+          const isPlanned = !selectedTrip || selectedTrip.status === "planned";
+          return (
+            <Space>
+              <Tooltip title={isPlanned ? "Sửa" : "Không thể sửa khi chuyến đã xuất phát"}>
                 <Button
                   type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  loading={deleteStatus === "pending"}
+                  icon={<EditOutlined />}
+                  onClick={() => openEdit(record)}
+                  style={{ color: isPlanned ? "#2563eb" : undefined }}
+                  disabled={!isPlanned}
                 />
               </Tooltip>
-            </Popconfirm>
-          </Space>
-        ),
+              <Popconfirm
+                title="Xóa xe?"
+                description="Bạn có chắc chắn muốn xóa xe này?"
+                onConfirm={() => deleteBusMutate(record.id)}
+                okText="Xóa"
+                cancelText="Hủy"
+                disabled={!isPlanned}
+              >
+                <Tooltip title={isPlanned ? "Xóa" : "Không thể xóa khi chuyến đã xuất phát"}>
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={deleteStatus === "pending"}
+                    disabled={!isPlanned}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            </Space>
+          );
+        },
       },
     ];
   }, [canManage, deleteBusMutate, deleteStatus, openEdit, users, trips]);
@@ -408,7 +415,7 @@ export default function BusManagement() {
             />
           </div>
 
-          {canManage && activeTripId && (
+          {canManage && activeTripId && trips.find((t) => String(t.id) === String(activeTripId))?.status === "planned" && (
             <div className="flex justify-end">
               {isSelectionMode ? (
                 <div className="flex gap-2">

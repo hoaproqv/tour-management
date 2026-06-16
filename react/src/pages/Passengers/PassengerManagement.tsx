@@ -281,7 +281,7 @@ export default function PassengerManagement() {
               onClick={handleExport}
               disabled={tripFilter === "all"}
               title={
-                tripFilter === "all" ? "Chọn trip để export" : "Export .xlsx"
+                tripFilter === "all" ? "Chọn chuyến đi để export" : "Export .xlsx"
               }
               className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
             >
@@ -314,7 +314,7 @@ export default function PassengerManagement() {
           <div className="flex items-center gap-3">
             <span className="font-medium text-slate-700 whitespace-nowrap">Chuyến đi:</span>
             <Select
-              value={tripFilter}
+              value={trips.some(t => String(t.id) === tripFilter) ? tripFilter : undefined}
               onChange={(val) => {
                 setTripFilter(val);
                 if (importResult && val !== importResult.trip_id) {
@@ -324,6 +324,8 @@ export default function PassengerManagement() {
               className="w-full sm:w-64"
               showSearch
               optionFilterProp="label"
+              placeholder="Chọn chuyến đi"
+              notFoundContent="Không có chuyến đi"
               options={[
                 ...trips.map((t) => ({
                   label: t.name,

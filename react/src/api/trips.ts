@@ -40,6 +40,8 @@ export interface TripBus {
   capacity: number;
   driver_name: string;
   driver_tel: string;
+  manager_name?: string;
+  manager_tel?: string;
   tour_guide_name: string;
   tour_guide_tel: string;
   description: string;
@@ -98,13 +100,15 @@ export type PassengerPayload = Omit<
 };
 
 export interface RoundBusItem {
-  id: string;
-  trip_bus: string;
-  round: string;
+  id: string | number;
+  trip_bus: string | number;
+  round: string | number;
+  checkout_finalized_at?: string | null;
   finalized_at?: string | null;
   finalized_by?: string | number | null;
-  created_at: string;
-  updated_at: string;
+  snapshot_data?: any;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type RoundBusPayload = Omit<
@@ -241,9 +245,6 @@ export const updateTripPartial = async (id: string, payload: Partial<TripPayload
 
 export const deleteTrip = async (id: string) => deleteData(`/trips/${id}/`);
 
-export const bulkDeleteTrips = async (ids: (string | number)[]) =>
-  postData("/trips/bulk-delete/", { ids });
-
 export const getTripBuses = async (
   params: PaginatedParams = {},
 ): Promise<PaginatedResponse<TripBus>> => {
@@ -338,7 +339,7 @@ export const bulkDeletePassengers = async (ids: (string | number)[]) =>
 export const getRoundBuses = async (
   params: PaginatedParams = {},
 ): Promise<PaginatedResponse<RoundBusItem>> => {
-  const { queryString, page, limit } = buildQueryString(params, 1000);
+  const { queryString, page, limit } = buildQueryString(params, 500);
   const res = await fetchData(
     `/round-buses/${queryString ? `?${queryString}` : ""}`,
   );
@@ -355,14 +356,27 @@ export const deleteRoundBus = async (id: string) =>
   deleteData(`/round-buses/${id}/`);
 
 export const finalizeRoundBus = async (
-  id: string,
+  id: string | number,
   finalized: boolean,
   finalizedAt?: string,
+  snapshotData?: any,
 ) => {
   const finalized_at = finalized
     ? finalizedAt || new Date().toISOString()
     : null;
-  return patchData(`/round-buses/${id}/`, { finalized_at });
+  return patchData(`/round-buses/${id}/`, { finalized_at, snapshot_data: snapshotData });
+};
+
+export const finalizeRoundBusCheckout = async (
+  id: string | number,
+  finalized: boolean,
+  finalizedAt?: string,
+  snapshotData?: any,
+) => {
+  const checkout_finalized_at = finalized
+    ? finalizedAt || new Date().toISOString()
+    : null;
+  return patchData(`/round-buses/${id}/`, { checkout_finalized_at, snapshot_data: snapshotData });
 };
 
 export const getTransactions = async (
@@ -382,6 +396,9 @@ export const updateTransaction = async (
   id: string,
   payload: TransactionPayload,
 ) => putData(`/transactions/${id}/`, payload);
+
+export const bulkCheckOutTransactions = async (payload: { transaction_ids: (string | number)[]; check_out: string }) =>
+  postData("/transactions/bulk-check-out/", payload);
 
 export const deleteTransaction = async (id: string) =>
   deleteData(`/transactions/${id}/`);

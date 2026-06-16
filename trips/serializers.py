@@ -211,6 +211,8 @@ class TripBusSerializer(serializers.ModelSerializer):
     bus_code = serializers.CharField(max_length=50, required=False)
     capacity = serializers.IntegerField(required=False, min_value=1, max_value=100)
     bus = serializers.PrimaryKeyRelatedField(queryset=Bus.objects.all(), required=False)
+    driver_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    driver_tel = serializers.CharField(max_length=30, required=False, allow_blank=True)
 
     class Meta:
         model = TripBus
@@ -231,6 +233,7 @@ class TripBusSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+        validators = []  # Disable implicit UniqueTogetherValidator because bus is computed in validate()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -238,6 +241,12 @@ class TripBusSerializer(serializers.ModelSerializer):
             data["registration_number"] = instance.bus.registration_number
             data["bus_code"] = instance.bus.bus_code
             data["capacity"] = instance.bus.capacity
+        if instance.manager:
+            data["manager_name"] = instance.manager.name or instance.manager.email
+            data["manager_tel"] = instance.manager.phone or ""
+        if instance.driver:
+            data["driver_name"] = instance.driver.name or instance.driver.email
+            data["driver_tel"] = instance.driver.phone or ""
         return data
 
     def validate(self, attrs):
@@ -287,6 +296,12 @@ class TripBusSerializer(serializers.ModelSerializer):
         driver = attrs.get("driver")
         if "driver" not in attrs and self.instance:
             driver = self.instance.driver
+
+        if driver:
+            if not attrs.get("driver_name"):
+                attrs["driver_name"] = driver.name or driver.email or ""
+            if not attrs.get("driver_tel"):
+                attrs["driver_tel"] = getattr(driver, "phone", "") or ""
 
         if trip:
             qs = TripBus.objects.filter(trip=trip)

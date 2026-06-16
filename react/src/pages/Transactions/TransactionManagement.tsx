@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Badge,
   Card,
@@ -15,7 +14,7 @@ import {
 } from "antd";
 import dayjs from "dayjs";
 
-import { updateTransaction, type TransactionItem } from "../../api/trips";
+import { type TransactionItem } from "../../api/trips";
 import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
 import { isFleetLead } from "../../utils/helper";
 
@@ -34,8 +33,6 @@ const { Title, Text } = Typography;
 const STORAGE_KEY = "transaction-state";
 
 export default function TransactionManagement() {
-  const queryClient = useQueryClient();
-
   const [activeTripBusId, setActiveTripBusId] = useState<string>();
   const [activeRoundId, setActiveRoundId] = useState<string>();
   const [crossCheck, setCrossCheck] = useState<{
@@ -60,11 +57,10 @@ export default function TransactionManagement() {
     transferByPassenger,
     passengerTransfersByTrip,
     tripBusLabelMap,
-    roundBusByKey,
     roundBusToTripBus,
-    canOperateTripBus,
     canOperateRoundBus,
     finalizedRoundBuses,
+    checkoutFinalizedRoundBuses,
     transactionByPassenger,
     tripScopedRound,
     tripRoundsSorted,
@@ -82,14 +78,20 @@ export default function TransactionManagement() {
     tripStatusInfo,
     isLoadingData,
     isRefreshingData,
+    roundBuses,
+    passengerBusAtStartOfRound,
   } = useTransactionsData(activeTripId, activeRoundId);
 
   const {
     checkInMutation,
     checkOutMutation,
+    undoCheckInMutation,
+    undoCheckOutMutation,
+    bulkCheckOutMutation,
     switchBusMutation,
     undoTransferMutation,
     finalizeRoundBusMutation,
+    finalizeRoundBusCheckoutMutation,
     startTripMutation,
     isMutationBusy,
   } = useTransactionsMutations({
@@ -99,14 +101,51 @@ export default function TransactionManagement() {
     transferByPassenger,
   });
 
+  const mutationBusy =
+    isMutationBusy ||
+    checkInMutation.isPending ||
+    checkOutMutation.isPending ||
+    undoCheckInMutation.isPending ||
+    undoCheckOutMutation.isPending ||
+    bulkCheckOutMutation.isPending ||
+    switchBusMutation.isPending ||
+    undoTransferMutation.isPending ||
+    finalizeRoundBusMutation.isPending ||
+    finalizeRoundBusCheckoutMutation.isPending ||
+    startTripMutation.isPending;
+
   useTransactionsWebSocket();
 
+  // Restore active view state
   useEffect(() => {
-    if (!activeTripId && trips.length) {
-      setActiveTripId(trips[0].id);
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (!activeTripId && parsed.activeTripId) {
+          // handled by useGlobalTripFilter in real app, but we mirror it just in case
+        }
+        if (!activeTripBusId && parsed.activeTripBusId) {
+          setActiveTripBusId(parsed.activeTripBusId);
+        }
+      }
+    } catch {
+      //
     }
-  }, [trips, activeTripId, setActiveTripId]);
+  }, [activeTripId, activeTripBusId, activeRoundId]);
 
+  // Save active view state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!activeTripId && !activeTripBusId) return;
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ activeTripId, activeTripBusId }),
+    );
+  }, [activeTripId, activeTripBusId]);
+
+  // Ensure valid selection when data loads
   useEffect(() => {
     if (!activeTripId) return;
 
@@ -114,14 +153,14 @@ export default function TransactionManagement() {
       !activeTripBusId ||
       !visibleTripBuses.some((t) => String(t.id) === String(activeTripBusId))
     ) {
-      setActiveTripBusId(visibleTripBuses[0]?.id);
+      setActiveTripBusId(String(visibleTripBuses[0]?.id));
     }
 
     if (
       !activeRoundId ||
       !tripScopedRound.some((r) => String(r.id) === String(activeRoundId))
     ) {
-      setActiveRoundId(tripScopedRound[0]?.id);
+      setActiveRoundId(String(openRoundId || tripScopedRound[0]?.id));
     }
   }, [
     activeTripId,
@@ -129,16 +168,8 @@ export default function TransactionManagement() {
     tripScopedRound,
     activeTripBusId,
     activeRoundId,
+    openRoundId,
   ]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!activeTripId && !activeTripBusId && !activeRoundId) return;
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ activeTripId, activeTripBusId, activeRoundId }),
-    );
-  }, [activeTripId, activeTripBusId, activeRoundId]);
 
   const handleStartTrip = () => {
     if (!activeTripId) return;
@@ -177,6 +208,16 @@ export default function TransactionManagement() {
 
   const rowsForBus = React.useCallback(
     (tripBusId: string): PassengerRow[] => {
+      if (activeRoundId) {
+        const targetRoundBusId = roundBusIdFor(activeRoundId, tripBusId);
+        const roundBus = targetRoundBusId
+          ? roundBuses.find((rb) => String(rb.id) === String(targetRoundBusId))
+          : undefined;
+        if (roundBus?.finalized_at && roundBus?.snapshot_data?.rows) {
+          return roundBus.snapshot_data.rows;
+        }
+      }
+
       const transferMap = passengerTransferMap;
 
       return tripPassengers
@@ -186,11 +227,12 @@ export default function TransactionManagement() {
             (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ??
             null;
           const homeBusId = overrideBus ?? baseAssigned ?? null;
-          if (homeBusId)
-            return (
-              String(homeBusId) === String(tripBusId) ||
-              String(baseAssigned) === String(tripBusId)
-            );
+          const busAtStart = passengerBusAtStartOfRound.get(String(p.id));
+
+          if (String(homeBusId) === String(tripBusId)) return true;
+          
+          if (String(busAtStart) === String(tripBusId)) return true;
+
           return false;
         })
         .map((p) => {
@@ -205,7 +247,26 @@ export default function TransactionManagement() {
             : undefined;
           let status: RowStatus = "pending";
           if (txn) {
+            let isCheckedOut = false;
             if (txn.check_out) {
+              const viewedRoundBusId = roundBusIdFor(activeRoundId, tripBusId);
+              const roundBusFinalizedAt = viewedRoundBusId
+                ? finalizedRoundBuses[activeTripId || ""]?.[viewedRoundBusId]
+                : undefined;
+
+              if (!roundBusFinalizedAt) {
+                // If the current round is not finalized, the checkout must have happened now.
+                isCheckedOut = true;
+              } else {
+                // If the round is finalized, we only consider them checked out if checkout happened before/near finalize time.
+                const checkOutTime = dayjs(txn.check_out);
+                isCheckedOut = checkOutTime.isBefore(
+                  dayjs(roundBusFinalizedAt).add(15, "minute"),
+                );
+              }
+            }
+
+            if (isCheckedOut) {
               status = "checkedOut";
             } else if (String(txnBusId) === String(tripBusId)) {
               status = "checkedInHere";
@@ -216,20 +277,20 @@ export default function TransactionManagement() {
 
           const transferredAway =
             Boolean(baseAssigned) &&
-            baseAssigned === tripBusId &&
+            String(baseAssigned) === String(tripBusId) &&
             !!overrideBus &&
-            overrideBus !== tripBusId;
+            String(overrideBus) !== String(tripBusId);
 
           const transferredHere =
             !!overrideBus &&
-            overrideBus === tripBusId &&
+            String(overrideBus) === String(tripBusId) &&
             !!baseAssigned &&
-            baseAssigned !== tripBusId;
+            String(baseAssigned) !== String(tripBusId);
 
           const isOwnedByBus =
             (homeBusId
-              ? homeBusId === tripBusId
-              : !baseAssigned || baseAssigned === tripBusId) &&
+              ? String(homeBusId) === String(tripBusId)
+              : !baseAssigned || String(baseAssigned) === String(tripBusId)) &&
             !transferredAway;
 
           const availableForCrossCheck = !txn || !!txn.check_out;
@@ -258,6 +319,12 @@ export default function TransactionManagement() {
       transactionByPassenger,
       tripBusLabelMap,
       tripPassengers,
+      activeRoundId,
+      activeTripId,
+      finalizedRoundBuses,
+      roundBusIdFor,
+      roundBuses,
+      passengerBusAtStartOfRound,
     ],
   );
 
@@ -265,13 +332,19 @@ export default function TransactionManagement() {
     const tags: React.ReactNode[] = [];
 
     if (row.status === "checkedInHere") {
-      const timeStr = row.transaction?.check_in ? ` ${dayjs(row.transaction.check_in).format("HH:mm")}` : "";
+      const timeStr = row.transaction?.check_in
+        ? ` ${dayjs(row.transaction.check_in).format("HH:mm")}`
+        : "";
       tags.push(<Tag color="green">Đã lên xe{timeStr}</Tag>);
     } else if (row.status === "checkedInElsewhere") {
-      const timeStr = row.transaction?.check_in ? ` ${dayjs(row.transaction.check_in).format("HH:mm")}` : "";
+      const timeStr = row.transaction?.check_in
+        ? ` ${dayjs(row.transaction.check_in).format("HH:mm")}`
+        : "";
       tags.push(<Tag color="green">Đã điểm danh{timeStr}</Tag>);
     } else if (row.status === "checkedOut") {
-      const timeStr = row.transaction?.check_out ? ` (xuống ${dayjs(row.transaction.check_out).format("HH:mm")})` : "";
+      const timeStr = row.transaction?.check_out
+        ? ` (xuống ${dayjs(row.transaction.check_out).format("HH:mm")})`
+        : "";
       tags.push(<Tag color="orange">Chưa lên xe{timeStr}</Tag>);
     } else {
       tags.push(<Tag>Chưa lên xe</Tag>);
@@ -332,6 +405,26 @@ export default function TransactionManagement() {
     checkOutMutation.mutate(txn);
   };
 
+  const handleUndoCheckIn = (txn: TransactionItem | undefined) => {
+    if (tripLockedForAttendance) return;
+    if (!txn) return;
+    if (!canOperateRoundBus(txn.round_bus)) {
+      message.warning("Bạn không được phép thao tác với xe này");
+      return;
+    }
+    undoCheckInMutation.mutate(txn);
+  };
+
+  const handleUndoCheckOut = (txn: TransactionItem | undefined) => {
+    if (tripLockedForAttendance) return;
+    if (!txn) return;
+    if (!canOperateRoundBus(txn.round_bus)) {
+      message.warning("Bạn không được phép thao tác với xe này");
+      return;
+    }
+    undoCheckOutMutation.mutate(txn);
+  };
+
   const handleCheckOutAll = (
     checkedInRows: PassengerRow[],
     roundBusId?: string,
@@ -353,22 +446,11 @@ export default function TransactionManagement() {
         !r.transaction.check_out,
     );
     if (toCheckOut.length === 0) return;
-    // Fire all in parallel — acceptable since they are independent transactions
-    Promise.all(
-      toCheckOut.map((r) =>
-        updateTransaction(r.transaction!.id, {
-          passenger: r.transaction!.passenger,
-          round_bus: r.transaction!.round_bus,
-          check_in: r.transaction!.check_in,
-          check_out: now,
-        }),
-      ),
-    )
-      .then(() => {
-        message.success(`Điểm danh xuống ${toCheckOut.length} hành khách`);
-        return queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      })
-      .catch(() => message.error("Điểm danh xuống thất bại"));
+
+    bulkCheckOutMutation.mutate({
+      transactionIds: toCheckOut.map((r) => r.transaction!.id),
+      checkOutTime: now,
+    });
   };
 
   const handleSwitchBus = (
@@ -398,7 +480,7 @@ export default function TransactionManagement() {
     });
   };
 
-  const handleFinalize = (roundBusId?: string) => {
+  const handleFinalize = (roundBusId?: string, snapshotData?: any) => {
     if (tripLockedForAttendance) {
       message.warning("Chuyến đi chưa bắt đầu. Chỉ xem điểm danh.");
       return;
@@ -413,7 +495,11 @@ export default function TransactionManagement() {
       return;
     }
 
-    finalizeRoundBusMutation.mutate(roundBusId);
+    finalizeRoundBusMutation.mutate({
+      roundBusId,
+      finalized: true,
+      snapshotData,
+    });
   };
 
   const handleCrossCheckPerform = (passengerId: string) => {
@@ -422,21 +508,26 @@ export default function TransactionManagement() {
       return;
     }
     if (!activeRoundId || !crossCheck.busId) return;
-    const targetRoundBusId = roundBusIdFor(activeRoundId, crossCheck.busId);
+    const targetRoundBusId = roundBusIdFor(
+      String(activeRoundId),
+      crossCheck.busId,
+    );
     if (!targetRoundBusId) {
       message.warning("Chưa cấu hình round-bus cho xe này");
       return;
     }
-    if (!canOperateRoundBus(targetRoundBusId)) {
+    if (!canOperateRoundBus(String(targetRoundBusId))) {
       message.warning("Bạn không được phép thao tác với xe này");
       return;
     }
     const fromTxn = transactionByPassenger.get(String(passengerId));
     if (fromTxn && !fromTxn.check_out) {
-      message.warning("Hành khách này đã lên xe khác, không thể điểm danh chéo.");
+      message.warning(
+        "Hành khách này đã lên xe khác, không thể điểm danh chéo.",
+      );
       return;
     }
-    handleSwitchBus(passengerId, fromTxn, targetRoundBusId);
+    handleSwitchBus(passengerId, fromTxn, String(targetRoundBusId));
   };
 
   const handleCrossCheckUndo = (passengerId: string) => {
@@ -454,20 +545,12 @@ export default function TransactionManagement() {
         id: round.id,
         label: round.location || round.name,
         number: round.sequence ?? index + 1,
-        status: getRoundVisualStatus(round.id, index),
-        isActive: activeRoundId === round.id,
+        status: getRoundVisualStatus(String(round.id), index),
+        isActive: String(activeRoundId) === String(round.id),
       })),
     [tripRoundsSorted, getRoundVisualStatus, activeRoundId],
   );
 
-  const mutationBusy = isMutationBusy || loading;
-
-  // Track which round-buses have completed the "checkout" phase for intermediate stops
-  const [checkoutDoneRbs, setCheckoutDoneRbs] = React.useState<Set<string>>(
-    new Set(),
-  );
-
-  // Position of the currently viewed round within the trip
   const activeRoundIndex = tripRoundsSorted.findIndex(
     (r) => String(r.id) === String(activeRoundId),
   );
@@ -478,71 +561,99 @@ export default function TransactionManagement() {
     return "middle";
   }, [activeRoundIndex, tripRoundsSorted.length]);
 
-  // Finalise the checkout phase for a middle stop — opens check-in phase
-  const handleFinalizeCheckout = (roundBusId: string) => {
-    if (!canOperateRoundBus(roundBusId)) {
+  const isCheckoutFinalizedForTripBus = React.useCallback(
+    (tripBusId: string) => {
+      if (roundPosition === "first") return true;
+      const rbId = activeRoundId
+        ? roundBusIdFor(String(activeRoundId), tripBusId)
+        : undefined;
+      if (!rbId) return false;
+      return Boolean(
+        checkoutFinalizedRoundBuses[activeTripId || ""]?.[String(rbId)],
+      );
+    },
+    [
+      roundPosition,
+      activeRoundId,
+      activeTripId,
+      roundBusIdFor,
+      checkoutFinalizedRoundBuses,
+    ],
+  );
+
+  const isCheckinFinalizedForTripBus = React.useCallback(
+    (tripBusId: string) => {
+      const rbId = activeRoundId
+        ? roundBusIdFor(String(activeRoundId), tripBusId)
+        : undefined;
+      if (!rbId) return false;
+      return Boolean(finalizedRoundBuses[activeTripId || ""]?.[String(rbId)]);
+    },
+    [activeRoundId, activeTripId, roundBusIdFor, finalizedRoundBuses],
+  );
+
+  const handleFinalizeCheckout = (
+    roundBusId: string | number,
+    snapshotData?: any,
+  ) => {
+    if (!canOperateRoundBus(String(roundBusId))) {
       message.warning("Bạn không được phép thao tác với xe này");
       return;
     }
-    setCheckoutDoneRbs((prev) => new Set([...prev, roundBusId]));
-    message.success("Đã chốt điểm danh xuống. Bây giờ có thể điểm danh lên.");
+    finalizeRoundBusCheckoutMutation.mutate({
+      roundBusId: String(roundBusId),
+      finalized: true,
+      snapshotData,
+    });
   };
 
-  // Finalise check-in phase (or first-round-only finalize)
-  const handleFinalizeCheckin = (roundBusId?: string) => {
+  const handleFinalizeCheckin = (
+    roundBusId?: string | number,
+    snapshotData?: any,
+  ) => {
     if (!roundBusId) return;
-    handleFinalize(roundBusId);
-    // Clear checkout-done flag when entire round-bus is finalized
-    setCheckoutDoneRbs((prev) => {
-      const next = new Set(prev);
-      next.delete(roundBusId);
-      return next;
-    });
+    handleFinalize(String(roundBusId), snapshotData);
   };
 
   const busTabs = visibleTripBuses
     .map((tb) => {
       const label = tripBusLabelMap.get(String(tb.id)) || "Bus";
       const roundBusId = activeRoundId
-        ? roundBusByKey.get(`${activeRoundId}-${tb.id}`)?.id
+        ? roundBusIdFor(String(activeRoundId), String(tb.id))
         : undefined;
 
-      // Hide tabs that have no round-bus configured for the active round
       if (!roundBusId) return null;
 
-      const rows = rowsForBus(tb.id);
+      const rows = rowsForBus(String(tb.id));
+
       const presentCount = rows.filter(
         (r) => r.status === "checkedInHere",
       ).length;
       const othersCount = rows.filter(
-        (r) => r.status !== "checkedInHere" && r.isOwnedByBus
+        (r) => r.status !== "checkedInHere" && r.isOwnedByBus,
       ).length;
-      const transferredAwayCount = rows.filter(
-        (r) => !r.isOwnedByBus
-      ).length;
-      const busReadOnly = tripLockedForAttendance || !canOperateTripBus(tb.id);
+      const transferredAwayCount = rows.filter((r) => !r.isOwnedByBus).length;
+
       const busFinalized = Boolean(
-        finalizedRoundBuses[activeTripId || ""]?.[roundBusId],
+        activeTripId && finalizedRoundBuses[activeTripId]?.[String(roundBusId)],
       );
 
-      const blockReason = busReadOnly
-        ? !canOperateTripBus(tb.id)
-          ? "Chỉ xem"
-          : undefined
-        : busFinalized
-          ? "Đã chốt điểm danh"
-          : roundLockedBySequence
-            ? "Chưa hoàn tất Chặng trước"
-            : !openRoundId
-              ? "Tất cả Chặng đã hoàn thành"
-              : undefined;
+      let blockReason: string | undefined;
+      if (tripLockedForAttendance) blockReason = "Chuyến đi chưa diễn ra.";
+      else if (roundLockedBySequence)
+        blockReason = "Vui lòng điểm danh xong checkpoint trước đó.";
+      else if (busFinalized) blockReason = "Đã chốt danh sách.";
+      else if (!canOperateRoundBus(String(roundBusId)))
+        blockReason = "Chỉ Trưởng xe mới được quyền thao tác.";
+      else if (!canModifyRound)
+        blockReason = "Bạn không có quyền quản lý chuyến đi này.";
 
-      const canModifyAttendance = Boolean(
-        !busReadOnly && roundBusId && canModifyRound && !busFinalized,
-      );
+      const busReadOnly = Boolean(blockReason) || busFinalized;
+      const canModifyAttendance =
+        canModifyRound && !tripLockedForAttendance && !busFinalized;
 
       return {
-        key: tb.id,
+        key: String(tb.id),
         label: (
           <Space size={4}>
             <span>{label}</span>
@@ -573,7 +684,7 @@ export default function TransactionManagement() {
         ),
         children: (
           <BusPane
-            roundBusId={roundBusId}
+            roundBusId={String(roundBusId)}
             rows={rows}
             loading={loading}
             busFinalized={busFinalized}
@@ -594,11 +705,17 @@ export default function TransactionManagement() {
             onFinalizeCheckout={handleFinalizeCheckout}
             onCheckIn={handleCheckIn}
             onCheckOut={handleCheckOut}
+            onUndoCheckIn={handleUndoCheckIn}
+            onUndoCheckOut={handleUndoCheckOut}
             onCheckOutAll={(checkedInRows) =>
-              handleCheckOutAll(checkedInRows, roundBusId)
+              handleCheckOutAll(checkedInRows, String(roundBusId))
             }
             roundPosition={roundPosition}
-            checkoutPhaseFinalized={checkoutDoneRbs.has(roundBusId)}
+            checkoutPhaseFinalized={Boolean(
+              checkoutFinalizedRoundBuses[activeTripId || ""]?.[
+                String(roundBusId)
+              ],
+            )}
             busy={mutationBusy}
           />
         ),
@@ -660,7 +777,11 @@ export default function TransactionManagement() {
             </span>
             <Select
               placeholder="Chọn chuyến đi"
-              value={activeTripId}
+              value={
+                trips.some((t) => String(t.id) === activeTripId)
+                  ? activeTripId
+                  : undefined
+              }
               onChange={(val) => setActiveTripId(val)}
               options={trips.map((t) => ({
                 value: String(t.id),
@@ -670,6 +791,7 @@ export default function TransactionManagement() {
               showSearch
               optionFilterProp="label"
               className="w-full sm:w-64"
+              notFoundContent="Không có chuyến đi"
             />
             {tripStatusInfo && (
               <div className="flex items-center gap-3">
@@ -748,6 +870,8 @@ export default function TransactionManagement() {
         statusTag={statusTag}
         onPerform={handleCrossCheckPerform}
         onUndo={handleCrossCheckUndo}
+        isCheckoutFinalizedForTripBus={isCheckoutFinalizedForTripBus}
+        isCheckinFinalizedForTripBus={isCheckinFinalizedForTripBus}
       />
     </div>
   );

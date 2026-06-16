@@ -1,6 +1,5 @@
 import React from "react";
 
-import { DeleteOutlined } from "@ant-design/icons";
 import { Button, Input, Select, Typography } from "antd";
 
 import type { Trip } from "../../../api/trips";
@@ -29,10 +28,6 @@ export default function TripHeader({
   onCreate,
   canCreate = true,
   statusMeta,
-  selectedRowKeys = [],
-  onBulkDelete,
-  isSelectionMode,
-  onSelectionModeChange,
 }: TripHeaderProps) {
   const { Title, Text } = Typography;
 
@@ -79,37 +74,6 @@ export default function TripHeader({
           </div>
         </div>
       </div>
-      
-      {canCreate && (
-        <div className="flex justify-end mt-4">
-          {isSelectionMode ? (
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  if (onSelectionModeChange) onSelectionModeChange(false);
-                }}
-              >
-                Hủy
-              </Button>
-              {selectedRowKeys.length > 0 && onBulkDelete && (
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={onBulkDelete}
-                >
-                  Xóa đã chọn ({selectedRowKeys.length})
-                </Button>
-              )}
-            </div>
-          ) : (
-            <Button danger onClick={() => {
-              if (onSelectionModeChange) onSelectionModeChange(true);
-            }}>
-              Xóa nhiều
-            </Button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

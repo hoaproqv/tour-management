@@ -242,6 +242,46 @@ class UndoTransferView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class BulkCheckOutView(APIView):
+    permission_classes = [IsAdminOrTourManagerOrFleetLeadOrReadOnly]
+
+    @extend_schema(
+        summary="Bulk check out transactions",
+        description="Update multiple transactions with a check_out time simultaneously.",
+        request={
+            "type": "object",
+            "properties": {
+                "transaction_ids": {"type": "array", "items": {"type": "integer"}},
+                "check_out": {"type": "string", "format": "date-time"},
+            },
+            "required": ["transaction_ids", "check_out"],
+        },
+        responses={200: {"description": "Success"}},
+        tags=["Transactions"],
+    )
+    def post(self, request, *args, **kwargs):
+        transaction_ids = request.data.get("transaction_ids", [])
+        check_out = request.data.get("check_out")
+
+        if not transaction_ids or not check_out:
+            return Response({"detail": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                txns = list(Transaction.objects.filter(id__in=transaction_ids))
+                for txn in txns:
+                    if not txn.check_out:
+                        txn.check_out = check_out
+                        txn.save(update_fields=["check_out"])
+                        publish_transaction_to_mqtt(TransactionSerializer(txn).data)
+
+            return Response({"success": True, "updated": len(txns)}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Failed to bulk check out: {e}")
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class TransactionListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = TransactionSerializer
     permission_classes = [IsAdminOrFleetLeadOrReadOnly]
@@ -369,4 +409,16 @@ class TransactionDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPI
         tags=["Transactions"],
     )
     def delete(self, request, *args, **kwargs):
-        return super().delete(request, *args, **kwargs)
+        # We need the ID before deleting
+        instance = self.get_object()
+        txn_id = instance.id
+        
+        response = super().delete(request, *args, **kwargs)
+        
+        if response.status_code == 204:
+            publish_transaction_to_mqtt({
+                "id": txn_id,
+                "deleted": True
+            })
+            
+        return response

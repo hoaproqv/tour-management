@@ -243,15 +243,15 @@ const TenantDashboard = ({ data, isLoading }: { data?: DashboardOverview; isLoad
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 md:gap-2">
+                  <div className="flex flex-nowrap w-full gap-1 xl:gap-2 mt-auto pt-1">
                     {metric.breakdown.map((item) => (
                       <Tag
                         key={`${metric.key}-${item.label}`}
                         color={item.color}
-                        className="m-0 px-2 py-0.5 md:px-3 md:py-1 text-[11px] md:text-sm"
+                        className="m-0 flex-1 flex items-center justify-center px-0.5 py-1 sm:px-1 xl:px-2 overflow-hidden"
                       >
-                        <span className="font-semibold">{item.value}</span>
-                        <span className="ml-1 md:ml-2 text-slate-700">{item.label}</span>
+                        <span className="font-bold text-xs xl:text-sm shrink-0">{item.value}</span>
+                        <span className="ml-0.5 xl:ml-1 text-slate-700 truncate text-[10px] md:text-[9px] lg:text-[10px] xl:text-xs" title={item.label}>{item.label}</span>
                       </Tag>
                     ))}
                   </div>
@@ -323,18 +323,18 @@ const TenantDashboard = ({ data, isLoading }: { data?: DashboardOverview; isLoad
             />
           </div>
 
-          {/* Recent Transactions */}
+          {/* Arriving Locations */}
           <div className="bg-white border border-slate-100 shadow-sm rounded-xl p-4 md:p-6 flex flex-col">
             <div className="mb-4">
               <Typography.Title level={4} className="!mb-0 !text-slate-800">
-                Hoạt động điểm danh
+                Địa điểm đang đến
               </Typography.Title>
               <Typography.Text className="text-slate-500">
-                5 lượt check-in gần nhất trên hệ thống
+                Các chặng đang trong quá trình di chuyển
               </Typography.Text>
             </div>
             <Table scroll={{ x: "max-content" }}
-              dataSource={data?.recent_transactions}
+              dataSource={data?.arriving_locations}
               rowKey="id"
               pagination={false}
               size="small"
@@ -342,25 +342,25 @@ const TenantDashboard = ({ data, isLoading }: { data?: DashboardOverview; isLoad
               className="custom-table overflow-x-auto"
               columns={[
                 {
-                  title: "Hành khách",
-                  dataIndex: "passenger_name",
-                  key: "passenger_name",
+                  title: "Chuyến đi",
+                  dataIndex: "trip_name",
+                  key: "trip_name",
                   render: (text) => <span className="font-medium text-slate-700">{text}</span>,
                 },
                 {
-                  title: "Điểm đến / Xe",
-                  key: "round_bus",
+                  title: "Chặng / Địa điểm",
+                  key: "round_location",
                   render: (_, record) => (
                     <div className="flex flex-col">
                       <span className="text-slate-800 text-sm">{record.round_name}</span>
-                      <span className="text-slate-500 text-xs">{record.bus_number}</span>
+                      <span className="text-slate-500 text-xs line-clamp-1" title={record.location}>{record.location}</span>
                     </div>
                   ),
                 },
                 {
-                  title: "Thời gian",
-                  dataIndex: "check_in",
-                  key: "check_in",
+                  title: "Cập nhật",
+                  dataIndex: "updated_at",
+                  key: "updated_at",
                   render: (date) => (
                     <span className="text-slate-600 text-sm">
                       {date ? dayjs(date).format("HH:mm DD/MM") : "—"}
