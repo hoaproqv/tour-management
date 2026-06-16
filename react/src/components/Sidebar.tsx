@@ -17,7 +17,12 @@ import { Button, Menu, Modal, type MenuProps } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useGetAccountInfo } from "../hooks/useAuth";
-import { isFleetLead, isDriver, isAdminLike, isTourManagerLike } from "../utils/helper";
+import {
+  isFleetLead,
+  isDriver,
+  isAdminLike,
+  isTourManagerLike,
+} from "../utils/helper";
 import { ROUTES } from "../utils/routers";
 
 import type { IUser } from "../utils/types";
@@ -68,7 +73,7 @@ const baseMenuItems: Required<MenuProps>["items"] = [
   {
     key: ROUTES.TRANSACTIONS,
     icon: <WalletOutlined style={{ color: "#fff" }} />,
-    label: "Điểm danh hành khách",
+    label: "Tiến trình chuyến đi",
   },
   {
     key: "about",
@@ -104,7 +109,10 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const menuItems = useMemo(() => {
     if (isAdmin) {
       return baseMenuItems.filter(
-        (item) => item?.key === ROUTES.DASHBOARD || item?.key === ROUTES.TENANT || item?.key === ROUTES.ACCOUNT,
+        (item) =>
+          item?.key === ROUTES.DASHBOARD ||
+          item?.key === ROUTES.TENANT ||
+          item?.key === ROUTES.ACCOUNT,
       );
     }
     if (isTourManager) {

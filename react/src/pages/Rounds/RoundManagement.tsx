@@ -80,6 +80,8 @@ interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
   "data-row-key": string;
 }
 
+const RoundContext = React.createContext<RoundItem[]>([]);
+
 const DraggableRow = ({ children, ...props }: RowProps) => {
   const isPlaceholder =
     props.className?.includes("ant-table-placeholder") ||
@@ -95,6 +97,11 @@ const DraggableRow = ({ children, ...props }: RowProps) => {
   } = useSortable({
     id: props["data-row-key"] || "empty",
   });
+
+  const localRounds = React.useContext(RoundContext);
+  const rowId = props["data-row-key"];
+  const isFirstRound =
+    localRounds.find((r) => String(r.id) === String(rowId))?.sequence === 1;
 
   if (isPlaceholder) {
     return <tr {...props}>{children}</tr>;
@@ -114,7 +121,15 @@ const DraggableRow = ({ children, ...props }: RowProps) => {
       {React.Children.map(children, (child) => {
         if ((child as React.ReactElement).key === "drag-handle") {
           return React.cloneElement(child as React.ReactElement<any>, {
-            children: (
+            children: isFirstRound ? (
+              <MenuOutlined
+                style={{
+                  touchAction: "none",
+                  cursor: "not-allowed",
+                  color: "#cbd5e1",
+                }}
+              />
+            ) : (
               <MenuOutlined
                 style={{ touchAction: "none", cursor: "grab", color: "#999" }}
                 {...listeners}
@@ -161,7 +176,9 @@ export default function RoundManagement() {
   });
 
   const trips = useMemo(() => {
-    const arr = Array.isArray(tripsResponse?.data) ? [...tripsResponse.data] : [];
+    const arr = Array.isArray(tripsResponse?.data)
+      ? [...tripsResponse.data]
+      : [];
     return arr.sort((a, b) => {
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -234,8 +251,26 @@ export default function RoundManagement() {
   const onDragEnd = ({ active, over }: any) => {
     if (active.id !== over?.id) {
       setLocalRounds((prev) => {
-        const activeIndex = prev.findIndex((i) => String(i.id) === String(active.id));
-        const overIndex = prev.findIndex((i) => String(i.id) === String(over?.id));
+        const activeItem = prev.find((i) => String(i.id) === String(active.id));
+
+        if (activeItem?.sequence === 1) {
+          message.warning(
+            "Không thể thay đổi thứ tự của chặng 'Tập trung và xuất phát'",
+          );
+          return prev;
+        }
+
+        const activeIndex = prev.findIndex(
+          (i) => String(i.id) === String(active.id),
+        );
+        let overIndex = prev.findIndex(
+          (i) => String(i.id) === String(over?.id),
+        );
+
+        if (overIndex === 0) {
+          overIndex = 1;
+        }
+
         const newArr = arrayMove(prev, activeIndex, overIndex);
 
         const updatedArr = newArr.map((item, index) => ({
@@ -315,7 +350,9 @@ export default function RoundManagement() {
         trip: String(round.trip),
         name: round.name,
         location: round.location,
-        estimate_time: round.estimate_time ? dayjs(round.estimate_time) : undefined,
+        estimate_time: round.estimate_time
+          ? dayjs(round.estimate_time)
+          : undefined,
       });
       setShowCreate(true);
     },
@@ -355,13 +392,17 @@ export default function RoundManagement() {
 
   const columns = useMemo(() => {
     const base = [
-      {
-        title: "Sắp xếp",
-        key: "drag-handle",
-        width: 50,
-        align: "center" as const,
-        render: () => null, // Renders the drag handle inside DraggableRow
-      },
+      ...(canManage
+        ? [
+            {
+              title: "Sắp xếp",
+              key: "drag-handle",
+              width: 50,
+              align: "center" as const,
+              render: () => null,
+            },
+          ]
+        : []),
       {
         title: "Thứ tự",
         width: 50,
@@ -371,11 +412,11 @@ export default function RoundManagement() {
       {
         title: "Tên chặng",
         dataIndex: "name",
-        width: 150,
+        width: 250,
         ellipsis: true,
         render: (val: string) => (
           <Tooltip title={val}>
-            <div className="truncate w-full" style={{ maxWidth: 130 }}>
+            <div className="truncate w-full" style={{ maxWidth: 230 }}>
               {val}
             </div>
           </Tooltip>
@@ -423,22 +464,28 @@ export default function RoundManagement() {
                 style={{ color: "#2563eb" }}
               />
             </Tooltip>
-            <Popconfirm
-              title="Xóa chặng này?"
-              description="Thao tác này không thể hoàn tác."
-              onConfirm={() => deleteRoundMutate(String(record.id))}
-              okText="Xóa"
-              cancelText="Hủy"
-            >
-              <Tooltip title="Xóa">
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  loading={deleteStatus === "pending"}
-                />
+            {record.sequence === 1 ? (
+              <Tooltip title="Không thể xóa chặng đầu tiên">
+                <Button type="text" disabled icon={<DeleteOutlined />} />
               </Tooltip>
-            </Popconfirm>
+            ) : (
+              <Popconfirm
+                title="Xóa chặng này?"
+                description="Thao tác này không thể hoàn tác."
+                onConfirm={() => deleteRoundMutate(String(record.id))}
+                okText="Xóa"
+                cancelText="Hủy"
+              >
+                <Tooltip title="Xóa">
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={deleteStatus === "pending"}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
           </Space>
         ),
       },
@@ -607,32 +654,34 @@ export default function RoundManagement() {
               items={localRounds.map((i) => i.id)}
               strategy={verticalListSortingStrategy}
             >
-              <Table
-                components={{ body: { row: DraggableRow } }}
-                size="small"
-                rowKey="id"
-                rowSelection={
-                  isSelectionMode
-                    ? {
-                        selectedRowKeys,
-                        onChange: (newSelectedRowKeys) =>
-                          setSelectedRowKeys(newSelectedRowKeys),
-                      }
-                    : undefined
-                }
-                dataSource={localRounds}
-                loading={isLoading}
-                pagination={false}
-                scroll={{ x: "max-content" }}
-                columns={columns}
-                locale={{
-                  emptyText: isLoading ? (
-                    <span>Đang tải...</span>
-                  ) : (
-                    <Empty description="Chưa có dữ liệu" />
-                  ),
-                }}
-              />
+              <RoundContext.Provider value={localRounds}>
+                <Table
+                  components={{ body: { row: DraggableRow } }}
+                  size="small"
+                  rowKey="id"
+                  rowSelection={
+                    isSelectionMode
+                      ? {
+                          selectedRowKeys,
+                          onChange: (newSelectedRowKeys) =>
+                            setSelectedRowKeys(newSelectedRowKeys),
+                        }
+                      : undefined
+                  }
+                  dataSource={localRounds}
+                  loading={isLoading}
+                  pagination={false}
+                  scroll={{ x: "max-content" }}
+                  columns={columns}
+                  locale={{
+                    emptyText: isLoading ? (
+                      <span>Đang tải...</span>
+                    ) : (
+                      <Empty description="Chưa có dữ liệu" />
+                    ),
+                  }}
+                />
+              </RoundContext.Provider>
             </SortableContext>
           </DndContext>
         </Card>

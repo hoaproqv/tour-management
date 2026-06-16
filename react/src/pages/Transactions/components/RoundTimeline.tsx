@@ -1,6 +1,6 @@
 import React from "react";
 
-import { FlagOutlined } from "@ant-design/icons";
+import { CheckCircleFilled } from "@ant-design/icons";
 import { Typography } from "antd";
 
 import type { RoundVisualStatus } from "./types";
@@ -20,76 +20,143 @@ interface RoundTimelineProps {
   onSelect: (_id: string) => void;
 }
 
-const styles: Record<RoundVisualStatus, { color: string; bg: string; connector: string; label: string }> = {
-  past: { color: "#6b7280", bg: "#e5e7eb", connector: "#9ca3af", label: "Đã đi" },
-  current: { color: "#16a34a", bg: "#dcfce7", connector: "#16a34a", label: "Đang đến" },
-  upcoming: { color: "#0ea5e9", bg: "#e0f2fe", connector: "#0ea5e9", label: "Chưa đến" },
+const styles: Record<
+  RoundVisualStatus,
+  { 
+    color: string; 
+    bg: string; 
+    pillBg: string;
+    border: string; 
+    connector: string; 
+    label: string; 
+    glow: string;
+  }
+> = {
+  past: {
+    color: "#15803d",
+    bg: "#dcfce7",
+    pillBg: "#dcfce7",
+    border: "#22c55e",
+    connector: "#22c55e",
+    label: "Đã đi",
+    glow: "rgba(34, 197, 94, 0.3)",
+  },
+  current: {
+    color: "#1d4ed8",
+    bg: "#dbeafe",
+    pillBg: "#dbeafe",
+    border: "#3b82f6",
+    connector: "#e2e8f0",
+    label: "Đang đến",
+    glow: "rgba(59, 130, 246, 0.3)",
+  },
+  upcoming: {
+    color: "#64748b",
+    bg: "#ffffff",
+    pillBg: "#f1f5f9",
+    border: "#cbd5e1",
+    connector: "#e2e8f0",
+    label: "Chưa đến",
+    glow: "rgba(100, 116, 139, 0.2)",
+  },
 };
 
 export function RoundTimeline({ items, onSelect }: RoundTimelineProps) {
   if (!items.length) return null;
 
-  return (
-    <div className="mt-4 bg-slate-50 border border-slate-100 rounded-xl p-4">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <Text strong>Tiến trình round</Text>
-        <Text type="secondary">Chọn checkpoint để xem và điểm danh</Text>
-      </div>
-      <div className="overflow-x-auto pb-2">
-        <div className="flex items-center min-w-max">
-          {items.map((item, index) => {
-            const meta = styles[item.status];
-            const leftColor = index > 0
-              ? (items[index].status === "current" ? styles.current.connector : styles[items[index].status].connector)
-              : "transparent";
-            const rightColor = index < items.length - 1
-              ? (items[index + 1].status === "current"
-                ? styles.current.connector
-                : styles[items[index + 1].status].connector)
-              : "transparent";
+  const getSegmentColor = (fromIndex: number) => {
+    if (fromIndex < 0 || fromIndex >= items.length - 1) return "transparent";
+    const fromStatus = items[fromIndex].status;
+    if (fromStatus === "past") return styles.past.connector;
+    return styles.upcoming.connector;
+  };
 
+  return (
+    <div className="mt-4 bg-slate-50 border border-slate-100 rounded-xl p-4 w-full">
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <Text strong>Tiến trình Chặng trong Chuyến đi</Text>
+        <Text type="secondary" className="hidden sm:inline">
+          Chọn Địa điểm để xem và điểm danh
+        </Text>
+      </div>
+      
+      <div className="w-full overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+        <div 
+          className="relative flex justify-between w-full px-4 pt-2 mx-auto"
+          style={{ minWidth: `${Math.max(items.length * 140, 400)}px` }}
+        >
+          
+          {/* Connecting lines container */}
+          {items.length > 1 && (
+            <div 
+              className="absolute flex -translate-y-1/2" 
+              style={{ 
+                top: '38px', // pt-2 (8px) + half of h-[60px] (30px)
+                left: 'calc(1rem + 4.5rem)', // px-4 is 1rem, w-36 is 9rem -> half is 4.5rem
+                right: 'calc(1rem + 4.5rem)'
+              }}
+            >
+              {items.slice(0, -1).map((_, i) => (
+                <div 
+                  key={i} 
+                  className="flex-1 h-[3px] transition-colors duration-300" 
+                  style={{ backgroundColor: getSegmentColor(i) }} 
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Nodes */}
+          {items.map((item) => {
+            const meta = styles[item.status];
+            
             return (
               <button
                 key={item.id}
                 onClick={() => onSelect(item.id)}
-                className="flex flex-col items-center min-w-[160px] focus:outline-none"
+                className="relative z-10 flex flex-col items-center group focus:outline-none w-36"
                 aria-pressed={item.isActive}
               >
-                <div className="flex items-center w-full h-[60px]">
-                  {index > 0 ? (
-                    <div className="h-[3px] flex-1" style={{ backgroundColor: leftColor }} />
-                  ) : (
-                    <div className="h-[3px] flex-1 opacity-0" />
-                  )}
+                <div className="flex items-center justify-center w-full h-[60px]">
                   <div
-                    className={`relative w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-transform ${
-                      item.isActive ? "scale-[1.05]" : ""
+                    className={`relative w-10 h-10 shrink-0 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${
+                      item.isActive ? "scale-110" : "group-hover:scale-105"
                     }`}
                     style={{
                       backgroundColor: meta.bg,
                       color: meta.color,
-                      border: `2px solid ${meta.color}`,
+                      border: `2px solid ${meta.border}`,
                       boxShadow: item.isActive
-                        ? "0 0 0 4px rgba(239,68,68,0.4)"
+                        ? `0 0 0 4px ${meta.glow}`
                         : "0 0 0 0 rgba(0,0,0,0)",
                     }}
                   >
                     {item.status === "past" && (
-                      <FlagOutlined
-                        style={{ position: "absolute", top: -10, right: -12, color: meta.color }}
-                      />
+                      <div className="absolute -top-1 -right-1 bg-white rounded-full leading-none border border-green-500 shadow-sm p-[1px]">
+                        <CheckCircleFilled style={{ color: "#22c55e", fontSize: "14px" }} />
+                      </div>
                     )}
-                    <span className="text-sm font-bold leading-none">{item.number}</span>
+                    <span className="text-sm font-bold leading-none">
+                      {item.number}
+                    </span>
                   </div>
-                  {index < items.length - 1 ? (
-                    <div className="h-[3px] flex-1" style={{ backgroundColor: rightColor }} />
-                  ) : (
-                    <div className="h-[3px] flex-1 opacity-0" />
-                  )}
                 </div>
-                <div className="mt-2 text-center">
-                  <div className="text-sm font-semibold text-slate-900 leading-tight">{item.label}</div>
-                  <div className="text-xs" style={{ color: meta.color }}>{meta.label}</div>
+
+                <div className="mt-1 text-center px-2 w-full flex flex-col items-center">
+                  <div className="w-full h-auto min-h-[36px] flex justify-center">
+                    <div
+                      className="text-sm font-semibold text-slate-800 leading-snug break-words line-clamp-2"
+                      title={item.label}
+                    >
+                      {item.label}
+                    </div>
+                  </div>
+                  <div
+                    className="text-xs mt-1.5 font-medium px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: meta.pillBg, color: meta.color }}
+                  >
+                    {meta.label}
+                  </div>
                 </div>
               </button>
             );

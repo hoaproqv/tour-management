@@ -212,7 +212,10 @@ export default function RoundFormModal({
             { required: activeTab === "manual", message: "Nhập tên chặng" },
           ]}
         >
-          <Input placeholder="Ví dụ: Tập huấn tại Cam Ranh" />
+          <Input 
+            placeholder="Ví dụ: Tập huấn tại Cam Ranh" 
+            disabled={editingRound?.sequence === 1}
+          />
         </Form.Item>
       </Col>
       <Col span={12}>

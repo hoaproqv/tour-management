@@ -4,3 +4,6 @@ from django.apps import AppConfig
 class RoundsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "rounds"
+
+    def ready(self):
+        import rounds.signals  # noqa

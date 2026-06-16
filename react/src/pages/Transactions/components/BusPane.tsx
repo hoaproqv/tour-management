@@ -5,20 +5,24 @@ import {
   ArrowUpOutlined,
   CheckCircleOutlined,
   LogoutOutlined,
-  SwapOutlined,
+  SearchOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
   Button,
   Card,
   Empty,
+  Input,
   Popconfirm,
   Space,
   Table,
   Tag,
   Typography,
+  Modal,
 } from "antd";
-import dayjs from "dayjs";
+
+import { removeAccents } from "../../../utils/helper";
 
 import type { PassengerRow } from "./types";
 import type { TransactionItem } from "../../../api/trips";
@@ -42,11 +46,6 @@ interface BusPaneProps {
   onCheckIn: (_passengerId: string, _roundBusId?: string) => void;
   onCheckOut: (_txn?: TransactionItem) => void;
   onCheckOutAll: (_checkedInRows: PassengerRow[]) => void;
-  onSwitchBus: (
-    _passengerId: string,
-    _txn: TransactionItem | undefined,
-    _roundBusId?: string,
-  ) => void;
   busy: boolean;
   /** Position of this round within the trip's ordered stops */
   roundPosition: "first" | "middle" | "last";
@@ -69,7 +68,6 @@ export function BusPane({
   onCheckIn,
   onCheckOut,
   onCheckOutAll,
-  onSwitchBus,
   busy,
   roundPosition,
   checkoutPhaseFinalized,
@@ -87,27 +85,61 @@ export function BusPane({
           ? "checkin"
           : "checkout";
 
-  const present = rows.filter((r) => r.status === "checkedInHere");
-  const others = rows.filter((r) => r.status !== "checkedInHere");
+  const [searchPresentInput, setSearchPresentInput] = React.useState("");
+  const [searchOthersInput, setSearchOthersInput] = React.useState("");
+  const [searchPresent, setSearchPresent] = React.useState("");
+  const [searchOthers, setSearchOthers] = React.useState("");
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setSearchPresent(searchPresentInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchPresentInput]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setSearchOthers(searchOthersInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchOthersInput]);
+
+  const filterRow = (r: PassengerRow, term: string) => {
+    if (!term) return true;
+    const t = removeAccents(term).trim().toLowerCase();
+    return (
+      removeAccents(r.passenger.name).toLowerCase().includes(t) ||
+      removeAccents(r.passenger.phone || "")
+        .toLowerCase()
+        .includes(t) ||
+      removeAccents(r.passenger.note || "")
+        .toLowerCase()
+        .includes(t) ||
+      removeAccents(r.passenger.extra_info || "")
+        .toLowerCase()
+        .includes(t)
+    );
+  };
+
+  const presentUnfiltered = rows.filter((r) => r.status === "checkedInHere");
+  const othersUnfiltered = rows.filter((r) => r.status !== "checkedInHere");
+
+  const present = presentUnfiltered.filter((r) => filterRow(r, searchPresent));
+  const others = othersUnfiltered.filter((r) => filterRow(r, searchOthers));
+
   const pendingRows = rows.filter(
-    (r) => r.isOwnedByBus && (r.status === "pending" || r.status === "checkedOut"),
+    (r) =>
+      r.isOwnedByBus && (r.status === "pending" || r.status === "checkedOut"),
   );
 
   /** Passengers still on the bus who need to check out (checkout phase) */
-  const stillOnBus = present.filter((r) => r.isOwnedByBus);
+  const stillOnBus = presentUnfiltered.filter((r) => r.isOwnedByBus);
 
   const renderActions = (row: PassengerRow) => {
-    if (readOnlyBus) {
-      return <Text type="secondary">Chỉ xem</Text>;
-    }
-    if (!roundBusId) {
+    if (!row.transaction && !row.isOwnedByBus) {
       return <Text type="secondary">Chưa cấu hình round-bus</Text>;
     }
     if (!row.isOwnedByBus) {
       return (
-        <Text type="secondary">
+        <Tag color="purple">
           Đã chuyển sang {row.transferTargetLabel || "xe khác"}
-        </Text>
+        </Tag>
       );
     }
     if (!canModifyAttendance) {
@@ -123,33 +155,35 @@ export function BusPane({
             icon={<ArrowDownOutlined />}
             onClick={() => onCheckOut(row.transaction)}
             loading={busy}
-            style={{ borderColor: "#f97316", color: "#f97316", background: "#fff7ed" }}
+            style={{
+              borderColor: "#f97316",
+              color: "#f97316",
+              background: "#fff7ed",
+            }}
           >
             Điểm danh xuống
           </Button>
         );
       }
       // Already checked out or not yet on bus — no action in this phase
-      return <Text type="secondary" className="text-xs">—</Text>;
+      return (
+        <Text type="secondary" className="text-xs">
+          —
+        </Text>
+      );
     }
 
     // ── Phase: check-in only (first round or checkin phase of middle round) ──
     if (row.status === "checkedInHere") {
       // Already on bus in checkin phase — show nothing useful
-      return <Text type="secondary" className="text-xs">Đã lên xe</Text>;
-    }
-    if (row.status === "checkedInElsewhere") {
       return (
-        <Button
-          size="small"
-          icon={<SwapOutlined />}
-          onClick={() => onSwitchBus(row.passenger.id, row.transaction, roundBusId)}
-          loading={busy}
-        >
-          Chuyển sang xe này
-        </Button>
+        <Text type="secondary" className="text-xs">
+          Đã lên xe
+        </Text>
       );
     }
+    // If checkedInElsewhere, just render the default check-in button
+    // as per the new logic requirement.
     return (
       <Button
         type="primary"
@@ -164,20 +198,50 @@ export function BusPane({
     );
   };
 
+  const showPassengerDetails = (passenger: any) => {
+    Modal.info({
+      title: "Thông tin hành khách",
+      content: (
+        <div className="mt-4 space-y-2">
+          <div>
+            <Text strong>Tên:</Text> {passenger.name}
+          </div>
+          <div>
+            <Text strong>Số điện thoại:</Text> {passenger.phone || "—"}
+          </div>
+          {passenger.extra_info && (
+            <div>
+              <Text strong>Thông tin thêm:</Text> {passenger.extra_info}
+            </div>
+          )}
+          <div>
+            <Text strong>Ghi chú:</Text> {passenger.note || <Text type="secondary" italic>Không có</Text>}
+          </div>
+        </div>
+      ),
+      okText: "Đóng",
+      maskClosable: true,
+    });
+  };
+
   const baseColumns = [
     {
       title: "Hành khách",
       dataIndex: "passenger",
       render: (_: unknown, row: PassengerRow) => (
         <div>
-          <div className="font-semibold text-slate-900">{row.passenger.name}</div>
-          <div className="text-xs text-slate-500">{row.passenger.phone || "—"}</div>
-          {row.passenger.extra_info ? (
-            <div className="text-xs text-sky-600">{row.passenger.extra_info}</div>
-          ) : null}
-          {row.passenger.note ? (
-            <div className="text-xs text-slate-500">{row.passenger.note}</div>
-          ) : null}
+          <div className="flex items-stretch justify-between min-h-[24px]">
+            <div className="font-semibold text-slate-900 text-sm flex items-center">
+              {row.passenger.name}
+            </div>
+            <Button
+              type="text"
+              icon={<EyeOutlined className="text-slate-500" />}
+              onClick={() => showPassengerDetails(row.passenger)}
+              title="Xem chi tiết"
+              className="flex items-center justify-center h-auto p-1"
+            />
+          </div>
         </div>
       ),
     },
@@ -187,13 +251,11 @@ export function BusPane({
       render: (_: unknown, row: PassengerRow) => (
         <Space direction="vertical" size={2}>
           {statusTag(row)}
-          {row.transaction ? (
-            <Text type="secondary" className="text-xs">
-              {row.transaction.check_out
-                ? `Xuống: ${dayjs(row.transaction.check_out).format("HH:mm:ss")}`
-                : `Lên: ${dayjs(row.transaction.check_in).format("HH:mm:ss")}`}
-            </Text>
-          ) : null}
+          {!row.isOwnedByBus && readOnlyBus && (
+            <div className="text-xs text-purple-600 mt-0.5">
+              Đã chuyển sang {row.transferTargetLabel || "xe khác"}
+            </div>
+          )}
         </Space>
       ),
     },
@@ -314,6 +376,10 @@ export function BusPane({
     );
   };
 
+  const presentCount = presentUnfiltered.length;
+  const othersCount = othersUnfiltered.filter((r) => r.isOwnedByBus).length;
+  const transferredAwayCount = othersUnfiltered.filter((r) => !r.isOwnedByBus).length;
+
   return (
     <div className="space-y-3">
       {/* Phase banner */}
@@ -322,8 +388,11 @@ export function BusPane({
       {/* Counts + action bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Space size="small" wrap>
-          <Tag color="green">Đang trên xe: {present.length}</Tag>
-          <Tag color="blue">Chưa/đã xuống: {others.length}</Tag>
+          <Tag color="green">Đang trên xe: {presentCount}</Tag>
+          <Tag color="blue">Chưa lên xe: {othersCount}</Tag>
+          {transferredAwayCount > 0 && (
+            <Tag color="purple">Đã sang xe khác: {transferredAwayCount}</Tag>
+          )}
           {busFinalized && <Tag color="green">Đã chốt</Tag>}
           {!busFinalized && blockReason && <Tag color="red">{blockReason}</Tag>}
         </Space>
@@ -351,28 +420,44 @@ export function BusPane({
       {/* Passenger tables — show based on phase */}
       <div className="grid md:grid-cols-2 gap-3">
         {/* Panel: Đang trên xe */}
-        {(phase === "checkin-only" || phase === "checkin" || phase === "checkout" || phase === "checkout-only") && (
+        {(phase === "checkin-only" ||
+          phase === "checkin" ||
+          phase === "checkout" ||
+          phase === "checkout-only") && (
           <Card
             title={
-              <span className="flex items-center gap-2">
-                <ArrowUpOutlined className="text-green-600" />
-                Đang trên xe
-              </span>
+              <div className="flex items-center gap-4 py-1">
+                <span className="flex items-center gap-2 font-medium whitespace-nowrap">
+                  <ArrowUpOutlined className="text-green-600" />
+                  Đang trên xe
+                </span>
+                <Input
+                  prefix={<SearchOutlined className="text-slate-400" />}
+                  placeholder="Tìm nhanh..."
+                  allowClear
+                  value={searchPresentInput}
+                  onChange={(e) => setSearchPresentInput(e.target.value)}
+                  size="small"
+                  className="font-normal w-32 sm:w-48"
+                />
+              </div>
             }
             size="small"
             styles={{ body: { padding: 0 } }}
             extra={
               !readOnlyBus &&
               canModifyAttendance &&
-              present.length > 0 &&
+              presentUnfiltered.length > 0 &&
               (phase === "checkout" || phase === "checkout-only") ? (
                 <Popconfirm
-                  title={`Điểm danh xuống ${present.length} hành khách?`}
+                  title={`Điểm danh xuống ${presentUnfiltered.length} hành khách?`}
                   description="Tất cả hành khách đang trên xe sẽ được điểm danh xuống."
                   okText="Xuống tất cả"
                   cancelText="Hủy"
-                  okButtonProps={{ style: { background: "#f97316", borderColor: "#f97316" } }}
-                  onConfirm={() => onCheckOutAll(present)}
+                  okButtonProps={{
+                    style: { background: "#f97316", borderColor: "#f97316" },
+                  }}
+                  onConfirm={() => onCheckOutAll(presentUnfiltered)}
                 >
                   <Button
                     size="small"
@@ -386,11 +471,19 @@ export function BusPane({
               ) : null
             }
           >
-            <Table scroll={{ x: "max-content" }}
+            <Table
+              scroll={{ x: "max-content" }}
               size="small"
               rowKey="key"
               dataSource={present}
               columns={columns}
+              rowClassName={(record) => {
+                if (record.transferredHere)
+                  return "bg-pink-50 border-l-4 border-pink-400";
+                if (record.transferredAway)
+                  return "bg-purple-50 border-l-4 border-purple-400 opacity-80";
+                return "";
+              }}
               pagination={false}
               loading={loading}
               locale={{ emptyText: <Empty description="Chưa có ai trên xe" /> }}
@@ -401,21 +494,38 @@ export function BusPane({
         {/* Panel: Chưa điểm danh / đã xuống / xe khác */}
         <Card
           title={
-            <span className="flex items-center gap-2">
-              <ArrowDownOutlined className="text-blue-500" />
-              {phase === "checkout" || phase === "checkout-only"
-                ? "Đã xuống / chưa lên"
-                : "Chưa điểm danh / đã xuống / đang ở xe khác"}
-            </span>
+            <div className="flex items-center gap-4 py-1">
+              <span className="flex items-center gap-2 font-medium whitespace-nowrap">
+                <ArrowDownOutlined className="text-blue-500" />
+                Chưa lên xe
+              </span>
+              <Input
+                prefix={<SearchOutlined className="text-slate-400" />}
+                placeholder="Tìm nhanh..."
+                allowClear
+                value={searchOthersInput}
+                onChange={(e) => setSearchOthersInput(e.target.value)}
+                size="small"
+                className="font-normal w-32 sm:w-48"
+              />
+            </div>
           }
           size="small"
           styles={{ body: { padding: 0 } }}
         >
-          <Table scroll={{ x: "max-content" }}
+          <Table
+            scroll={{ x: "max-content" }}
             size="small"
             rowKey="key"
             dataSource={others}
             columns={columns}
+            rowClassName={(record) => {
+              if (record.transferredHere)
+                return "bg-pink-50 border-l-4 border-pink-400";
+              if (record.transferredAway)
+                return "bg-purple-50 border-l-4 border-purple-400 opacity-80";
+              return "";
+            }}
             pagination={false}
             loading={loading}
             locale={{

@@ -236,6 +236,9 @@ export const createTrip = async (payload: TripPayload) =>
 export const updateTrip = async (id: string, payload: TripPayload) =>
   putData(`/trips/${id}/`, payload);
 
+export const updateTripPartial = async (id: string, payload: Partial<TripPayload>) =>
+  patchData(`/trips/${id}/`, payload);
+
 export const deleteTrip = async (id: string) => deleteData(`/trips/${id}/`);
 
 export const bulkDeleteTrips = async (ids: (string | number)[]) =>
@@ -400,6 +403,22 @@ export const getPassengerTransfers = async (
   }
   return [];
 };
+
+export const switchBus = async (payload: {
+  passenger_id: string;
+  from_txn_id?: number | string | null;
+  target_round_bus_id: string | number;
+  target_trip_bus_id: string | number;
+  from_trip_bus_id?: string | number | null;
+  trip_id: string;
+}) => postData("/transactions/switch-bus/", payload);
+
+export const undoTransfer = async (payload: {
+  passenger_id: string;
+  round_id: string;
+  trip_id: string;
+}) => postData("/transactions/undo-transfer/", payload);
+
 
 export const upsertPassengerTransfer = async (
   payload: PassengerTransferPayload,

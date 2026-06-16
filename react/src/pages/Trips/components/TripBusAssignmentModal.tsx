@@ -1,9 +1,8 @@
 import React from "react";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Modal, Empty, Spin, Select, message } from "antd";
+import { Modal, Empty, Spin } from "antd";
 
-import { updateTripBus, type BusItem, type TripBus } from "../../../api/trips";
+import { type BusItem } from "../../../api/trips";
 
 import type { EnrichedTrip } from "./types";
 import type { IUser } from "../../../utils/types";
@@ -27,48 +26,7 @@ export default function TripBusAssignmentModal({
   drivers,
   fleetLeads,
 }: TripBusAssignmentModalProps) {
-  const queryClient = useQueryClient();
   const tripBuses = trip?.buses || [];
-
-  const mutation = useMutation({
-    mutationFn: (data: { id: string; payload: Partial<TripBus> }) =>
-      updateTripBus(data.id, data.payload),
-    onSuccess: async () => {
-      message.success("Cập nhật thành công");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["trips"] }),
-        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
-      ]);
-    },
-    onError: (error: any) => {
-      const msg =
-        error?.response?.data?.manager?.[0] ||
-        error?.response?.data?.driver?.[0] ||
-        "Cập nhật thất bại";
-      message.error(msg);
-    },
-  });
-
-  const getAssignedBusStr = (
-    userId: string,
-    currentTbId: string,
-    type: "manager" | "driver",
-  ) => {
-    const assignedTb = tripBuses.find(
-      (tb) => String(tb[type]) === userId && tb.id !== currentTbId,
-    );
-    if (!assignedTb) return null;
-    const b = buses.find((b) => b.id === assignedTb.bus);
-    return b ? b.registration_number || b.bus_code : "Xe khác";
-  };
-
-  const filteredFleetLeads = trip?.tenant
-    ? fleetLeads.filter((m) => String(m.tenant) === String(trip.tenant))
-    : fleetLeads;
-
-  const filteredDrivers = trip?.tenant
-    ? drivers.filter((d) => String(d.tenant) === String(trip.tenant))
-    : drivers;
 
   return (
     <Modal
@@ -103,86 +61,53 @@ export default function TripBusAssignmentModal({
               >
                 {tripBuses.map((tb, index) => {
                   const busObj = buses.find((b) => b.id === tb.bus);
+                  const managerUser = fleetLeads.find(
+                    (m) => String(m.id) === String(tb.manager),
+                  );
+                  const driverUser = drivers.find(
+                    (d) => String(d.id) === String(tb.driver),
+                  );
 
                   return (
                     <div
                       key={tb.id || index}
-                      className="p-4 border border-slate-200 rounded-lg bg-slate-50 flex flex-col md:flex-row gap-4"
+                      className="px-4 py-3 border border-slate-200 rounded-lg bg-slate-50 flex flex-col md:flex-row md:items-center gap-4"
                     >
                       {/* Bus info */}
                       <div className="flex-1 border-b md:border-b-0 md:border-r border-slate-200 pb-3 md:pb-0 md:pr-4">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
                           Xe {index + 1}
                         </div>
-                        <div className="font-bold text-slate-800 text-lg">
-                          {busObj?.registration_number ||
-                            busObj?.bus_code ||
-                            `Xe ${index + 1}`}
+                        <div className="font-bold text-slate-800 text-lg leading-tight">
+                          {busObj?.registration_number || `Xe ${index + 1}`}
                         </div>
+                        {busObj?.bus_code && (
+                          <div className="text-sm text-slate-500 mt-0.5">
+                            Mã xe: {busObj.bus_code}
+                          </div>
+                        )}
                       </div>
 
                       {/* Staff info */}
                       <div className="flex-[2] grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Manager */}
                         <div>
-                          <div className="text-xs font-semibold text-slate-500 mb-1">
+                          <div className="text-[11px] font-semibold text-slate-500 mb-0.5 uppercase tracking-wider">
                             Trưởng xe
                           </div>
-                          <Select
-                            value={tb.manager || undefined}
-                            className="w-full"
-                            placeholder="Chọn trưởng xe"
-                            loading={mutation.status === "pending"}
-                            onChange={(val) =>
-                              mutation.mutate({
-                                id: tb.id,
-                                payload: { manager: val },
-                              })
-                            }
-                            options={filteredFleetLeads.map((m) => {
-                              const assignedBus = getAssignedBusStr(
-                                String(m.id),
-                                tb.id,
-                                "manager",
-                              );
-                              return {
-                                value: m.id,
-                                label: `${m.name} ${m.phone ? `- ${m.phone}` : ""}${assignedBus ? ` (Đã gán ở ${assignedBus})` : ""}`,
-                                disabled: !!assignedBus,
-                              };
-                            })}
-                          />
+                          <div className="text-[15px] font-medium text-slate-800">
+                            {managerUser ? managerUser.name : "—"}
+                          </div>
                         </div>
 
                         {/* Driver */}
                         <div>
-                          <div className="text-xs font-semibold text-slate-500 mb-1">
+                          <div className="text-[11px] font-semibold text-slate-500 mb-0.5 uppercase tracking-wider">
                             Lái xe
                           </div>
-                          <Select
-                            value={tb.driver || undefined}
-                            className="w-full"
-                            placeholder="Chọn lái xe"
-                            loading={mutation.status === "pending"}
-                            onChange={(val) =>
-                              mutation.mutate({
-                                id: tb.id,
-                                payload: { driver: val },
-                              })
-                            }
-                            options={filteredDrivers.map((d) => {
-                              const assignedBus = getAssignedBusStr(
-                                String(d.id),
-                                tb.id,
-                                "driver",
-                              );
-                              return {
-                                value: d.id,
-                                label: `${d.name} ${d.phone ? `- ${d.phone}` : ""}${assignedBus ? ` (Đã gán ở ${assignedBus})` : ""}`,
-                                disabled: !!assignedBus,
-                              };
-                            })}
-                          />
+                          <div className="text-[15px] font-medium text-slate-800">
+                            {driverUser ? driverUser.name : "—"}
+                          </div>
                         </div>
                       </div>
                     </div>

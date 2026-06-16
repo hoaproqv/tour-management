@@ -19,4 +19,5 @@ export interface PassengerRow {
   transferredAway: boolean;
   transferredHere: boolean;
   transferTargetLabel?: string;
+  availableForCrossCheck: boolean;
 }

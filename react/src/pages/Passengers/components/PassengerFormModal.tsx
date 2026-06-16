@@ -7,6 +7,7 @@ import { Form, Input, Modal, Button, Typography, Select } from "antd";
 import {
   downloadPassengerTemplate,
   getTripBuses,
+  getPassengers,
   type Passenger,
   type Trip,
 } from "../../../api/trips";
@@ -52,6 +53,22 @@ export default function PassengerFormModal({
   });
 
   const tripBuses = Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [];
+
+  const { data: passengersResponse } = useQuery({
+    queryKey: ["passengers", { trip: selectedTripId }],
+    queryFn: () => getPassengers({ trip: selectedTripId, page: 1, limit: 1000 }),
+    enabled: open && Boolean(selectedTripId),
+  });
+
+  const passengers = Array.isArray(passengersResponse?.data) ? passengersResponse.data : [];
+
+  const getBusPassengerCount = (busId: string) => {
+    return passengers.filter((p: Passenger) => {
+      // Handle Passenger or PassengerAssignment model structure
+      const assignedBus = (p as any).assigned_trip_bus;
+      return String(assignedBus) === String(busId);
+    }).length;
+  };
 
   const handleDownloadTemplate = async () => {
     try {
@@ -138,10 +155,16 @@ export default function PassengerFormModal({
                 placeholder="Chọn xe"
                 allowClear
                 disabled={!selectedTripId}
-                options={tripBuses.map((tb) => ({
-                  value: String(tb.id),
-                  label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${tb.capacity || 0} chỗ)`,
-                }))}
+                options={tripBuses.map((tb) => {
+                  const currentCount = getBusPassengerCount(String(tb.id));
+                  const isFull = currentCount >= (tb.capacity || 0);
+                  
+                  return {
+                    value: String(tb.id),
+                    label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${currentCount}/${tb.capacity || 0} chỗ)${isFull ? ' - Đã đầy' : ''}`,
+                    disabled: isFull,
+                  };
+                })}
               />
             </Form.Item>
           </div>

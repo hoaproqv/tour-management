@@ -10,7 +10,11 @@ from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 
-from core.permissions import IsAdminOrTourManagerOrReadOnly, TenantScopedMixin
+from core.permissions import (
+    IsAdminOrTourManagerOrReadOnly,
+    IsAdminOrTourManagerOrFleetLeadOrReadOnly,
+    TenantScopedMixin,
+)
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -195,7 +199,7 @@ class PassengerDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIVi
 
 class PassengerTransferListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     serializer_class = PassengerTransferSerializer
-    permission_classes = [IsAdminOrTourManagerOrReadOnly]
+    permission_classes = [IsAdminOrTourManagerOrFleetLeadOrReadOnly]
     pagination_class = None
 
     def get_queryset(self):
@@ -245,7 +249,7 @@ class PassengerTransferListCreateView(TenantScopedMixin, generics.ListCreateAPIV
 
 class PassengerTransferDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PassengerTransferSerializer
-    permission_classes = [IsAdminOrTourManagerOrReadOnly]
+    permission_classes = [IsAdminOrTourManagerOrFleetLeadOrReadOnly]
 
     def get_queryset(self):
         qs = PassengerTransfer.objects.select_related(

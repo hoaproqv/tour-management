@@ -44,7 +44,8 @@ class TripListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
 
 class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TripSerializer
-    permission_classes = [IsAdminOrTourManagerOrReadOnly]
+    from core.permissions import IsAdminOrTourManagerOrFleetLeadOrReadOnly
+    permission_classes = [IsAdminOrTourManagerOrFleetLeadOrReadOnly]
 
     def get_queryset(self):
         qs = Trip.objects.select_related("tenant").prefetch_related(
@@ -69,6 +70,15 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Trips"],
     )
     def put(self, request, *args, **kwargs):
+        from core.permissions import get_role_name
+        from rest_framework.exceptions import PermissionDenied
+        role = get_role_name(request.user)
+        if role == "fleet_lead":
+            raise PermissionDenied("Trưởng xe không có quyền cập nhật toàn bộ chuyến đi.")
+            
+        if request.data.get("status") == "doing" and role != "fleet_lead":
+            raise PermissionDenied("Chỉ Trưởng xe mới có quyền khởi hành chuyến đi.")
+            
         return super().put(request, *args, **kwargs)
 
     @extend_schema(
@@ -79,6 +89,20 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Trips"],
     )
     def patch(self, request, *args, **kwargs):
+        from core.permissions import get_role_name
+        from rest_framework.exceptions import PermissionDenied
+        role = get_role_name(request.user)
+        
+        # If user is fleet_lead, they can ONLY update 'status'
+        if role == "fleet_lead":
+            allowed_keys = {"status"}
+            if set(request.data.keys()) - allowed_keys:
+                raise PermissionDenied("Trưởng xe chỉ có quyền cập nhật trạng thái chuyến đi.")
+                
+        # If trying to start the trip, ONLY fleet_lead is allowed
+        if request.data.get("status") == "doing" and role != "fleet_lead":
+            raise PermissionDenied("Chỉ Trưởng xe mới có quyền khởi hành chuyến đi.")
+
         return super().patch(request, *args, **kwargs)
 
     @extend_schema(

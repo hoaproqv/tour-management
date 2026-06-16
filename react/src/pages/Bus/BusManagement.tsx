@@ -129,7 +129,10 @@ export default function BusManagement() {
       message.success("Tạo xe thành công");
       setShowCreate(false);
       form.resetFields();
-      await queryClient.invalidateQueries({ queryKey: ["trip-buses"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses-validation"] }),
+      ]);
     },
     onError: (err: any) =>
       message.error(
@@ -148,7 +151,10 @@ export default function BusManagement() {
       setEditingBus(null);
       setShowCreate(false);
       form.resetFields();
-      await queryClient.invalidateQueries({ queryKey: ["trip-buses"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses-validation"] }),
+      ]);
     },
     onError: (err: any) =>
       message.error(
@@ -163,7 +169,10 @@ export default function BusManagement() {
     mutationFn: (id: string) => deleteTripBus(id),
     onSuccess: async () => {
       message.success("Xóa xe thành công");
-      await queryClient.invalidateQueries({ queryKey: ["trip-buses"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+        queryClient.invalidateQueries({ queryKey: ["trip-buses-validation"] }),
+      ]);
     },
     onError: () => message.error("Xóa xe thất bại"),
   });
@@ -193,8 +202,8 @@ export default function BusManagement() {
         bus_code: bus.bus_code,
         capacity: bus.capacity,
         description: bus.description,
-        manager: String(bus.manager),
-        driver: String(bus.driver),
+        manager: bus.manager && String(bus.manager) !== "null" ? String(bus.manager) : undefined,
+        driver: bus.driver && String(bus.driver) !== "null" ? String(bus.driver) : undefined,
       });
       setShowCreate(true);
     },
@@ -432,9 +441,10 @@ export default function BusManagement() {
                               );
                               setSelectedRowKeys([]);
                               setIsSelectionMode(false);
-                              await queryClient.invalidateQueries({
-                                queryKey: ["trip-buses"],
-                              });
+                              await Promise.all([
+                                queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+                                queryClient.invalidateQueries({ queryKey: ["trip-buses-validation"] }),
+                              ]);
                             } catch {
                               message.error("Lỗi khi xóa xe");
                             } finally {

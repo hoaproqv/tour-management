@@ -370,6 +370,11 @@ export default function AssignPassengerBusModal({
 
                     const selectedLabel = selectedTripBus ? tripBusLabelMap.get(selectedTripBus.id) : '';
 
+                    const isSelectedBusFull =
+                      selectedTripBus &&
+                      (assignedCounts.get(selectedTripBus.id) || 0) >=
+                        (selectedTripBus.capacity || 0);
+
                     return (
                       <List.Item className="!p-0 !mb-1.5 border border-slate-100 rounded-md overflow-hidden">
                         <div className="flex flex-col w-full">
@@ -397,14 +402,16 @@ export default function AssignPassengerBusModal({
                               ghost
                               size="small"
                               className="text-[11px] h-[22px] px-2 py-0"
-                              icon={!isInSelected && <SwapRightOutlined className="text-[10px]" />}
-                              disabled={!selectedTripBus || isInSelected || undefined}
+                              icon={!isInSelected && !isSelectedBusFull && <SwapRightOutlined className="text-[10px]" />}
+                              disabled={!selectedTripBus || isInSelected || isSelectedBusFull || undefined}
                               onClick={() => handleAssign(p, selectedTripBus)}
                               loading={assignMutation.isPending}
                             >
                               {isInSelected
                                 ? "Đã ở xe này"
-                                : `Gán vào ${selectedLabel || 'xe'}`}
+                                : isSelectedBusFull
+                                  ? "Xe đã đầy"
+                                  : `Gán vào ${selectedLabel || 'xe'}`}
                             </Button>
                           </div>
                         </div>
