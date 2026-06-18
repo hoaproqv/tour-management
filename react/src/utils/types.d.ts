@@ -157,6 +157,9 @@ export interface IUser {
   is_available?: boolean;
   created_at?: string;
   updated_at?: string;
+  receive_in_app_notifications?: boolean;
+  receive_device_notifications?: boolean;
+  receive_email_notifications?: boolean;
 }
 
 export interface IRoleItem {

@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { DeleteOutlined, FileExcelOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  FileExcelOutlined,
+  EditOutlined,
+} from "@ant-design/icons";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button, Card, Form, Input, Select, Typography, Tabs } from "antd";
 import dayjs from "dayjs";
@@ -9,7 +13,6 @@ import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
 import { canManageCatalog, removeAccents } from "../../utils/helper";
-
 
 import RoundFormModal, {
   type RoundFormValues,
@@ -397,9 +400,7 @@ export default function RoundManagement() {
             />
             {canManage && isEditingAll && (
               <div className="flex gap-2">
-                <Button onClick={handleCancelEditRounds}>
-                  Hủy
-                </Button>
+                <Button onClick={handleCancelEditRounds}>Hủy</Button>
                 <Button type="primary" onClick={handleLockRounds}>
                   Chốt chặng
                 </Button>
@@ -496,7 +497,9 @@ export default function RoundManagement() {
         form={form}
         trips={trips}
         editingRound={editingRound}
-        tripFilter={tripFilter && tripFilter !== "all" ? String(tripFilter) : undefined}
+        tripFilter={
+          tripFilter && tripFilter !== "all" ? String(tripFilter) : undefined
+        }
       />
     </div>
   );

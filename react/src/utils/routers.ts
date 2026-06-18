@@ -2,6 +2,8 @@ export const ROUTES = {
   DASHBOARD: "/",
   LOGIN: "/view/login",
   REGISTER: "/view/register",
+  FORGOT_PASSWORD: "/view/forgot-password",
+  RESET_PASSWORD: "/view/reset-password",
   TRIP: "/view/trip",
   ROUND: "/view/round",
   BUS: "/view/bus",
@@ -12,5 +14,6 @@ export const ROUTES = {
   PROFILE: "/view/profile",
   GUIDE: "/view/guide",
   NOTIFICATIONS: "/view/notifications",
+  SETTINGS: "/view/settings",
   NOT_FOUND: "*",
 };

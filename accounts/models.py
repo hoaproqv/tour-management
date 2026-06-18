@@ -108,6 +108,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
+    # Notification preferences
+    receive_in_app_notifications = models.BooleanField(default=True)
+    receive_device_notifications = models.BooleanField(default=True)
+    receive_email_notifications = models.BooleanField(default=False)
+
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS: list[str] = ["email", "name"]
 

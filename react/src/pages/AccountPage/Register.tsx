@@ -1,9 +1,15 @@
 import React, { useEffect } from "react";
 
-import { LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
-import { Button, Card, Form, Input } from "antd";
+import {
+  ArrowRightOutlined,
+  LockOutlined,
+  MailOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
+import { Button, Form, Input } from "antd";
 import { Link } from "react-router-dom";
 
+import { LogoIcon } from "../../components/LogoIcon";
 import { useRegister } from "../../hooks/useAuth";
 import { ROUTES } from "../../utils/routers";
 
@@ -34,130 +40,159 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-600 via-cyan-500 to-sky-700 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white/90 backdrop-blur rounded-2xl shadow-2xl overflow-hidden">
-        <div className="hidden md:flex flex-col justify-between bg-[rgba(28,100,242,0.12)] p-10 border-r border-white/40">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-sky-700 font-semibold">
-              Quản lý Chuyến đi
-            </p>
-            <h1 className="text-3xl font-bold text-slate-900 mt-4 leading-tight">
-              Tạo tài khoản mới
+    <div className="min-h-screen relative overflow-hidden bg-slate-900 flex items-center justify-center p-4 sm:p-8">
+      {/* Dynamic Background Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-60 animate-blob"></div>
+      <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-cyan-400 rounded-full mix-blend-multiply filter blur-[128px] opacity-60 animate-blob animation-delay-2000"></div>
+      <div className="absolute bottom-[-20%] left-[20%] w-[40rem] h-[40rem] bg-indigo-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-60 animate-blob animation-delay-4000"></div>
+
+      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 rounded-3xl overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] bg-white/5 border border-white/10 backdrop-blur-xl">
+        {/* Left Side: Branding & Info */}
+        <div className="hidden lg:flex flex-col justify-between p-12 text-white bg-gradient-to-br from-white/10 to-transparent border-r border-white/10 relative">
+          <div className="absolute inset-0 bg-blue-500/10 mix-blend-overlay"></div>
+          <div className="relative z-10">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 border border-white/20 backdrop-blur-md mb-8 shadow-lg">
+              <LogoIcon className="w-8 h-8 drop-shadow-md" />
+            </div>
+            <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-4">
+              Quản lý <br />{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+                Chuyến đi
+              </span>{" "}
+              của bạn.
             </h1>
-            <p className="mt-4 text-slate-600">
-              Tham gia hệ thống để quản lý chuyến, vòng và hành khách dễ dàng
-              hơn.
+            <p className="text-blue-100 text-lg max-w-sm mt-6 font-light leading-relaxed">
+              Tạo tài khoản mới để bắt đầu hệ thống vận hành thông minh giúp bạn
+              quản lý chuyến đi, điều phối tài xế tối ưu.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
-              <p className="text-xs text-slate-500">Bảo mật</p>
-              <p className="text-lg font-semibold text-slate-900">JWT Access</p>
+
+          <div className="relative z-10 grid grid-cols-2 gap-4 mt-12">
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors duration-300 cursor-pointer group">
+              <p className="text-xs text-blue-200 uppercase tracking-wider mb-1 font-semibold">
+                Điều phối
+              </p>
+              <p className="text-lg font-bold text-white group-hover:text-cyan-300 transition-colors">
+                Quản lý xe linh hoạt
+              </p>
             </div>
-            <div className="p-4 bg-white rounded-xl shadow-sm border border-slate-100">
-              <p className="text-xs text-slate-500">Trải nghiệm</p>
-              <p className="text-lg font-semibold text-slate-900">
-                UI thân thiện
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors duration-300 cursor-pointer group">
+              <p className="text-xs text-blue-200 uppercase tracking-wider mb-1 font-semibold">
+                Thống kê
+              </p>
+              <p className="text-lg font-bold text-white group-hover:text-cyan-300 transition-colors">
+                Báo cáo trực quan
               </p>
             </div>
           </div>
         </div>
 
-        <div className="p-8 md:p-10">
+        {/* Right Side: Register Form */}
+        <div className="p-8 sm:p-12 lg:px-12 lg:py-8 flex flex-col justify-center relative bg-white/95">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">Đăng ký</h2>
-            <p className="text-slate-500 mt-2">
-              Điền thông tin để tạo tài khoản mới.
+            <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
+              Đăng ký
+            </h2>
+            <p className="text-slate-500 mt-2 font-medium">
+              Vui lòng điền thông tin để tạo tài khoản mới.
             </p>
           </div>
 
-          <Card className="shadow-sm border border-slate-100">
-            <Form
-              form={form}
-              name="register"
-              onFinish={handleSubmit}
-              size="large"
-              layout="vertical"
-              requiredMark={false}
-              initialValues={{
-                username: "",
-                name: "",
-                email: "",
-                password: "",
-              }}
+          <Form
+            form={form}
+            name="register"
+            onFinish={handleSubmit}
+            size="large"
+            layout="vertical"
+            requiredMark={false}
+            validateTrigger="onChange"
+            initialValues={{
+              username: "",
+              name: "",
+              email: "",
+              password: "",
+            }}
+            className="register-form"
+          >
+            <Form.Item
+              label={
+                <span className="text-slate-700 font-semibold">
+                  Tên hiển thị
+                </span>
+              }
+              name="name"
+              rules={[
+                { required: true, message: "Vui lòng nhập tên hiển thị" },
+              ]}
             >
-              <Form.Item
-                label={
-                  <span className="text-slate-800 font-medium">
-                    Tên hiển thị
-                  </span>
-                }
-                name="name"
-                rules={[
-                  { required: true, message: "Vui lòng nhập tên hiển thị" },
-                ]}
-              >
-                <Input
-                  prefix={<UserOutlined className="text-sky-600" />}
-                  placeholder="Nguyễn Văn A"
-                  className="rounded-lg"
-                />
-              </Form.Item>
+              <Input
+                prefix={<UserOutlined className="text-slate-400 mr-1" />}
+                placeholder="Nguyễn Văn A"
+                className="rounded-xl px-4 py-3 bg-slate-50 border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
+              />
+            </Form.Item>
 
-              <Form.Item
-                label={
-                  <span className="text-slate-800 font-medium">
-                    Tên đăng nhập
-                  </span>
-                }
-                name="username"
-                rules={[
-                  { required: true, message: "Vui lòng nhập tên đăng nhập" },
-                ]}
-              >
-                <Input
-                  prefix={<UserOutlined className="text-sky-600" />}
-                  placeholder="username"
-                  className="rounded-lg"
-                />
-              </Form.Item>
+            <Form.Item
+              label={
+                <span className="text-slate-700 font-semibold">
+                  Tên đăng nhập
+                </span>
+              }
+              name="username"
+              rules={[
+                { required: true, message: "Vui lòng nhập tên đăng nhập" },
+                {
+                  pattern: /^[a-zA-Z][a-zA-Z0-9]*$/,
+                  message:
+                    "Tên đăng nhập không được chứa khoảng trắng, ký tự đặc biệt và phải bắt đầu bằng chữ cái",
+                },
+              ]}
+            >
+              <Input
+                prefix={<UserOutlined className="text-slate-400 mr-1" />}
+                placeholder="username"
+                className="rounded-xl px-4 py-3 bg-slate-50 border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
+              />
+            </Form.Item>
 
-              <Form.Item
-                label={
-                  <span className="text-slate-800 font-medium">Email</span>
-                }
-                name="email"
-                rules={[
-                  { required: true, message: "Vui lòng nhập email" },
-                  { type: "email", message: "Email không hợp lệ" },
-                ]}
-              >
-                <Input
-                  prefix={<MailOutlined className="text-sky-600" />}
-                  placeholder="you@example.com"
-                  className="rounded-lg"
-                />
-              </Form.Item>
+            <Form.Item
+              label={
+                <span className="text-slate-700 font-semibold">Email</span>
+              }
+              name="email"
+              rules={[
+                { required: true, message: "Vui lòng nhập email" },
+                { type: "email", message: "Email không hợp lệ" },
+              ]}
+            >
+              <Input
+                prefix={<MailOutlined className="text-slate-400 mr-1" />}
+                placeholder="you@example.com"
+                className="rounded-xl px-4 py-3 bg-slate-50 border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
+              />
+            </Form.Item>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Form.Item
                 label={
-                  <span className="text-slate-800 font-medium">Mật khẩu</span>
+                  <span className="text-slate-700 font-semibold">Mật khẩu</span>
                 }
                 name="password"
-                rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
+                rules={[
+                  { required: true, message: "Vui lòng nhập mật khẩu" },
+                  { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự" },
+                ]}
               >
                 <Input.Password
-                  prefix={<LockOutlined className="text-sky-600" />}
-                  placeholder="Tối thiểu 6 ký tự"
-                  className="rounded-lg"
+                  prefix={<LockOutlined className="text-slate-400 mr-1" />}
+                  placeholder="Tối thiểu 8 ký tự"
+                  className="rounded-xl px-4 py-3 bg-slate-50 border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
                 />
               </Form.Item>
 
               <Form.Item
                 label={
-                  <span className="text-slate-800 font-medium">
-                    Nhập lại mật khẩu
-                  </span>
+                  <span className="text-slate-700 font-semibold">Xác nhận</span>
                 }
                 name="confirmPassword"
                 dependencies={["password"]}
@@ -174,38 +209,80 @@ const Register = () => {
                 ]}
               >
                 <Input.Password
-                  prefix={<LockOutlined className="text-sky-600" />}
+                  prefix={<LockOutlined className="text-slate-400 mr-1" />}
                   placeholder="Nhập lại mật khẩu"
-                  className="rounded-lg"
+                  className="rounded-xl px-4 py-3 bg-slate-50 border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
                 />
               </Form.Item>
+            </div>
 
-              <div className="flex items-center justify-between mb-6 text-sm">
-                <span className="text-slate-500">Đã có tài khoản?</span>
-                <Link to={ROUTES.LOGIN} className="text-sky-600 font-medium">
-                  Đăng nhập
-                </Link>
-              </div>
+            <div className="flex items-center justify-between mb-8 mt-2 text-sm">
+              <span className="text-slate-500 font-medium">
+                Đã có tài khoản?
+              </span>
+              <Link
+                to={ROUTES.LOGIN}
+                className="text-blue-600 font-semibold hover:text-blue-700 hover:underline transition-all"
+              >
+                Đăng nhập
+              </Link>
+            </div>
 
-              <Form.Item className="mb-0">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={isPending}
-                  className="w-full h-11 rounded-lg bg-sky-600"
-                >
-                  {isPending ? "Đang tạo tài khoản..." : "Đăng ký"}
-                </Button>
-              </Form.Item>
-            </Form>
-          </Card>
+            <Form.Item className="mb-0">
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={isPending}
+                className="w-full h-14 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 border-0 text-white font-bold text-lg shadow-[0_4px_14px_0_rgba(14,165,233,0.39)] hover:shadow-[0_6px_20px_rgba(14,165,233,0.23)] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center"
+              >
+                {isPending ? "Đang xử lý..." : "Đăng ký ngay"}
+                {!isPending && <ArrowRightOutlined className="ml-2" />}
+              </Button>
+            </Form.Item>
+          </Form>
 
-          <p className="text-center text-xs text-slate-500 mt-6">
-            Thông tin của bạn sẽ được bảo mật và chỉ sử dụng cho quản trị hệ
-            thống.
+          <p className="text-center text-xs text-slate-400 mt-8">
+            Việc bạn đăng ký đồng nghĩa với việc chấp nhận{" "}
+            <Link to="#" className="text-blue-500 hover:underline">
+              điều khoản sử dụng
+            </Link>{" "}
+            của hệ thống.
           </p>
         </div>
       </div>
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes blob {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        /* Override Ant Design input focus to match tailwind style */
+        .register-form .ant-input-affix-wrapper-focused {
+          border-color: #3b82f6 !important;
+          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2) !important;
+        }
+        .register-form .ant-form-item-has-error .ant-input-affix-wrapper {
+          border-color: #ef4444 !important;
+        }
+        .register-form .ant-form-item-has-error .ant-input-affix-wrapper-focused {
+          box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2) !important;
+        }
+      `,
+        }}
+      />
     </div>
   );
 };

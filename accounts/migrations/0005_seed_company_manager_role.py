@@ -3,7 +3,7 @@ from django.db import migrations
 def seed_company_manager_role(apps, schema_editor):
     Role = apps.get_model("accounts", "Role")
     Role.objects.update_or_create(
-        name="company_manager", 
+        name="company_manager",
         defaults={"description": "Company manager: can manage users for their company and has tour manager permissions."}
     )
 

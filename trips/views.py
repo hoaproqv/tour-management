@@ -129,6 +129,15 @@ class TripBusListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
         trip_param = self.request.query_params.get("trip")
         if trip_param:
             qs = qs.filter(trip_id=trip_param)
+
+        driver_param = self.request.query_params.get("driver")
+        if driver_param:
+            qs = qs.filter(driver_id=driver_param)
+
+        manager_param = self.request.query_params.get("manager")
+        if manager_param:
+            qs = qs.filter(manager_id=manager_param)
+
         return qs
 
     @extend_schema(

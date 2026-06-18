@@ -36,7 +36,14 @@ export interface DashboardOverview {
     tenants: { total: number };
     users: { total: number; active: number; inactive: number };
     recent_tenants: Array<{ id: number; name: string; created_at: string }>;
-    recent_users: Array<{ id: number; name: string; email: string; role: string | null; tenant_name: string | null; created_at: string }>;
+    recent_users: Array<{
+      id: number;
+      name: string;
+      email: string;
+      role: string | null;
+      tenant_name: string | null;
+      created_at: string;
+    }>;
   };
 }
 

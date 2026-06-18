@@ -75,10 +75,14 @@ export const updateUserEmail = async (email: string) => {
   throw new Error(`Update email API is not available yet (email=${email})`);
 };
 
-export const forgotPassword = async (username: number, email: string) => {
-  throw new Error(
-    `Forgot password API is not available yet (username=${username}, email=${email})`,
-  );
+export const forgotPassword = async (email: string) => {
+  const response = await postData(`${API_URL}/forgot-password`, { email });
+  return unwrapSuccess<string>(response);
+};
+
+export const resetPassword = async (data: any) => {
+  const response = await postData(`${API_URL}/reset-password`, data);
+  return unwrapSuccess<string>(response);
 };
 
 export const updateProfile = async (data: Partial<IUser>) => {

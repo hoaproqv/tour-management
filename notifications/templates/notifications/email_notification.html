@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .header {
+            background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .content {
+            padding: 40px 30px;
+            color: #334155;
+            line-height: 1.6;
+        }
+        .content p {
+            margin: 0 0 20px 0;
+            font-size: 16px;
+        }
+        .message-box {
+            background-color: #f1f5f9;
+            border-left: 4px solid #3b82f6;
+            padding: 20px;
+            border-radius: 4px 8px 8px 4px;
+            margin: 24px 0;
+        }
+        .message-box p {
+            margin: 0;
+            color: #1e293b;
+            font-size: 15px;
+        }
+        .footer {
+            background-color: #f8fafc;
+            padding: 24px 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer p {
+            margin: 0;
+            color: #64748b;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header" style="text-align: center;">
+            <div style="display: inline-block; vertical-align: middle;">
+                <img src="http://localhost:8000/static/images/logo.png" alt="GoTrip Logo" style="width: 48px; height: 48px; margin-right: 12px; vertical-align: middle; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.2));" />
+                <h1 style="display: inline-block; vertical-align: middle; margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">GoTrip</h1>
+            </div>
+        </div>
+        <div class="content">
+            <p>Xin chào,</p>
+            <p>Bạn có một thông báo mới từ hệ thống quản lý điều hành <strong>GoTrip</strong>:</p>
+            
+            <div class="message-box">
+                <p><strong>{{ title }}</strong></p>
+                <p style="margin-top: 8px;">{{ message }}</p>
+            </div>
+            
+            <p>Trân trọng,<br>Ban điều hành GoTrip</p>
+        </div>
+        <div class="footer">
+            <p>Đây là email thông báo tự động, vui lòng không trả lời email này.</p>
+            <p style="margin-top: 8px;">Để tắt thông báo qua email, hãy truy cập mục <strong>Cài đặt</strong> trên hệ thống.</p>
+        </div>
+    </div>
+</body>
+</html>

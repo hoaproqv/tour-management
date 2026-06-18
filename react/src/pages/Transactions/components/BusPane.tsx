@@ -22,10 +22,7 @@ import {
   Modal,
 } from "antd";
 
-import {
-  removeAccents,
-  compareVietnameseNames,
-} from "../../../utils/helper";
+import { removeAccents, compareVietnameseNames } from "../../../utils/helper";
 
 import type { PassengerRow } from "./types";
 import type { TransactionItem } from "../../../api/trips";
@@ -127,12 +124,12 @@ export function BusPane({
   const presentUnfiltered = rows.filter((r) => r.status === "checkedInHere");
   const othersUnfiltered = rows.filter((r) => {
     if (r.status === "checkedInHere") return false;
-    
+
     if (r.transferredAway) {
       if (r.status === "checkedInElsewhere") return true;
       return false;
     }
-    
+
     return true;
   });
 
@@ -146,8 +143,12 @@ export function BusPane({
   const sortedPresentUnfiltered = [...presentUnfiltered].sort(sortPassengers);
   const sortedOthersUnfiltered = [...othersUnfiltered].sort(sortPassengers);
 
-  const present = sortedPresentUnfiltered.filter((r) => filterRow(r, searchPresent));
-  const others = sortedOthersUnfiltered.filter((r) => filterRow(r, searchOthers));
+  const present = sortedPresentUnfiltered.filter((r) =>
+    filterRow(r, searchPresent),
+  );
+  const others = sortedOthersUnfiltered.filter((r) =>
+    filterRow(r, searchOthers),
+  );
 
   const pendingRows = rows.filter(
     (r) =>
@@ -194,8 +195,19 @@ export function BusPane({
       if (row.status === "checkedOut" && row.transaction) {
         return (
           <div className="flex flex-col items-center gap-1">
-            <Text type="secondary" className="text-xs">Đã xuống xe</Text>
-            <Button type="link" danger size="small" className="p-0 h-auto text-xs" onClick={() => onUndoCheckOut(row.transaction)} loading={busy}>Hủy</Button>
+            <Text type="secondary" className="text-xs">
+              Đã xuống xe
+            </Text>
+            <Button
+              type="link"
+              danger
+              size="small"
+              className="p-0 h-auto text-xs"
+              onClick={() => onUndoCheckOut(row.transaction)}
+              loading={busy}
+            >
+              Hủy
+            </Button>
           </div>
         );
       }
@@ -212,8 +224,19 @@ export function BusPane({
       if (row.transaction) {
         return (
           <div className="flex flex-col items-center gap-1">
-            <Text type="secondary" className="text-xs">Đã lên xe</Text>
-            <Button type="link" danger size="small" className="p-0 h-auto text-xs" onClick={() => onUndoCheckIn(row.transaction)} loading={busy}>Hủy</Button>
+            <Text type="secondary" className="text-xs">
+              Đã lên xe
+            </Text>
+            <Button
+              type="link"
+              danger
+              size="small"
+              className="p-0 h-auto text-xs"
+              onClick={() => onUndoCheckIn(row.transaction)}
+              loading={busy}
+            >
+              Hủy
+            </Button>
           </div>
         );
       }
@@ -257,7 +280,12 @@ export function BusPane({
             </div>
           )}
           <div>
-            <Text strong>Ghi chú:</Text> {passenger.note || <Text type="secondary" italic>Không có</Text>}
+            <Text strong>Ghi chú:</Text>{" "}
+            {passenger.note || (
+              <Text type="secondary" italic>
+                Không có
+              </Text>
+            )}
           </div>
         </div>
       ),
@@ -424,7 +452,9 @@ export function BusPane({
 
   const presentCount = presentUnfiltered.length;
   const othersCount = othersUnfiltered.filter((r) => r.isOwnedByBus).length;
-  const transferredAwayCount = othersUnfiltered.filter((r) => !r.isOwnedByBus).length;
+  const transferredAwayCount = othersUnfiltered.filter(
+    (r) => !r.isOwnedByBus,
+  ).length;
 
   return (
     <div className="space-y-3">

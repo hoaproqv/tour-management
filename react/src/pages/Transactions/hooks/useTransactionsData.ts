@@ -363,21 +363,25 @@ export function useTransactionsData(
 
   const transactionByPassenger = useMemo(() => {
     const map = new Map<string, TransactionItem>();
-    
+
     // We want to find the latest transaction for each passenger,
     // but ONLY up to the active round, to preserve history.
-    const activeRoundIndex = tripRoundsSorted.findIndex((r) => String(r.id) === String(activeRoundId));
+    const activeRoundIndex = tripRoundsSorted.findIndex(
+      (r) => String(r.id) === String(activeRoundId),
+    );
     if (activeRoundIndex < 0) return map;
 
     const validRoundIds = new Set(
-      tripRoundsSorted.slice(0, activeRoundIndex + 1).map((r) => String(r.id))
+      tripRoundsSorted.slice(0, activeRoundIndex + 1).map((r) => String(r.id)),
     );
 
     transactions.forEach((tx) => {
       // Only consider transactions for buses in the active trip
       const tripBusId = roundBusToTripBus.get(String(tx.round_bus));
       if (!tripBusId) return;
-      const tripIdForBus = tripBuses.find((tb) => String(tb.id) === String(tripBusId))?.trip;
+      const tripIdForBus = tripBuses.find(
+        (tb) => String(tb.id) === String(tripBusId),
+      )?.trip;
       if (String(tripIdForBus) !== String(activeTripId)) return;
 
       const roundId = roundBusToRound.get(String(tx.round_bus));
@@ -385,12 +389,12 @@ export function useTransactionsData(
 
       const passengerIdStr = String(tx.passenger);
       const existing = map.get(passengerIdStr);
-      
+
       if (!existing) {
         map.set(passengerIdStr, tx);
         return;
       }
-      
+
       const existingTime = dayjs(existing.check_in || existing.created_at);
       const currentTime = dayjs(tx.check_in || tx.created_at);
       if (currentTime.isAfter(existingTime)) {
@@ -398,21 +402,35 @@ export function useTransactionsData(
       }
     });
     return map;
-  }, [transactions, activeTripId, tripBuses, roundBusToTripBus, tripRoundsSorted, activeRoundId, roundBusToRound]);
+  }, [
+    transactions,
+    activeTripId,
+    tripBuses,
+    roundBusToTripBus,
+    tripRoundsSorted,
+    activeRoundId,
+    roundBusToRound,
+  ]);
 
   const passengerBusAtStartOfRound = useMemo(() => {
     const map = new Map<string, string | null>();
-    
-    const activeRoundIndex = tripRoundsSorted.findIndex((r) => String(r.id) === String(activeRoundId));
+
+    const activeRoundIndex = tripRoundsSorted.findIndex(
+      (r) => String(r.id) === String(activeRoundId),
+    );
     if (activeRoundIndex <= 0) {
-      passengers.forEach(p => {
-        map.set(String(p.id), (p as { assigned_trip_bus?: string | null }).assigned_trip_bus || null);
+      passengers.forEach((p) => {
+        map.set(
+          String(p.id),
+          (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ||
+            null,
+        );
       });
       return map;
     }
 
     const validRoundIdsBeforeActive = new Set(
-      tripRoundsSorted.slice(0, activeRoundIndex).map((r) => String(r.id))
+      tripRoundsSorted.slice(0, activeRoundIndex).map((r) => String(r.id)),
     );
 
     const latestTxnBeforeActive = new Map<string, TransactionItem>();
@@ -420,7 +438,9 @@ export function useTransactionsData(
     transactions.forEach((tx) => {
       const tripBusId = roundBusToTripBus.get(String(tx.round_bus));
       if (!tripBusId) return;
-      const tripIdForBus = tripBuses.find((tb) => String(tb.id) === String(tripBusId))?.trip;
+      const tripIdForBus = tripBuses.find(
+        (tb) => String(tb.id) === String(tripBusId),
+      )?.trip;
       if (String(tripIdForBus) !== String(activeTripId)) return;
 
       const roundId = roundBusToRound.get(String(tx.round_bus));
@@ -428,13 +448,15 @@ export function useTransactionsData(
 
       const passengerIdStr = String(tx.passenger);
       const existing = latestTxnBeforeActive.get(passengerIdStr);
-      
+
       if (!existing) {
         latestTxnBeforeActive.set(passengerIdStr, tx);
         return;
       }
-      
-      const existingTime = dayjs(existing.check_in || existing.created_at).valueOf();
+
+      const existingTime = dayjs(
+        existing.check_in || existing.created_at,
+      ).valueOf();
       const currentTime = dayjs(tx.check_in || tx.created_at).valueOf();
       if (currentTime > existingTime) {
         latestTxnBeforeActive.set(passengerIdStr, tx);
@@ -445,18 +467,31 @@ export function useTransactionsData(
       }
     });
 
-    passengers.forEach(p => {
+    passengers.forEach((p) => {
       const pid = String(p.id);
       const txn = latestTxnBeforeActive.get(pid);
       if (txn) {
         map.set(pid, roundBusToTripBus.get(String(txn.round_bus)) || null);
       } else {
-        map.set(pid, (p as { assigned_trip_bus?: string | null }).assigned_trip_bus || null);
+        map.set(
+          pid,
+          (p as { assigned_trip_bus?: string | null }).assigned_trip_bus ||
+            null,
+        );
       }
     });
 
     return map;
-  }, [passengers, transactions, tripRoundsSorted, activeRoundId, roundBusToTripBus, roundBusToRound, tripBuses, activeTripId]);
+  }, [
+    passengers,
+    transactions,
+    tripRoundsSorted,
+    activeRoundId,
+    roundBusToTripBus,
+    roundBusToRound,
+    tripBuses,
+    activeTripId,
+  ]);
 
   const isRoundFullyFinalized = useMemo(() => {
     const tripId = activeTripId;
@@ -516,10 +551,13 @@ export function useTransactionsData(
     (roundId: string | number, index: number): RoundVisualStatus => {
       if (isRoundFullyFinalized(String(roundId))) return "past";
       if (tripLockedForAttendance) return "upcoming";
-      if (openRoundId && String(roundId) === String(openRoundId)) return "current";
+      if (openRoundId && String(roundId) === String(openRoundId))
+        return "current";
 
       const openIndex = openRoundId
-        ? tripRoundsSorted.findIndex((r) => String(r.id) === String(openRoundId))
+        ? tripRoundsSorted.findIndex(
+            (r) => String(r.id) === String(openRoundId),
+          )
         : -1;
 
       if (openIndex >= 0) {

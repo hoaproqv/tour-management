@@ -12,9 +12,12 @@ import {
   Table,
   Tag,
   Space,
+  Row,
+  Col,
 } from "antd";
 
 import { changePassword, checkPassword, updateProfile } from "../../api/auth";
+import { getTripBuses } from "../../api/trips";
 import { getUsers } from "../../api/users";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 
@@ -54,6 +57,37 @@ export const Profile = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [historyPagination, setHistoryPagination] = useState({
+    page: 1,
+    limit: 10,
+  });
+
+  const isTripHistoryVisible =
+    currentUser?.role_name === "fleet_lead" ||
+    currentUser?.role_name === "driver";
+
+  const tripHistoryQuery = useQuery({
+    queryKey: [
+      "trip-history",
+      currentUser?.id,
+      historyPagination.page,
+      historyPagination.limit,
+    ],
+    queryFn: () =>
+      getTripBuses({
+        page: historyPagination.page,
+        limit: historyPagination.limit,
+        ...(currentUser?.role_name === "fleet_lead"
+          ? { manager: currentUser?.id || "" }
+          : { driver: currentUser?.id || "" }),
+      }),
+    enabled: isTripHistoryVisible && Boolean(currentUser?.id),
+  });
+
+  const tripHistoryData = useMemo(
+    () => tripHistoryQuery.data?.data ?? [],
+    [tripHistoryQuery.data],
+  );
 
   React.useEffect(() => {
     if (currentUser) {
@@ -62,6 +96,11 @@ export const Profile = () => {
         name: currentUser.name,
         email: currentUser.email,
         phone: currentUser.phone,
+        tenant_name: currentUser.tenant_name || "—",
+        role_name:
+          roleMeta[currentUser.role_name || ""]?.label ||
+          currentUser.role_name ||
+          "Không có",
       });
     }
   }, [currentUser, profileForm]);
@@ -80,7 +119,7 @@ export const Profile = () => {
 
   const handleUpdateProfile = (values: any) => {
     if (!currentUser) return;
-    
+
     const isChanged =
       values.name !== currentUser.name ||
       values.email !== currentUser.email ||
@@ -99,7 +138,8 @@ export const Profile = () => {
   };
 
   const checkPasswordMutation = useMutation({
-    mutationFn: (current_password: string) => checkPassword({ current_password }),
+    mutationFn: (current_password: string) =>
+      checkPassword({ current_password }),
     onSuccess: (_, current_password) => {
       setIsPasswordVerified(true);
       setCurrentPasswordCache(current_password);
@@ -134,7 +174,13 @@ export const Profile = () => {
   };
 
   const usersQuery = useQuery({
-    queryKey: ["users", "company", pagination.page, pagination.limit, currentUser?.tenant],
+    queryKey: [
+      "users",
+      "company",
+      pagination.page,
+      pagination.limit,
+      currentUser?.tenant,
+    ],
     queryFn: () =>
       getUsers({
         page: pagination.page,
@@ -147,6 +193,10 @@ export const Profile = () => {
   const users = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data]);
 
   const columns: TableColumnsType<IUser> = [
+    {
+      title: "Tên đăng nhập",
+      dataIndex: "username",
+    },
     {
       title: "Tên hiển thị",
       dataIndex: "name",
@@ -169,45 +219,71 @@ export const Profile = () => {
   ];
 
   const renderPersonalInfo = () => (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <Card className="shadow-sm border-slate-100 rounded-2xl mb-6">
         <Form
           layout="vertical"
           form={profileForm}
           onFinish={handleUpdateProfile}
         >
-          <Form.Item
-            label="Tên đăng nhập (Username)"
-            name="username"
-          >
-            <Input disabled />
-          </Form.Item>
-          
-          <Form.Item
-            label="Họ và tên"
-            name="name"
-            rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
-          >
-            <Input placeholder="Nhập họ và tên" disabled={!isEditingProfile} />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Công ty" name="tenant_name">
+                <Input disabled />
+              </Form.Item>
+            </Col>
 
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[
-              { required: true, message: "Vui lòng nhập email" },
-              { type: "email", message: "Email không hợp lệ" },
-            ]}
-          >
-            <Input placeholder="Nhập email" disabled={!isEditingProfile} />
-          </Form.Item>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Vai trò" name="role_name">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <Form.Item
-            label="Số điện thoại"
-            name="phone"
-          >
-            <Input placeholder="Nhập số điện thoại" disabled={!isEditingProfile} />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item label="Tên đăng nhập (Username)" name="username">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label="Họ và tên"
+                name="name"
+                rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
+              >
+                <Input
+                  placeholder="Nhập họ và tên"
+                  disabled={!isEditingProfile}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: "Vui lòng nhập email" },
+                  { type: "email", message: "Email không hợp lệ" },
+                ]}
+              >
+                <Input placeholder="Nhập email" disabled={!isEditingProfile} />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} sm={12}>
+              <Form.Item label="Số điện thoại" name="phone">
+                <Input
+                  placeholder="Nhập số điện thoại"
+                  disabled={!isEditingProfile}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item className="mb-0">
             {!isEditingProfile ? (
@@ -238,6 +314,11 @@ export const Profile = () => {
                         name: currentUser.name,
                         email: currentUser.email,
                         phone: currentUser.phone,
+                        tenant_name: currentUser.tenant_name || "—",
+                        role_name:
+                          roleMeta[currentUser.role_name || ""]?.label ||
+                          currentUser.role_name ||
+                          "Không có",
                       });
                     }
                   }}
@@ -251,7 +332,9 @@ export const Profile = () => {
       </Card>
 
       <Card className="shadow-sm border-slate-100 rounded-2xl">
-        <Title level={4} className="!mb-4">Đổi mật khẩu</Title>
+        <Title level={4} className="!mb-4">
+          Đổi mật khẩu
+        </Title>
         {!isChangingPassword ? (
           <Button onClick={() => setIsChangingPassword(true)}>
             Thay đổi mật khẩu
@@ -267,7 +350,12 @@ export const Profile = () => {
                 <Form.Item
                   label="Mật khẩu hiện tại"
                   name="current_password"
-                  rules={[{ required: true, message: "Vui lòng nhập mật khẩu hiện tại" }]}
+                  rules={[
+                    {
+                      required: true,
+                      message: "Vui lòng nhập mật khẩu hiện tại",
+                    },
+                  ]}
                 >
                   <Input.Password placeholder="Nhập mật khẩu hiện tại" />
                 </Form.Item>
@@ -279,10 +367,14 @@ export const Profile = () => {
                   >
                     Xác thực
                   </Button>
-                  <Button onClick={() => {
-                    setIsChangingPassword(false);
-                    passwordForm.resetFields();
-                  }}>Hủy</Button>
+                  <Button
+                    onClick={() => {
+                      setIsChangingPassword(false);
+                      passwordForm.resetFields();
+                    }}
+                  >
+                    Hủy
+                  </Button>
                 </Space>
               </Form>
             ) : (
@@ -306,13 +398,18 @@ export const Profile = () => {
                   name="confirm_password"
                   dependencies={["new_password"]}
                   rules={[
-                    { required: true, message: "Vui lòng xác nhận mật khẩu mới" },
+                    {
+                      required: true,
+                      message: "Vui lòng xác nhận mật khẩu mới",
+                    },
                     ({ getFieldValue }) => ({
                       validator(_, value) {
                         if (!value || getFieldValue("new_password") === value) {
                           return Promise.resolve();
                         }
-                        return Promise.reject(new Error("Mật khẩu không khớp!"));
+                        return Promise.reject(
+                          new Error("Mật khẩu không khớp!"),
+                        );
                       },
                     }),
                   ]}
@@ -327,12 +424,16 @@ export const Profile = () => {
                   >
                     Cập nhật mật khẩu
                   </Button>
-                  <Button onClick={() => {
-                    setIsChangingPassword(false);
-                    setIsPasswordVerified(false);
-                    newPasswordForm.resetFields();
-                    passwordForm.resetFields();
-                  }}>Hủy</Button>
+                  <Button
+                    onClick={() => {
+                      setIsChangingPassword(false);
+                      setIsPasswordVerified(false);
+                      newPasswordForm.resetFields();
+                      passwordForm.resetFields();
+                    }}
+                  >
+                    Hủy
+                  </Button>
                 </Space>
               </Form>
             )}
@@ -343,9 +444,14 @@ export const Profile = () => {
   );
 
   const renderCompanyMembers = () => (
-    <Card className="shadow-sm border-slate-100 rounded-2xl" styles={{ body: { padding: 0 } }}>
+    <Card
+      className="shadow-sm border-slate-100 rounded-2xl"
+      styles={{ body: { padding: 0 } }}
+    >
       <div className="p-4 border-b border-slate-100">
-        <Title level={4} className="!m-0">Thành viên công ty</Title>
+        <Title level={4} className="!m-0">
+          Thành viên công ty
+        </Title>
         <Text type="secondary">Danh sách nhân viên cùng công ty</Text>
       </div>
       <Table
@@ -359,7 +465,50 @@ export const Profile = () => {
           current: pagination.page,
           pageSize: pagination.limit,
           total: usersQuery.data?.pagination?.total_items ?? users.length,
-          onChange: (page, pageSize) => setPagination({ page, limit: pageSize }),
+          onChange: (page, pageSize) =>
+            setPagination({ page, limit: pageSize }),
+          showSizeChanger: true,
+          pageSizeOptions: [10, 20, 50, 100],
+        }}
+      />
+    </Card>
+  );
+
+  const renderTripHistory = () => (
+    <Card
+      className="shadow-sm border-slate-100 rounded-2xl"
+      styles={{ body: { padding: 0 } }}
+    >
+      <div className="p-4 border-b border-slate-100">
+        <Title level={4} className="!m-0">
+          Lịch sử phân công xe
+        </Title>
+        <Text type="secondary">
+          Danh sách các xe được phân công trong các chuyến đi
+        </Text>
+      </div>
+      <Table
+        size="small"
+        scroll={{ x: "max-content" }}
+        rowKey="id"
+        dataSource={tripHistoryData}
+        loading={tripHistoryQuery.isLoading || tripHistoryQuery.isFetching}
+        columns={[
+          { title: "Mã chuyến đi", dataIndex: "trip" },
+          { title: "Biển số", dataIndex: "registration_number" },
+          { title: "Mã xe", dataIndex: "bus_code" },
+          { title: "Sức chứa", dataIndex: "capacity" },
+          { title: "Trưởng xe", dataIndex: "manager_name" },
+          { title: "Lái xe", dataIndex: "driver_name" },
+        ]}
+        pagination={{
+          current: historyPagination.page,
+          pageSize: historyPagination.limit,
+          total:
+            tripHistoryQuery.data?.pagination?.total_items ??
+            tripHistoryData.length,
+          onChange: (page, pageSize) =>
+            setHistoryPagination({ page, limit: pageSize }),
           showSizeChanger: true,
           pageSizeOptions: [10, 20, 50, 100],
         }}
@@ -392,6 +541,15 @@ export const Profile = () => {
               label: "Thành viên công ty",
               children: renderCompanyMembers(),
             },
+            ...(isTripHistoryVisible
+              ? [
+                  {
+                    key: "3",
+                    label: "Lịch sử chuyến đi",
+                    children: renderTripHistory(),
+                  },
+                ]
+              : []),
           ]}
         />
       </div>

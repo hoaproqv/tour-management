@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { EditOutlined, DeleteOutlined, FileExcelOutlined } from "@ant-design/icons";
+import {
+  EditOutlined,
+  DeleteOutlined,
+  FileExcelOutlined,
+} from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -202,8 +206,14 @@ export default function BusManagement() {
         bus_code: bus.bus_code,
         capacity: bus.capacity,
         description: bus.description,
-        manager: bus.manager && String(bus.manager) !== "null" ? String(bus.manager) : undefined,
-        driver: bus.driver && String(bus.driver) !== "null" ? String(bus.driver) : undefined,
+        manager:
+          bus.manager && String(bus.manager) !== "null"
+            ? String(bus.manager)
+            : undefined,
+        driver:
+          bus.driver && String(bus.driver) !== "null"
+            ? String(bus.driver)
+            : undefined,
       });
       setShowCreate(true);
     },
@@ -286,10 +296,22 @@ export default function BusManagement() {
         title: "Trạng thái chuyến",
         key: "tripStatus",
         render: (_: unknown, record: TripBus) => {
-          const selectedTrip = trips.find((t) => String(t.id) === String(record.trip));
+          const selectedTrip = trips.find(
+            (t) => String(t.id) === String(record.trip),
+          );
           if (selectedTrip) {
-            const statusColor = selectedTrip.status === "done" ? "success" : selectedTrip.status === "doing" ? "blue" : "default";
-            const statusLabel = selectedTrip.status === "done" ? "Đã hoàn thành" : selectedTrip.status === "doing" ? "Đang đi" : "Chưa xuất phát";
+            const statusColor =
+              selectedTrip.status === "done"
+                ? "success"
+                : selectedTrip.status === "doing"
+                  ? "blue"
+                  : "default";
+            const statusLabel =
+              selectedTrip.status === "done"
+                ? "Đã hoàn thành"
+                : selectedTrip.status === "doing"
+                  ? "Đang đi"
+                  : "Chưa xuất phát";
             return <Tag color={statusColor}>{statusLabel}</Tag>;
           }
           return <Tag color="success">Sẵn sàng</Tag>;
@@ -305,11 +327,17 @@ export default function BusManagement() {
         title: "Thao tác",
         dataIndex: "actions",
         render: (_: unknown, record: TripBus) => {
-          const selectedTrip = trips.find((t) => String(t.id) === String(record.trip));
+          const selectedTrip = trips.find(
+            (t) => String(t.id) === String(record.trip),
+          );
           const isPlanned = !selectedTrip || selectedTrip.status === "planned";
           return (
             <Space>
-              <Tooltip title={isPlanned ? "Sửa" : "Không thể sửa khi chuyến đã xuất phát"}>
+              <Tooltip
+                title={
+                  isPlanned ? "Sửa" : "Không thể sửa khi chuyến đã xuất phát"
+                }
+              >
                 <Button
                   type="text"
                   icon={<EditOutlined />}
@@ -326,7 +354,11 @@ export default function BusManagement() {
                 cancelText="Hủy"
                 disabled={!isPlanned}
               >
-                <Tooltip title={isPlanned ? "Xóa" : "Không thể xóa khi chuyến đã xuất phát"}>
+                <Tooltip
+                  title={
+                    isPlanned ? "Xóa" : "Không thể xóa khi chuyến đã xuất phát"
+                  }
+                >
                   <Button
                     type="text"
                     danger
@@ -378,8 +410,12 @@ export default function BusManagement() {
                       const url = window.URL.createObjectURL(blob);
                       const a = document.createElement("a");
                       a.href = url;
-                      const selectedTrip = trips.find((t) => String(t.id) === String(activeTripId));
-                      const tripName = selectedTrip ? selectedTrip.name.replace(/[/\\?%*:|"<>]/g, '-') : "unknown";
+                      const selectedTrip = trips.find(
+                        (t) => String(t.id) === String(activeTripId),
+                      );
+                      const tripName = selectedTrip
+                        ? selectedTrip.name.replace(/[/\\?%*:|"<>]/g, "-")
+                        : "unknown";
                       a.download = `Danh_sach_xe_${tripName}.xlsx`;
                       a.click();
                       window.URL.revokeObjectURL(url);
@@ -415,63 +451,70 @@ export default function BusManagement() {
             />
           </div>
 
-          {canManage && activeTripId && trips.find((t) => String(t.id) === String(activeTripId))?.status === "planned" && (
-            <div className="flex justify-end">
-              {isSelectionMode ? (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => {
-                      setIsSelectionMode(false);
-                      setSelectedRowKeys([]);
-                    }}
-                  >
-                    Hủy
-                  </Button>
-                  {selectedRowKeys.length > 0 && (
+          {canManage &&
+            activeTripId &&
+            trips.find((t) => String(t.id) === String(activeTripId))?.status ===
+              "planned" && (
+              <div className="flex justify-end">
+                {isSelectionMode ? (
+                  <div className="flex gap-2">
                     <Button
-                      danger
-                      icon={<DeleteOutlined />}
                       onClick={() => {
-                        Modal.confirm({
-                          title: "Xóa nhiều xe?",
-                          content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} xe đã chọn khỏi chuyến đi?`,
-                          okText: "Xóa",
-                          cancelText: "Hủy",
-                          onOk: async () => {
-                            const hide = message.loading("Đang xóa...", 0);
-                            try {
-                              await bulkDeleteTripBuses(
-                                selectedRowKeys as number[],
-                              );
-                              message.success(
-                                `Đã xóa ${selectedRowKeys.length} xe`,
-                              );
-                              setSelectedRowKeys([]);
-                              setIsSelectionMode(false);
-                              await Promise.all([
-                                queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
-                                queryClient.invalidateQueries({ queryKey: ["trip-buses-validation"] }),
-                              ]);
-                            } catch {
-                              message.error("Lỗi khi xóa xe");
-                            } finally {
-                              hide();
-                            }
-                          },
-                        });
+                        setIsSelectionMode(false);
+                        setSelectedRowKeys([]);
                       }}
                     >
-                      Xóa đã chọn ({selectedRowKeys.length})
+                      Hủy
                     </Button>
-                  )}
-                </div>
-              ) : (
-                <Button danger onClick={() => setIsSelectionMode(true)}>
-                  Xóa nhiều
-                </Button>
-              )}
-            </div>
-          )}
+                    {selectedRowKeys.length > 0 && (
+                      <Button
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => {
+                          Modal.confirm({
+                            title: "Xóa nhiều xe?",
+                            content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} xe đã chọn khỏi chuyến đi?`,
+                            okText: "Xóa",
+                            cancelText: "Hủy",
+                            onOk: async () => {
+                              const hide = message.loading("Đang xóa...", 0);
+                              try {
+                                await bulkDeleteTripBuses(
+                                  selectedRowKeys as number[],
+                                );
+                                message.success(
+                                  `Đã xóa ${selectedRowKeys.length} xe`,
+                                );
+                                setSelectedRowKeys([]);
+                                setIsSelectionMode(false);
+                                await Promise.all([
+                                  queryClient.invalidateQueries({
+                                    queryKey: ["trip-buses"],
+                                  }),
+                                  queryClient.invalidateQueries({
+                                    queryKey: ["trip-buses-validation"],
+                                  }),
+                                ]);
+                              } catch {
+                                message.error("Lỗi khi xóa xe");
+                              } finally {
+                                hide();
+                              }
+                            },
+                          });
+                        }}
+                      >
+                        Xóa đã chọn ({selectedRowKeys.length})
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Button danger onClick={() => setIsSelectionMode(true)}>
+                    Xóa nhiều
+                  </Button>
+                )}
+              </div>
+            )}
         </div>
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>

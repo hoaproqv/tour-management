@@ -8,8 +8,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { MainLayout } from "./layout/MainLayout";
 import SidebarLayout from "./layout/SidebarLayout";
 import { Account } from "./pages/AccountPage/Account";
+import ForgotPasswordPage from "./pages/AccountPage/ForgotPassword";
 import LoginPage from "./pages/AccountPage/Login";
 import RegisterPage from "./pages/AccountPage/Register";
+import ResetPasswordPage from "./pages/AccountPage/ResetPassword";
 import BusManagement from "./pages/Bus/BusManagement";
 import DashboardPage from "./pages/Dashboard";
 import GuidePage from "./pages/GuidePage/GuidePage";
@@ -18,6 +20,7 @@ import NotificationList from "./pages/Notifications/NotificationList";
 import PassengerManagement from "./pages/Passengers/PassengerManagement";
 import Profile from "./pages/ProfilePage/Profile";
 import RoundManagement from "./pages/Rounds/RoundManagement";
+import SettingsPage from "./pages/Settings/SettingsPage";
 import TenantManagement from "./pages/Tenants/TenantManagement";
 import TransactionManagement from "./pages/Transactions/TransactionManagement";
 import TripManagement from "./pages/Trips/TripManagement";
@@ -31,6 +34,8 @@ function App() {
     <Routes>
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+      <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+      <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
       {/* Các trang dùng chung layout */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
@@ -49,6 +54,7 @@ function App() {
             <Route path={ROUTES.PROFILE} element={<Profile />} />
             <Route path={ROUTES.GUIDE} element={<GuidePage />} />
             <Route path={ROUTES.NOTIFICATIONS} element={<NotificationList />} />
+            <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
             <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
           </Route>
         </Route>

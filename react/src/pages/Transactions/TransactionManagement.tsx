@@ -205,7 +205,9 @@ export default function TransactionManagement() {
     const todayDayjs = dayjs().startOf("day");
 
     if (targetDateDayjs.isBefore(todayDayjs, "day")) {
-      return message.error("Đã quá ngày xuất phát, không thể bắt đầu chuyến đi!");
+      return message.error(
+        "Đã quá ngày xuất phát, không thể bắt đầu chuyến đi!",
+      );
     }
     if (targetDateDayjs.isAfter(todayDayjs, "day")) {
       return message.error("Chưa đến ngày bắt đầu chuyến đi!");
@@ -238,7 +240,7 @@ export default function TransactionManagement() {
           const busAtStart = passengerBusAtStartOfRound.get(String(p.id));
 
           if (String(homeBusId) === String(tripBusId)) return true;
-          
+
           if (String(busAtStart) === String(tripBusId)) return true;
 
           return false;
@@ -341,7 +343,9 @@ export default function TransactionManagement() {
     const activeRoundIndex = tripRoundsSorted.findIndex(
       (r) => String(r.id) === String(activeRoundId),
     );
-    const isLastRound = tripRoundsSorted.length > 0 && activeRoundIndex === tripRoundsSorted.length - 1;
+    const isLastRound =
+      tripRoundsSorted.length > 0 &&
+      activeRoundIndex === tripRoundsSorted.length - 1;
 
     if (row.status === "checkedInHere") {
       const timeStr = row.transaction?.check_in
@@ -573,10 +577,15 @@ export default function TransactionManagement() {
   }, [activeTripObj]);
 
   useEffect(() => {
-    if (tripDays.length > 0 && (!activeTabDay || !tripDays.includes(activeTabDay))) {
+    if (
+      tripDays.length > 0 &&
+      (!activeTabDay || !tripDays.includes(activeTabDay))
+    ) {
       // By default, try to find the day of the openRoundId
       if (openRoundId) {
-        const openRound = tripRoundsSorted.find(r => String(r.id) === String(openRoundId));
+        const openRound = tripRoundsSorted.find(
+          (r) => String(r.id) === String(openRoundId),
+        );
         if (openRound?.round_date) {
           const openDay = openRound.round_date;
           if (tripDays.includes(openDay)) {
@@ -602,9 +611,9 @@ export default function TransactionManagement() {
       round_date: round.round_date,
       estimate_time: round.estimate_time,
     }));
-    
+
     if (!activeTabDay) return items;
-    return items.filter(r => r.round_date && r.round_date === activeTabDay);
+    return items.filter((r) => r.round_date && r.round_date === activeTabDay);
   }, [tripRoundsSorted, getRoundVisualStatus, activeRoundId, activeTabDay]);
 
   const activeRoundIndex = tripRoundsSorted.findIndex(
@@ -849,56 +858,61 @@ export default function TransactionManagement() {
               className="w-full sm:w-64"
               notFoundContent="Không có chuyến đi"
             />
-            {tripStatusInfo && (() => {
-              if (tripStatusInfo.status !== "planned" || tripStatusInfo.isOverdue) return null;
-              const targetDate = activeTabDay || activeTripObj?.start_date;
-              if (!targetDate) return null;
+            {tripStatusInfo &&
+              (() => {
+                if (
+                  tripStatusInfo.status !== "planned" ||
+                  tripStatusInfo.isOverdue
+                )
+                  return null;
+                const targetDate = activeTabDay || activeTripObj?.start_date;
+                if (!targetDate) return null;
 
-              const targetDateDayjs = dayjs(targetDate).startOf("day");
-              const todayDayjs = dayjs().startOf("day");
+                const targetDateDayjs = dayjs(targetDate).startOf("day");
+                const todayDayjs = dayjs().startOf("day");
 
-              const isSameDay = targetDateDayjs.isSame(todayDayjs, "day");
-              const isPastDay = targetDateDayjs.isBefore(todayDayjs, "day");
-              const isFutureDay = targetDateDayjs.isAfter(todayDayjs, "day");
-              
-              return (
-                <div className="flex items-center gap-3">
-                  {isFutureDay && (
-                    <Button 
-                      disabled
-                      className="font-medium text-slate-500 bg-slate-100 border-none"
-                    >
-                      Xuất phát ngày {dayjs(targetDate).format("DD/MM/YYYY")}
-                    </Button>
-                  )}
-                  {isPastDay && (
-                    <Button 
-                      type="dashed"
-                      danger
-                      className="font-medium cursor-default"
-                      style={{ pointerEvents: "none" }}
-                    >
-                      Đã quá ngày xuất phát
-                    </Button>
-                  )}
-                  {isSameDay && isTourManagerLike(currentUser) && (
-                    <Button
-                      type="primary"
-                      icon={<SendOutlined />}
-                      className="font-bold tracking-wide shadow-md hover:shadow-lg"
-                      style={{
-                        backgroundColor: "#16a34a",
-                        borderColor: "#16a34a",
-                      }}
-                      onClick={handleStartTrip}
-                      loading={startTripMutation.isPending}
-                    >
-                      XUẤT PHÁT
-                    </Button>
-                  )}
-                </div>
-              );
-            })()}
+                const isSameDay = targetDateDayjs.isSame(todayDayjs, "day");
+                const isPastDay = targetDateDayjs.isBefore(todayDayjs, "day");
+                const isFutureDay = targetDateDayjs.isAfter(todayDayjs, "day");
+
+                return (
+                  <div className="flex items-center gap-3">
+                    {isFutureDay && (
+                      <Button
+                        disabled
+                        className="font-medium text-slate-500 bg-slate-100 border-none"
+                      >
+                        Xuất phát ngày {dayjs(targetDate).format("DD/MM/YYYY")}
+                      </Button>
+                    )}
+                    {isPastDay && (
+                      <Button
+                        type="dashed"
+                        danger
+                        className="font-medium cursor-default"
+                        style={{ pointerEvents: "none" }}
+                      >
+                        Đã quá ngày xuất phát
+                      </Button>
+                    )}
+                    {isSameDay && isTourManagerLike(currentUser) && (
+                      <Button
+                        type="primary"
+                        icon={<SendOutlined />}
+                        className="font-bold tracking-wide shadow-md hover:shadow-lg"
+                        style={{
+                          backgroundColor: "#16a34a",
+                          borderColor: "#16a34a",
+                        }}
+                        onClick={handleStartTrip}
+                        loading={startTripMutation.isPending}
+                      >
+                        XUẤT PHÁT
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
           </div>
         </div>
 

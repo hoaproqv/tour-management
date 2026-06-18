@@ -24,7 +24,7 @@ export default function TripFilterSelector({
   });
 
   const trips = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
-  
+
   const options = trips
     .sort((a, b) => {
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -40,7 +40,11 @@ export default function TripFilterSelector({
     options.unshift({ value: "all", label: "Tất cả chuyến đi" });
   }
 
-  const displayValue = options.some(opt => String(opt.value) === String(value)) ? value : undefined;
+  const displayValue = options.some(
+    (opt) => String(opt.value) === String(value),
+  )
+    ? value
+    : undefined;
 
   return (
     <Select

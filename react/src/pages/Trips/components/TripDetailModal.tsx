@@ -21,16 +21,14 @@ export default function TripDetailModal({
       open={!!detail}
       onCancel={onClose}
       footer={null}
-      title={
-        detail
-          ? `Round liên quan - ${detail.trip.name}`
-          : ""
-      }
+      title={detail ? `Round liên quan - ${detail.trip.name}` : ""}
       width={700}
     >
       {detail?.mode === "rounds" && (
         <div className="space-y-3">
-          {detail.trip.rounds.length === 0 && <Empty description="Chưa có round" />}
+          {detail.trip.rounds.length === 0 && (
+            <Empty description="Chưa có round" />
+          )}
           {detail.trip.rounds.map((round) => (
             <Card
               key={round.id}
@@ -40,7 +38,9 @@ export default function TripDetailModal({
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold text-slate-900">{round.name}</div>
+                  <div className="font-semibold text-slate-900">
+                    {round.name}
+                  </div>
                   <div className="text-xs text-slate-500">
                     Thứ tự: {round.sequence} · {round.location}
                   </div>

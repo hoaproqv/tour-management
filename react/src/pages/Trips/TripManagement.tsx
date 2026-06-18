@@ -44,8 +44,10 @@ export default function TripManagement() {
   const [statusFilter, setStatusFilter] = useState<Trip["status"] | "all">(
     "all",
   );
-  const [managingRoundsTrip, setManagingRoundsTrip] = useState<EnrichedTrip | null>(null);
-  const [assigningBusesTrip, setAssigningBusesTrip] = useState<EnrichedTrip | null>(null);
+  const [managingRoundsTrip, setManagingRoundsTrip] =
+    useState<EnrichedTrip | null>(null);
+  const [assigningBusesTrip, setAssigningBusesTrip] =
+    useState<EnrichedTrip | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [assigningTrip, setAssigningTrip] = useState<EnrichedTrip | null>(null);
@@ -117,7 +119,6 @@ export default function TripManagement() {
       Array.isArray(fleetLeadResponse?.data) ? fleetLeadResponse.data : [],
     [fleetLeadResponse],
   );
-
 
   useEffect(() => {
     // Không cần set tenant_id nữa vì backend tự xử lý

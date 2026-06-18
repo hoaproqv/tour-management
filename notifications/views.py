@@ -29,7 +29,10 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         token = request.data.get('token')
         if token:
             from .models import FCMDevice
-            FCMDevice.objects.get_or_create(user=request.user, token=token)
+            FCMDevice.objects.update_or_create(
+                token=token,
+                defaults={'user': request.user}
+            )
             return Response({'status': 'registered'})
         return Response({'error': 'Token is required'}, status=400)
 

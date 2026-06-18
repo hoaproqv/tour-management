@@ -60,7 +60,10 @@ export interface RoundItem {
   bus_ids: Array<string | number>;
 }
 
-export type RoundPayload = Omit<RoundItem, "id" | "estimate_time" | "actual_time" | "status"> & {
+export type RoundPayload = Omit<
+  RoundItem,
+  "id" | "estimate_time" | "actual_time" | "status"
+> & {
   estimate_time?: string | null;
   actual_time?: string | null;
   status?: "planned" | "doing" | "done";
@@ -175,6 +178,8 @@ export interface PaginatedParams {
   limit?: number;
   search?: string;
   trip?: string | number;
+  driver?: string | number;
+  manager?: string | number;
 }
 
 const buildQueryString = (
@@ -197,6 +202,14 @@ const buildQueryString = (
 
   if (trip !== undefined && trip !== null && `${trip}`.trim()) {
     query.append("trip", `${trip}`.trim());
+  }
+
+  if (params.driver !== undefined && params.driver !== null) {
+    query.append("driver", `${params.driver}`);
+  }
+
+  if (params.manager !== undefined && params.manager !== null) {
+    query.append("manager", `${params.manager}`);
   }
 
   const queryString = query.toString();
@@ -242,8 +255,10 @@ export const createTrip = async (payload: TripPayload) =>
 export const updateTrip = async (id: string, payload: TripPayload) =>
   putData(`/trips/${id}/`, payload);
 
-export const updateTripPartial = async (id: string, payload: Partial<TripPayload>) =>
-  patchData(`/trips/${id}/`, payload);
+export const updateTripPartial = async (
+  id: string,
+  payload: Partial<TripPayload>,
+) => patchData(`/trips/${id}/`, payload);
 
 export const deleteTrip = async (id: string) => deleteData(`/trips/${id}/`);
 
@@ -257,15 +272,14 @@ export const getTripBuses = async (
   return normalizePaginated<TripBus>(res, { page, limit });
 };
 
-export const updateTripBus = async (
-  id: string,
-  payload: Partial<TripBus>,
-) => patchData(`/trip-buses/${id}/`, payload);
+export const updateTripBus = async (id: string, payload: Partial<TripBus>) =>
+  patchData(`/trip-buses/${id}/`, payload);
 
 export const createTripBus = async (payload: Partial<TripBus>) =>
   postData("/trip-buses/", payload);
 
-export const deleteTripBus = async (id: string) => deleteData(`/trip-buses/${id}/`);
+export const deleteTripBus = async (id: string) =>
+  deleteData(`/trip-buses/${id}/`);
 
 export const bulkDeleteTripBuses = async (ids: number[]) =>
   postData("/trip-buses/bulk-delete/", { ids });
@@ -366,7 +380,10 @@ export const finalizeRoundBus = async (
   const finalized_at = finalized
     ? finalizedAt || new Date().toISOString()
     : null;
-  return patchData(`/round-buses/${id}/`, { finalized_at, snapshot_data: snapshotData });
+  return patchData(`/round-buses/${id}/`, {
+    finalized_at,
+    snapshot_data: snapshotData,
+  });
 };
 
 export const finalizeRoundBusCheckout = async (
@@ -378,7 +395,10 @@ export const finalizeRoundBusCheckout = async (
   const checkout_finalized_at = finalized
     ? finalizedAt || new Date().toISOString()
     : null;
-  return patchData(`/round-buses/${id}/`, { checkout_finalized_at, snapshot_data: snapshotData });
+  return patchData(`/round-buses/${id}/`, {
+    checkout_finalized_at,
+    snapshot_data: snapshotData,
+  });
 };
 
 export const getTransactions = async (
@@ -399,8 +419,10 @@ export const updateTransaction = async (
   payload: TransactionPayload,
 ) => putData(`/transactions/${id}/`, payload);
 
-export const bulkCheckOutTransactions = async (payload: { transaction_ids: (string | number)[]; check_out: string }) =>
-  postData("/transactions/bulk-check-out/", payload);
+export const bulkCheckOutTransactions = async (payload: {
+  transaction_ids: (string | number)[];
+  check_out: string;
+}) => postData("/transactions/bulk-check-out/", payload);
 
 export const deleteTransaction = async (id: string) =>
   deleteData(`/transactions/${id}/`);
@@ -437,7 +459,6 @@ export const undoTransfer = async (payload: {
   round_id: string;
   trip_id: string;
 }) => postData("/transactions/undo-transfer/", payload);
-
 
 export const upsertPassengerTransfer = async (
   payload: PassengerTransferPayload,
@@ -509,9 +530,13 @@ export const importPassengers = async (
 export const checkImportPassengers = async (
   formData: FormData,
 ): Promise<any> => {
-  const response = await axiosInstance.post("/passengers/import/check/", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await axiosInstance.post(
+    "/passengers/import/check/",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
   return response.data;
 };
 
@@ -591,24 +616,37 @@ export const exportRounds = async (tripId: string): Promise<Blob> => {
 };
 
 export const downloadRoundTemplate = async (tripId: string): Promise<Blob> => {
-  const response = await axiosInstance.get(`/rounds/import/template/?trip=${tripId}`, {
-    responseType: "blob",
-  });
+  const response = await axiosInstance.get(
+    `/rounds/import/template/?trip=${tripId}`,
+    {
+      responseType: "blob",
+    },
+  );
   return response.data as Blob;
 };
 
 // Trip Buses Import/Export
-export const importTripBuses = async (tripId: string, formData: FormData): Promise<any> => {
-  const response = await axiosInstance.post(`/trip-buses/import/?trip=${tripId}`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+export const importTripBuses = async (
+  tripId: string,
+  formData: FormData,
+): Promise<any> => {
+  const response = await axiosInstance.post(
+    `/trip-buses/import/?trip=${tripId}`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
   return response.data;
 };
 
 export const exportTripBuses = async (tripId: string): Promise<Blob> => {
-  const response = await axiosInstance.get(`/trip-buses/export/?trip=${tripId}`, {
-    responseType: "blob",
-  });
+  const response = await axiosInstance.get(
+    `/trip-buses/export/?trip=${tripId}`,
+    {
+      responseType: "blob",
+    },
+  );
   return response.data as Blob;
 };
 

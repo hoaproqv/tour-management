@@ -1,4 +1,11 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.encoding import force_bytes, force_str
+from django.utils.html import strip_tags
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import generics, permissions, serializers, status
@@ -11,10 +18,12 @@ from accounts.serializers import (
     ChangePasswordSerializer,
     CheckPasswordSerializer,
     CsrfSerializer,
+    ForgotPasswordSerializer,
     LoginResponseSerializer,
     LoginSerializer,
     RefreshTokenSerializer,
     RegisterSerializer,
+    ResetPasswordSerializer,
     RoleSerializer,
     TenantSerializer,
     TokenPairSerializer,
@@ -558,3 +567,89 @@ class CheckPasswordView(BaseAPIView):
             return self.error("Mật khẩu hiện tại không chính xác")
 
         return self.success(True)
+
+
+class ForgotPasswordView(BaseAPIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    serializer_class = ForgotPasswordSerializer
+
+    @extend_schema(
+        summary="Forgot Password",
+        description="Send password reset email to user.",
+        request=ForgotPasswordSerializer,
+        responses={200: inline_serializer("ForgotResponse", fields={"success": serializers.BooleanField(), "data": serializers.CharField()})},
+        tags=["Auth"],
+    )
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return self.error("Email không hợp lệ")
+
+        email = serializer.validated_data["email"]
+        user = User.objects.filter(email=email).first()
+        if user:
+            token = default_token_generator.make_token(user)
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+
+            # Using port 3000 assuming frontend is running there, could be driven by .env later
+            reset_url = f"http://localhost:3000/view/reset-password?uidb64={uidb64}&token={token}"
+
+            subject = "Yêu cầu khôi phục mật khẩu - Hệ thống Quản lý Chuyến đi"
+
+            context = {
+                'user_name': user.name or user.username,
+                'reset_url': reset_url,
+            }
+            html_message = render_to_string('accounts/email/reset_password.html', context)
+            plain_message = strip_tags(html_message)
+
+            try:
+                send_mail(
+                    subject,
+                    plain_message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [user.email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
+            except Exception as e:
+                return self.error(f"Lỗi gửi email: {str(e)}")
+
+        # Luôn trả về thành công dù có email hay không (bảo mật không lộ user)
+        return self.success("Đường link khôi phục mật khẩu đã được gửi vào email của bạn.")
+
+
+class ResetPasswordView(BaseAPIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    serializer_class = ResetPasswordSerializer
+
+    @extend_schema(
+        summary="Reset Password",
+        description="Reset user password using token and uidb64.",
+        request=ResetPasswordSerializer,
+        responses={200: inline_serializer("ResetResponse", fields={"success": serializers.BooleanField(), "data": serializers.CharField()})},
+        tags=["Auth"],
+    )
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return self.error("Dữ liệu không hợp lệ")
+
+        uidb64 = serializer.validated_data["uidb64"]
+        token = serializer.validated_data["token"]
+        new_password = serializer.validated_data["new_password"]
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user is not None and default_token_generator.check_token(user, token):
+            user.set_password(new_password)
+            user.save()
+            return self.success("Khôi phục mật khẩu thành công")
+        else:
+            return self.error("Đường dẫn không hợp lệ hoặc đã hết hạn")

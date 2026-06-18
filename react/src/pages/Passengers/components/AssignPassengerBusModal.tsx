@@ -1,8 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-import { SearchOutlined, MinusCircleOutlined, SwapRightOutlined } from "@ant-design/icons";
+import {
+  SearchOutlined,
+  MinusCircleOutlined,
+  SwapRightOutlined,
+} from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Card, Empty, List, Modal, Space, Spin, Tag, message, Input } from "antd";
+import {
+  Button,
+  Card,
+  Empty,
+  List,
+  Modal,
+  Space,
+  Spin,
+  Tag,
+  message,
+  Input,
+} from "antd";
 
 import {
   deletePassengerAssignment,
@@ -52,7 +67,7 @@ export default function AssignPassengerBusModal({
 }: AssignPassengerBusModalProps) {
   const queryClient = useQueryClient();
   const [selectedTripBusId, setSelectedTripBusId] = useState<string>();
-  
+
   const [searchBus, setSearchBus] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
   const [searchAll, setSearchAll] = useState("");
@@ -67,7 +82,11 @@ export default function AssignPassengerBusModal({
     enabled: open && Boolean(trip?.id),
   });
 
-  const tripBuses = useMemo(() => Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [], [tripBusesResponse]);
+  const tripBuses = useMemo(
+    () =>
+      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
+    [tripBusesResponse],
+  );
 
   const busesForTrip = useMemo(() => tripBuses ?? [], [tripBuses]);
 
@@ -94,14 +113,17 @@ export default function AssignPassengerBusModal({
     enabled: open && Boolean(trip?.id),
   });
 
-  const { data: assignmentsResponse, isLoading: loadingAssignments } = useQuery({
-    queryKey: ["passenger-assignments", trip?.id],
-    queryFn: () => getPassengerAssignments({ trip: trip?.id }),
-    enabled: open && Boolean(trip?.id),
-  });
+  const { data: assignmentsResponse, isLoading: loadingAssignments } = useQuery(
+    {
+      queryKey: ["passenger-assignments", trip?.id],
+      queryFn: () => getPassengerAssignments({ trip: trip?.id }),
+      enabled: open && Boolean(trip?.id),
+    },
+  );
 
   const passengers = useMemo(
-    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    () =>
+      Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
     [passengersResponse],
   );
 
@@ -135,36 +157,44 @@ export default function AssignPassengerBusModal({
   const filteredBuses = useMemo(() => {
     if (!debouncedSearchBus) return busesForTrip;
     const lowerSearch = removeVietnameseTones(debouncedSearchBus);
-    return busesForTrip.filter(tb => {
+    return busesForTrip.filter((tb) => {
       const label = tripBusLabelMap.get(tb.id) || "";
       return removeVietnameseTones(label).includes(lowerSearch);
     });
   }, [busesForTrip, debouncedSearchBus, tripBusLabelMap]);
 
   const passengersForSelected = useMemo(() => {
-    let list = passengers
-      .filter((p) => {
-        const assignment = assignmentByPassenger.get(p.id);
-        return selectedTripBus ? assignment?.trip_bus === selectedTripBus.id : false;
-      });
-    
+    let list = passengers.filter((p) => {
+      const assignment = assignmentByPassenger.get(p.id);
+      return selectedTripBus
+        ? assignment?.trip_bus === selectedTripBus.id
+        : false;
+    });
+
     if (debouncedSearchAssigned) {
       const lowerSearch = removeVietnameseTones(debouncedSearchAssigned);
-      list = list.filter(p => 
-        removeVietnameseTones(p.name).includes(lowerSearch) || 
-        removeVietnameseTones(p.phone || "").includes(lowerSearch)
+      list = list.filter(
+        (p) =>
+          removeVietnameseTones(p.name).includes(lowerSearch) ||
+          removeVietnameseTones(p.phone || "").includes(lowerSearch),
       );
     }
     return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [assignmentByPassenger, passengers, selectedTripBus, debouncedSearchAssigned]);
+  }, [
+    assignmentByPassenger,
+    passengers,
+    selectedTripBus,
+    debouncedSearchAssigned,
+  ]);
 
   const filteredAllPassengers = useMemo(() => {
     let list = [...passengers];
     if (debouncedSearchAll) {
       const lowerSearch = removeVietnameseTones(debouncedSearchAll);
-      list = list.filter(p => 
-        removeVietnameseTones(p.name).includes(lowerSearch) || 
-        removeVietnameseTones(p.phone || "").includes(lowerSearch)
+      list = list.filter(
+        (p) =>
+          removeVietnameseTones(p.name).includes(lowerSearch) ||
+          removeVietnameseTones(p.phone || "").includes(lowerSearch),
       );
     }
     return list.sort((a, b) => a.name.localeCompare(b.name));
@@ -196,7 +226,9 @@ export default function AssignPassengerBusModal({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["passengers"] }),
         queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
-        queryClient.invalidateQueries({ queryKey: ["passengers", { trip: trip?.id }] }),
+        queryClient.invalidateQueries({
+          queryKey: ["passengers", { trip: trip?.id }],
+        }),
       ]);
     },
     onError: () => message.error("Cập nhật xe thất bại"),
@@ -279,7 +311,16 @@ export default function AssignPassengerBusModal({
                 : "Chọn xe"
             }
             className="h-full flex flex-col"
-            styles={{ body: { padding: 0, minHeight: 360, flex: 1, display: 'flex', flexDirection: 'column' }, header: { padding: '0 12px' } }}
+            styles={{
+              body: {
+                padding: 0,
+                minHeight: 360,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+              },
+              header: { padding: "0 12px" },
+            }}
             extra={
               <Input
                 placeholder="Tìm khách..."
@@ -293,13 +334,22 @@ export default function AssignPassengerBusModal({
               />
             }
           >
-            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+            <div
+              className="flex-1 overflow-y-auto p-3 custom-scrollbar"
+              style={{ maxHeight: "calc(100vh - 250px)" }}
+            >
               {!selectedTripBus && (
-                <Empty description="Chọn xe để xem danh sách" className="mt-8" />
+                <Empty
+                  description="Chọn xe để xem danh sách"
+                  className="mt-8"
+                />
               )}
 
               {selectedTripBus && passengersForSelected.length === 0 && (
-                <Empty description="Không tìm thấy hành khách" className="mt-8" />
+                <Empty
+                  description="Không tìm thấy hành khách"
+                  className="mt-8"
+                />
               )}
 
               {selectedTripBus && passengersForSelected.length > 0 && (
@@ -310,9 +360,22 @@ export default function AssignPassengerBusModal({
                     <List.Item className="!p-0 !mb-1.5 border border-slate-100 rounded-md overflow-hidden bg-slate-50">
                       <div className="flex justify-between items-center w-full px-2 py-1.5">
                         <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
-                          <span className="font-medium text-[13px] leading-snug truncate text-slate-800">{p.name}</span>
-                          {p.phone && <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap">- {p.phone}</span>}
-                          {p.note && <Tag className="!m-0 !text-[10px] !leading-3 border-transparent bg-slate-200 text-slate-600 shrink-0" color="default">{p.note}</Tag>}
+                          <span className="font-medium text-[13px] leading-snug truncate text-slate-800">
+                            {p.name}
+                          </span>
+                          {p.phone && (
+                            <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap">
+                              - {p.phone}
+                            </span>
+                          )}
+                          {p.note && (
+                            <Tag
+                              className="!m-0 !text-[10px] !leading-3 border-transparent bg-slate-200 text-slate-600 shrink-0"
+                              color="default"
+                            >
+                              {p.note}
+                            </Tag>
+                          )}
                         </div>
                         <Button
                           danger
@@ -336,7 +399,16 @@ export default function AssignPassengerBusModal({
           <Card
             title={`Tất cả hành khách (${passengers.length})`}
             className="h-full flex flex-col"
-            styles={{ body: { padding: 0, minHeight: 360, flex: 1, display: 'flex', flexDirection: 'column' }, header: { padding: '0 12px' } }}
+            styles={{
+              body: {
+                padding: 0,
+                minHeight: 360,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+              },
+              header: { padding: "0 12px" },
+            }}
             extra={
               <Input
                 placeholder="Tìm khách..."
@@ -349,9 +421,15 @@ export default function AssignPassengerBusModal({
               />
             }
           >
-            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+            <div
+              className="flex-1 overflow-y-auto p-3 custom-scrollbar"
+              style={{ maxHeight: "calc(100vh - 250px)" }}
+            >
               {filteredAllPassengers.length === 0 && (
-                <Empty description="Không tìm thấy hành khách" className="mt-8" />
+                <Empty
+                  description="Không tìm thấy hành khách"
+                  className="mt-8"
+                />
               )}
 
               {filteredAllPassengers.length > 0 && (
@@ -368,7 +446,9 @@ export default function AssignPassengerBusModal({
                       selectedTripBus &&
                       assignment?.trip_bus === selectedTripBus.id;
 
-                    const selectedLabel = selectedTripBus ? tripBusLabelMap.get(selectedTripBus.id) : '';
+                    const selectedLabel = selectedTripBus
+                      ? tripBusLabelMap.get(selectedTripBus.id)
+                      : "";
 
                     const isSelectedBusFull =
                       selectedTripBus &&
@@ -381,20 +461,31 @@ export default function AssignPassengerBusModal({
                           {/* Info Row */}
                           <div className="w-full px-2 py-1 bg-white">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-medium text-[13px] leading-snug truncate text-slate-800">{p.name}</span>
-                              {p.phone && <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap">- {p.phone}</span>}
+                              <span className="font-medium text-[13px] leading-snug truncate text-slate-800">
+                                {p.name}
+                              </span>
+                              {p.phone && (
+                                <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap">
+                                  - {p.phone}
+                                </span>
+                              )}
                             </div>
                           </div>
-                          
+
                           {/* Action Row */}
                           <div className="w-full bg-slate-50 border-t border-slate-100 px-2 py-1 flex justify-between items-center">
                             <div className="shrink-0 pr-2">
                               {currentTripBusLabel ? (
-                                <Tag color="processing" className="!m-0 text-[10px] leading-[14px] px-1 border-blue-200">
+                                <Tag
+                                  color="processing"
+                                  className="!m-0 text-[10px] leading-[14px] px-1 border-blue-200"
+                                >
                                   {currentTripBusLabel}
                                 </Tag>
                               ) : (
-                                <Tag className="!m-0 text-[10px] leading-[14px] px-1 text-slate-400 bg-slate-50 border-slate-200">Chưa gán</Tag>
+                                <Tag className="!m-0 text-[10px] leading-[14px] px-1 text-slate-400 bg-slate-50 border-slate-200">
+                                  Chưa gán
+                                </Tag>
                               )}
                             </div>
                             <Button
@@ -402,8 +493,18 @@ export default function AssignPassengerBusModal({
                               ghost
                               size="small"
                               className="text-[11px] h-[22px] px-2 py-0"
-                              icon={!isInSelected && !isSelectedBusFull && <SwapRightOutlined className="text-[10px]" />}
-                              disabled={!selectedTripBus || isInSelected || isSelectedBusFull || undefined}
+                              icon={
+                                !isInSelected &&
+                                !isSelectedBusFull && (
+                                  <SwapRightOutlined className="text-[10px]" />
+                                )
+                              }
+                              disabled={
+                                !selectedTripBus ||
+                                isInSelected ||
+                                isSelectedBusFull ||
+                                undefined
+                              }
                               onClick={() => handleAssign(p, selectedTripBus)}
                               loading={assignMutation.isPending}
                             >
@@ -411,7 +512,7 @@ export default function AssignPassengerBusModal({
                                 ? "Đã ở xe này"
                                 : isSelectedBusFull
                                   ? "Xe đã đầy"
-                                  : `Gán vào ${selectedLabel || 'xe'}`}
+                                  : `Gán vào ${selectedLabel || "xe"}`}
                             </Button>
                           </div>
                         </div>

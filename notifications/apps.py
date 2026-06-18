@@ -6,4 +6,4 @@ class NotificationsConfig(AppConfig):
     name = 'notifications'
 
     def ready(self):
-        import notifications.signals  # noqa: F401
+        import notifications.signals  # noqa: F401 # pylint: disable=unused-import

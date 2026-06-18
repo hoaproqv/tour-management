@@ -16,7 +16,6 @@ services:
       - .env
     environment:
       DJANGO_SETTINGS_MODULE: tour_management.settings
-      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
       DB_HOST: db
     ports:
       - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"

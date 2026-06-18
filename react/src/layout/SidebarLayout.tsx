@@ -31,7 +31,9 @@ export default function SidebarLayout() {
 
           {/* Mobile toggle button */}
           <div className="md:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-md py-3 -mx-4 px-4 mb-6 shadow-sm border-b border-slate-200 flex items-center justify-between">
-            <span className="font-bold tracking-tight text-slate-800">Trình điều khiển</span>
+            <span className="font-bold tracking-tight text-slate-800">
+              Trình điều khiển
+            </span>
             <Button
               type="primary"
               icon={<MenuOutlined />}

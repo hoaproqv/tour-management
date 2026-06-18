@@ -2,7 +2,16 @@ import React, { useMemo, useState } from "react";
 
 import { DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Form, Input, Select, Typography, message, Modal, Tabs } from "antd";
+import {
+  Button,
+  Form,
+  Input,
+  Select,
+  Typography,
+  message,
+  Modal,
+  Tabs,
+} from "antd";
 
 import {
   createPassenger,
@@ -41,8 +50,6 @@ export default function PassengerManagement() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
-
-
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showAssignBus, setShowAssignBus] = useState(false);
@@ -66,7 +73,9 @@ export default function PassengerManagement() {
   });
 
   const trips = useMemo(() => {
-    const arr = Array.isArray(tripsResponse?.data) ? [...tripsResponse.data] : [];
+    const arr = Array.isArray(tripsResponse?.data)
+      ? [...tripsResponse.data]
+      : [];
     return arr.sort((a, b) => {
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -102,13 +111,15 @@ export default function PassengerManagement() {
 
   const { data: tripBusesResponse } = useQuery({
     queryKey: ["trip-buses", { trip: tripFilter }],
-    queryFn: () => getTripBuses({ trip: tripFilter as string, page: 1, limit: 1000 }),
+    queryFn: () =>
+      getTripBuses({ trip: tripFilter as string, page: 1, limit: 1000 }),
     enabled: tripFilter !== "all" && Boolean(tripFilter),
   });
 
   const tripBuses = useMemo(
-    () => Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
-    [tripBusesResponse]
+    () =>
+      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
+    [tripBusesResponse],
   );
 
   const { data: assignmentsResponse } = useQuery({
@@ -118,20 +129,23 @@ export default function PassengerManagement() {
   });
 
   const assignments = useMemo(
-    () => Array.isArray(assignmentsResponse) ? assignmentsResponse : [],
-    [assignmentsResponse]
+    () => (Array.isArray(assignmentsResponse) ? assignmentsResponse : []),
+    [assignmentsResponse],
   );
 
   const assignmentMap = useMemo(() => {
     const map = new Map<string, any>();
-    assignments.forEach(a => map.set(a.passenger, a));
+    assignments.forEach((a) => map.set(a.passenger, a));
     return map;
   }, [assignments]);
 
   const tripMap = useMemo(
     () =>
       new Map(
-        (Array.isArray(trips) ? trips : []).map((t: Trip) => [String(t.id), t.name]),
+        (Array.isArray(trips) ? trips : []).map((t: Trip) => [
+          String(t.id),
+          t.name,
+        ]),
       ),
     [trips],
   );
@@ -152,29 +166,31 @@ export default function PassengerManagement() {
       return (
         removeAccents(p.name).toLowerCase().includes(term) ||
         removeAccents(p.phone).toLowerCase().includes(term) ||
-        removeAccents(p.note || "").toLowerCase().includes(term)
+        removeAccents(p.note || "")
+          .toLowerCase()
+          .includes(term)
       );
     });
   }, [passengers, debouncedSearch]);
 
   const groupedPassengers = useMemo(() => {
     if (tripFilter === "all" || !tripFilter) return { all: filteredPassengers };
-    
+
     const groups: Record<string, Passenger[]> = {
       unassigned: [],
     };
-    
-    tripBuses.forEach(tb => {
+
+    tripBuses.forEach((tb) => {
       groups[`trip_bus_${tb.id}`] = [];
     });
-    
-    importedBusesForTrip.forEach(ib => {
+
+    importedBusesForTrip.forEach((ib) => {
       if (!ib.is_mapped) {
         groups[`imported_bus_${ib.id}`] = [];
       }
     });
 
-    filteredPassengers.forEach(p => {
+    filteredPassengers.forEach((p) => {
       const assign = assignmentMap.get(p.id);
       if (!assign) {
         groups.unassigned.push(p);
@@ -185,7 +201,9 @@ export default function PassengerManagement() {
           groups.unassigned.push(p);
         }
       } else if (assign.imported_bus) {
-        const importedBus = importedBusesForTrip.find(ib => String(ib.id) === String(assign.imported_bus));
+        const importedBus = importedBusesForTrip.find(
+          (ib) => String(ib.id) === String(assign.imported_bus),
+        );
         if (importedBus) {
           if (!importedBus.is_mapped) {
             if (groups[`imported_bus_${assign.imported_bus}`]) {
@@ -215,7 +233,13 @@ export default function PassengerManagement() {
     });
 
     return groups;
-  }, [filteredPassengers, tripFilter, tripBuses, importedBusesForTrip, assignmentMap]);
+  }, [
+    filteredPassengers,
+    tripFilter,
+    tripBuses,
+    importedBusesForTrip,
+    assignmentMap,
+  ]);
 
   const createMutation = useMutation({
     mutationFn: (payload: PassengerPayload) => createPassenger(payload),
@@ -280,11 +304,14 @@ export default function PassengerManagement() {
     }
     setEditingPassenger(passenger);
     const assign = assignmentMap.get(passenger.id);
-    
+
     // Default to the current global tripFilter if available, otherwise fallback to assignment's trip
-    const defaultTripId = (tripFilter !== "all" && tripFilter) 
-      ? String(tripFilter) 
-      : (assign ? String(assign.trip) : undefined);
+    const defaultTripId =
+      tripFilter !== "all" && tripFilter
+        ? String(tripFilter)
+        : assign
+          ? String(assign.trip)
+          : undefined;
 
     form.setFieldsValue({
       name: passenger.name,
@@ -292,7 +319,8 @@ export default function PassengerManagement() {
       extra_info: passenger.extra_info,
       note: passenger.note,
       trip_id: defaultTripId,
-      trip_bus_id: assign && assign.trip_bus ? String(assign.trip_bus) : undefined,
+      trip_bus_id:
+        assign && assign.trip_bus ? String(assign.trip_bus) : undefined,
     });
     setShowCreate(true);
   };
@@ -312,7 +340,7 @@ export default function PassengerManagement() {
         if (editingPassenger) {
           payload.trip_id = values.trip_id;
           // Explicitly pass null if undefined so the backend knows to clear the assignment
-          payload.trip_bus_id = values.trip_bus_id || null as any;
+          payload.trip_bus_id = values.trip_bus_id || (null as any);
           updateMutation.mutate({ id: editingPassenger.id, payload });
         } else {
           payload.trip_id = values.trip_id;
@@ -388,7 +416,9 @@ export default function PassengerManagement() {
               onClick={handleExport}
               disabled={tripFilter === "all"}
               title={
-                tripFilter === "all" ? "Chọn chuyến đi để export" : "Export .xlsx"
+                tripFilter === "all"
+                  ? "Chọn chuyến đi để export"
+                  : "Export .xlsx"
               }
               className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
             >
@@ -400,7 +430,11 @@ export default function PassengerManagement() {
                   type="primary"
                   onClick={() => setShowAssignBus(true)}
                   disabled={tripFilter === "all" || !selectedTrip}
-                  title={tripFilter === "all" ? "Chọn chuyến đi để sắp xếp xe" : "Sắp xếp xe cho hành khách"}
+                  title={
+                    tripFilter === "all"
+                      ? "Chọn chuyến đi để sắp xếp xe"
+                      : "Sắp xếp xe cho hành khách"
+                  }
                   className="bg-green-600 hover:bg-green-700 shadow-sm px-5 border-none text-white disabled:bg-slate-300 disabled:text-slate-500"
                 >
                   Sắp xếp xe
@@ -419,9 +453,15 @@ export default function PassengerManagement() {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 mb-4 p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
           <div className="flex items-center gap-3">
-            <span className="font-medium text-slate-700 whitespace-nowrap">Chuyến đi:</span>
+            <span className="font-medium text-slate-700 whitespace-nowrap">
+              Chuyến đi:
+            </span>
             <Select
-              value={trips.some(t => String(t.id) === tripFilter) ? tripFilter : undefined}
+              value={
+                trips.some((t) => String(t.id) === tripFilter)
+                  ? tripFilter
+                  : undefined
+              }
               onChange={(val) => {
                 setTripFilter(val);
                 if (importResult && val !== importResult.trip_id) {
@@ -467,11 +507,17 @@ export default function PassengerManagement() {
                           onOk: async () => {
                             const hide = message.loading("Đang xóa...", 0);
                             try {
-                              await bulkDeletePassengers(selectedRowKeys as string[]);
-                              message.success(`Đã xóa ${selectedRowKeys.length} hành khách`);
+                              await bulkDeletePassengers(
+                                selectedRowKeys as string[],
+                              );
+                              message.success(
+                                `Đã xóa ${selectedRowKeys.length} hành khách`,
+                              );
                               setSelectedRowKeys([]);
                               setIsSelectionMode(false);
-                              await queryClient.invalidateQueries({ queryKey: ["passengers"] });
+                              await queryClient.invalidateQueries({
+                                queryKey: ["passengers"],
+                              });
                             } catch {
                               message.error("Lỗi khi xóa hành khách");
                             } finally {
@@ -495,16 +541,19 @@ export default function PassengerManagement() {
         </div>
 
         {/* Imported Bus Mapper */}
-        {tripFilter !== "all" && importedBusesForTrip.length > 0 && selectedTrip?.status === "planned" && canManage && (
-          <div className="mb-4">
-            <ImportedBusMapper
-              tripId={tripFilter as string}
-              tripName={selectedTrip?.name || importResult?.trip_name}
-              readOnly={false}
-              onDone={() => setImportResult(null)}
-            />
-          </div>
-        )}
+        {tripFilter !== "all" &&
+          importedBusesForTrip.length > 0 &&
+          selectedTrip?.status === "planned" &&
+          canManage && (
+            <div className="mb-4">
+              <ImportedBusMapper
+                tripId={tripFilter as string}
+                tripName={selectedTrip?.name || importResult?.trip_name}
+                readOnly={false}
+                onDone={() => setImportResult(null)}
+              />
+            </div>
+          )}
 
         {tripFilter === "all" || !tripFilter ? (
           <PassengerTable
@@ -524,31 +573,39 @@ export default function PassengerManagement() {
             type="card"
             items={[
               ...tripBuses
-                .filter((tb) => (groupedPassengers[`trip_bus_${tb.id}`]?.length || 0) > 0)
+                .filter(
+                  (tb) =>
+                    (groupedPassengers[`trip_bus_${tb.id}`]?.length || 0) > 0,
+                )
                 .map((tb) => {
                   const mappedSheets = importedBusesForTrip
-                    .filter((ib) => String(ib.mapped_trip_bus) === String(tb.id))
+                    .filter(
+                      (ib) => String(ib.mapped_trip_bus) === String(tb.id),
+                    )
                     .map((ib) => ib.sheet_name);
-                  const prefix = mappedSheets.length > 0 ? `${mappedSheets.join(', ')} - ` : '';
+                  const prefix =
+                    mappedSheets.length > 0
+                      ? `${mappedSheets.join(", ")} - `
+                      : "";
                   return {
-                  key: `trip_bus_${tb.id}`,
-                  label: `${prefix}${tb.registration_number || tb.bus_code || `Xe #${tb.id}`} (${groupedPassengers[`trip_bus_${tb.id}`]?.length || 0})`,
-                  children: (
-                    <PassengerTable
-                      className=""
-                    data={groupedPassengers[`trip_bus_${tb.id}`] || []}
-                    isLoading={isLoading}
-                    deleting={deleteMutation.status === "pending"}
-                    canManage={canManage}
-                    selectedRowKeys={selectedRowKeys}
-                    onSelectChange={setSelectedRowKeys}
-                    isSelectionMode={isSelectionMode}
-                    onDelete={(id) => deleteMutation.mutate(id)}
-                    onEdit={openEdit}
-                  />
-                ),
-              };
-            }),
+                    key: `trip_bus_${tb.id}`,
+                    label: `${prefix}${tb.registration_number || tb.bus_code || `Xe #${tb.id}`} (${groupedPassengers[`trip_bus_${tb.id}`]?.length || 0})`,
+                    children: (
+                      <PassengerTable
+                        className=""
+                        data={groupedPassengers[`trip_bus_${tb.id}`] || []}
+                        isLoading={isLoading}
+                        deleting={deleteMutation.status === "pending"}
+                        canManage={canManage}
+                        selectedRowKeys={selectedRowKeys}
+                        onSelectChange={setSelectedRowKeys}
+                        isSelectionMode={isSelectionMode}
+                        onDelete={(id) => deleteMutation.mutate(id)}
+                        onEdit={openEdit}
+                      />
+                    ),
+                  };
+                }),
               ...importedBusesForTrip
                 .filter((ib) => !ib.is_mapped)
                 .map((ib) => ({

@@ -1,6 +1,12 @@
 import React from "react";
 
-import { ApartmentOutlined, CarOutlined, DeleteOutlined, EditOutlined, TeamOutlined } from "@ant-design/icons";
+import {
+  ApartmentOutlined,
+  CarOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import { Button, Empty, Popconfirm, Space, Table, Tag, Tooltip } from "antd";
 
 import type { EnrichedTrip } from "./types";
@@ -38,8 +44,12 @@ export default function TripTable({
       rowKey="id"
       dataSource={trips}
       loading={loading}
-      pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
-      scroll={{ x: 'max-content' }}
+      pagination={{
+        defaultPageSize: 10,
+        showSizeChanger: true,
+        pageSizeOptions: ["5", "10", "20", "50"],
+      }}
+      scroll={{ x: "max-content" }}
       columns={[
         {
           title: "Tên",
@@ -68,13 +78,17 @@ export default function TripTable({
           title: "Số xe",
           dataIndex: "busCount",
           align: "center",
-          render: (_: number, record: EnrichedTrip) => <Tag color="processing">{record.busCount}</Tag>,
+          render: (_: number, record: EnrichedTrip) => (
+            <Tag color="processing">{record.busCount}</Tag>
+          ),
         },
         {
           title: "Số chặng",
           dataIndex: "roundCount",
           align: "center",
-          render: (_: number, record: EnrichedTrip) => <Tag color="geekblue">{record.roundCount}</Tag>,
+          render: (_: number, record: EnrichedTrip) => (
+            <Tag color="geekblue">{record.roundCount}</Tag>
+          ),
         },
         {
           title: "Tình trạng",
@@ -112,7 +126,13 @@ export default function TripTable({
                   onConfirm={() => onDelete(record)}
                   disabled={record.status !== "planned"}
                 >
-                  <Tooltip title={record.status !== "planned" ? "Không thể xóa chuyến đi đã khởi hành" : "Xóa trip"}>
+                  <Tooltip
+                    title={
+                      record.status !== "planned"
+                        ? "Không thể xóa chuyến đi đã khởi hành"
+                        : "Xóa trip"
+                    }
+                  >
                     <Button
                       type="text"
                       danger
@@ -151,7 +171,11 @@ export default function TripTable({
         },
       ]}
       locale={{
-        emptyText: loading ? <span>Đang tải...</span> : <Empty description="Chưa có dữ liệu" />,
+        emptyText: loading ? (
+          <span>Đang tải...</span>
+        ) : (
+          <Empty description="Chưa có dữ liệu" />
+        ),
       }}
     />
   );

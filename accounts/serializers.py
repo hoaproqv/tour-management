@@ -1,3 +1,4 @@
+# pylint: disable=abstract-method
 from django.contrib.auth import authenticate, get_user_model
 from django.db import models
 from rest_framework import serializers
@@ -78,6 +79,9 @@ class UserSerializer(serializers.ModelSerializer):
             "is_available",
             "created_at",
             "updated_at",
+            "receive_in_app_notifications",
+            "receive_device_notifications",
+            "receive_email_notifications",
         ]
 
     def _get_active_trip_bus(self, obj):
@@ -185,7 +189,14 @@ class UserMeUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["name", "email", "phone"]
+        fields = [
+            "name",
+            "email",
+            "phone",
+            "receive_in_app_notifications",
+            "receive_device_notifications",
+            "receive_email_notifications",
+        ]
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -195,3 +206,13 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 class CheckPasswordSerializer(serializers.Serializer):
     current_password = serializers.CharField(required=True)
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    uidb64 = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, min_length=8)

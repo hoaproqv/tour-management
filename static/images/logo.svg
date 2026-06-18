@@ -1,0 +1,11 @@
+<svg viewBox="0 0 64 64" width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M32 4C19.85 4 10 13.85 10 26C10 42.5 32 60 32 60C32 60 54 42.5 54 26C54 13.85 44.15 4 32 4Z M32 14C38.6 14 44 19.4 44 26C44 32.6 38.6 38 32 38C25.4 38 20 32.6 20 26C20 19.4 25.4 14 32 14Z" fill="#0EA5E9" />
+  <path d="M 12 38 C 28 50, 24 16, 46 16" stroke="#22C55E" stroke-width="6" stroke-linecap="round" fill="none" />
+  <g transform="translate(35, 6) rotate(12)">
+    <rect x="0" y="0" width="24" height="14" rx="4" fill="#FFFFFF" stroke="#22C55E" stroke-width="3" />
+    <rect x="14" y="3" width="6" height="5" rx="1.5" fill="#0EA5E9" />
+    <rect x="6" y="3" width="6" height="5" rx="1.5" fill="#0EA5E9" />
+    <circle cx="6" cy="14" r="3" fill="#1E293B" />
+    <circle cx="18" cy="14" r="3" fill="#1E293B" />
+  </g>
+</svg>

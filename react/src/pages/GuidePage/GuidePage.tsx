@@ -112,29 +112,41 @@ export default function GuidePage() {
                     <Tag color="green">Thêm mới</Tag>
                   </Text>
                   Từ trang danh sách hoặc trong Chi tiết chuyến đi, bấm{" "}
-                  <Text mark>Thêm mới chặng</Text>. Bạn cần nhập: Thuộc chuyến đi, 
-                  Tên chặng, Địa điểm, Ngày và Giờ đến dự kiến (dạng 24 giờ).
+                  <Text mark>Thêm mới chặng</Text>. Bạn cần nhập: Thuộc chuyến
+                  đi, Tên chặng, Địa điểm, Ngày và Giờ đến dự kiến (dạng 24
+                  giờ).
                 </Paragraph>
                 <Paragraph className="mb-2">
                   <Text strong>
                     <Tag color="orange">Sửa lộ trình</Tag>
                   </Text>
-                  Sử dụng tính năng sửa để cập nhật lại thời gian hoặc địa điểm nếu có thay đổi.{" "}
-                  <Text type="danger" strong>Lưu ý:</Text> Chỉ được sửa các chặng ở ngày chưa đi. Trong ngày đang đi, chỉ được sửa các chặng chưa đến. Không thể sửa chặng đã đến hoặc đang đi.
+                  Sử dụng tính năng sửa để cập nhật lại thời gian hoặc địa điểm
+                  nếu có thay đổi.{" "}
+                  <Text type="danger" strong>
+                    Lưu ý:
+                  </Text>{" "}
+                  Chỉ được sửa các chặng ở ngày chưa đi. Trong ngày đang đi, chỉ
+                  được sửa các chặng chưa đến. Không thể sửa chặng đã đến hoặc
+                  đang đi.
                 </Paragraph>
                 <Paragraph className="mb-2">
                   <Text strong>
                     <Tag color="purple">Sắp xếp thứ tự</Tag>
                   </Text>
-                  Bạn có thể kéo thả trực tiếp các dòng trong bảng để thay đổi thứ tự các chặng.{" "}
-                  <Text type="danger" strong>Lưu ý:</Text> Không được kéo và sắp xếp các chặng chưa đến lên trước các chặng đang thực hiện (đang đi).
+                  Bạn có thể kéo thả trực tiếp các dòng trong bảng để thay đổi
+                  thứ tự các chặng.{" "}
+                  <Text type="danger" strong>
+                    Lưu ý:
+                  </Text>{" "}
+                  Không được kéo và sắp xếp các chặng chưa đến lên trước các
+                  chặng đang thực hiện (đang đi).
                 </Paragraph>
                 <Paragraph className="mb-0">
                   <Text strong>
                     <Tag color="red">Xóa</Tag>
                   </Text>
-                  Hệ thống sẽ yêu cầu xác nhận khi xóa. Chỉ xóa được chặng chưa có
-                  dữ liệu điểm danh.
+                  Hệ thống sẽ yêu cầu xác nhận khi xóa. Chỉ xóa được chặng chưa
+                  có dữ liệu điểm danh.
                 </Paragraph>
               </div>
             ) : (
@@ -143,7 +155,8 @@ export default function GuidePage() {
                   <Text strong>
                     <Tag color="blue">Xem danh sách phân công</Tag>
                   </Text>
-                  Bạn sẽ chỉ thấy các chặng thuộc chuyến đi mà xe của bạn được phân công.
+                  Bạn sẽ chỉ thấy các chặng thuộc chuyến đi mà xe của bạn được
+                  phân công.
                 </Paragraph>
               </div>
             )}
@@ -230,9 +243,11 @@ export default function GuidePage() {
                 cho một chuyến đi.
                 <Text type="danger" strong>
                   {" "}
-                  LƯU Ý QUAN TRỌNG: Sau khi import hành khách từ Excel hoặc tạo tay, bạn bắt
-                  buộc phải gắn xe thực tế cho họ thì họ mới hiển thị trên app của tài xế. 
-                  Khi gắn xe, hệ thống sẽ tự động gộp danh sách hành khách của xe import vào chung tab với xe thực tế.
+                  LƯU Ý QUAN TRỌNG: Sau khi import hành khách từ Excel hoặc tạo
+                  tay, bạn bắt buộc phải gắn xe thực tế cho họ thì họ mới hiển
+                  thị trên app của tài xế. Khi gắn xe, hệ thống sẽ tự động gộp
+                  danh sách hành khách của xe import vào chung tab với xe thực
+                  tế.
                 </Text>
               </Paragraph>
               <Paragraph className="mb-2">
@@ -240,7 +255,9 @@ export default function GuidePage() {
                   <Tag color="purple">Phân bổ hành khách</Tag>
                 </Text>
                 Trong màn hình chi tiết Chuyến đi, bạn có thể chọn nhiều hành
-                khách và gán họ vào một Chặng (Xe) cụ thể. Các hành khách đã được gán sẽ tự động được gộp chung danh sách với xe thực tế theo thứ tự bảng chữ cái.
+                khách và gán họ vào một Chặng (Xe) cụ thể. Các hành khách đã
+                được gán sẽ tự động được gộp chung danh sách với xe thực tế theo
+                thứ tự bảng chữ cái.
               </Paragraph>
               <Paragraph className="mb-2">
                 <Text strong>
@@ -265,7 +282,7 @@ export default function GuidePage() {
     if (isCompanyManagerRole || isTourManager || isDriverOrFleet) {
       items.push({
         key: "transactions",
-        label: "Điểm danh hành khách (Cốt lõi)",
+        label: "Điểm danh hành khách",
         children: (
           <div className="space-y-4">
             <Paragraph>
@@ -275,11 +292,22 @@ export default function GuidePage() {
             </Paragraph>
             <Paragraph className="mb-4">
               <Text type="warning" strong>
-                *Lưu ý (Dành riêng cho Quản lý chuyến đi): 
+                *Lưu ý (Dành riêng cho Quản lý chuyến đi):
               </Text>{" "}
-              Quản lý chuyến đi bắt buộc phải bấm nút <Text strong>XUẤT PHÁT</Text> ở phía trên cùng của màn hình để bắt đầu chuyến đi. Nút này sẽ kiểm tra ngày của chặng bạn đang chọn. Nếu chưa đến ngày, hệ thống sẽ hiển thị <Text type="secondary">"Xuất phát ngày..."</Text> và chặn thao tác để tránh xuất phát nhầm ngày.
-              <br/>
-              Đồng thời, hệ thống sẽ tự động kiểm tra số lượng hành khách. Nếu còn <Text type="danger" strong>hành khách chưa được gán xe</Text>, hệ thống sẽ cảnh báo và chặn xuất phát để đảm bảo không sót khách.
+              Quản lý chuyến đi bắt buộc phải bấm nút{" "}
+              <Text strong>XUẤT PHÁT</Text> ở phía trên cùng của màn hình để bắt
+              đầu chuyến đi. Nút này sẽ kiểm tra ngày của chặng bạn đang chọn.
+              Nếu chưa đến ngày, hệ thống sẽ hiển thị{" "}
+              <Text type="secondary">"Xuất phát ngày..."</Text> và chặn thao tác
+              để tránh xuất phát nhầm ngày.
+              <br />
+              Đồng thời, hệ thống sẽ tự động kiểm tra số lượng hành khách. Nếu
+              còn{" "}
+              <Text type="danger" strong>
+                hành khách chưa được gán xe
+              </Text>
+              , hệ thống sẽ cảnh báo và chặn xuất phát để đảm bảo không sót
+              khách.
             </Paragraph>
 
             <Divider orientation="left" plain>
@@ -300,7 +328,7 @@ export default function GuidePage() {
                   {
                     title: <Text strong>Bước 2: Chọn Chặng (Timeline)</Text>,
                     description:
-                      'Bấm vào các mốc chặng trên thanh Timeline để xem danh sách xe. Cần chốt điểm danh lần lượt theo thứ tự của các chặng.',
+                      "Bấm vào các mốc chặng trên thanh Timeline để xem danh sách xe. Cần chốt điểm danh lần lượt theo thứ tự của các chặng.",
                   },
                   {
                     title: <Text strong>Bước 3: Chọn Xe khách</Text>,
@@ -366,6 +394,51 @@ export default function GuidePage() {
         ),
       });
     }
+
+    // Personal Settings
+    items.push({
+      key: "personal",
+      label: "Thông tin cá nhân & Cài đặt thông báo",
+      children: (
+        <div className="space-y-4">
+          <Paragraph>
+            Quản lý thông tin hồ sơ của bạn và các tùy chọn nhận thông báo từ hệ
+            thống.
+          </Paragraph>
+          <div className="pl-4 border-l-2 border-blue-500">
+            <Paragraph className="mb-2">
+              <Text strong>
+                <Tag color="blue">Thông tin cá nhân</Tag>
+              </Text>
+              Truy cập menu (bấm vào Avatar ở góc phải màn hình) và chọn "Thông
+              tin cá nhân". Bạn có thể sửa tên, số điện thoại, email và đổi mật
+              khẩu tại đây. Đối với Trưởng xe và Lái xe, bạn có thể xem lịch sử
+              các xe mà mình được phân công.
+            </Paragraph>
+            <Paragraph className="mb-0">
+              <Text strong>
+                <Tag color="green">Cài đặt thông báo</Tag>
+              </Text>
+              Truy cập menu và chọn "Cài đặt". Tại đây bạn có thể cấu hình
+              bật/tắt nhận thông báo nổi trên thiết bị (Popup) kể cả khi đóng
+              ứng dụng, hoặc nhận thông báo qua Email.
+            </Paragraph>
+            <Paragraph className="mb-0 mt-2">
+              <Text strong>
+                <Tag color="orange">Khôi phục mật khẩu</Tag>
+              </Text>
+              Nếu bạn quên mật khẩu, hãy nhấn vào <b>"Quên mật khẩu?"</b> tại
+              màn hình Đăng nhập. Hệ thống sẽ gửi một đường dẫn để thiết lập lại
+              mật khẩu mới.{" "}
+              <Text type="danger">
+                Lưu ý: Bạn phải kiểm tra hộp thư của địa chỉ email đã được đăng
+                ký trong tài khoản để nhận link (kể cả trong mục Thư rác/Spam).
+              </Text>
+            </Paragraph>
+          </div>
+        </div>
+      ),
+    });
 
     return items;
   }, [isCompanyManagerRole, isTourManager, isDriverOrFleet]);

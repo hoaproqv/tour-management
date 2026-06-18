@@ -1,13 +1,6 @@
 import React from "react";
 
-import {
-  Col,
-  DatePicker,
-  Form,
-  Input,
-  Modal,
-  Row,
-} from "antd";
+import { Col, DatePicker, Form, Input, Modal, Row } from "antd";
 import dayjs from "dayjs";
 
 import type { Trip } from "../../../api/trips";
@@ -37,7 +30,6 @@ export default function TripFormModal({
   form,
   editingTrip,
 }: TripFormModalProps) {
-
   return (
     <Modal
       open={open}
@@ -50,7 +42,12 @@ export default function TripFormModal({
       destroyOnClose
       width="min(720px, 95vw)"
     >
-      <Form layout="vertical" form={form} initialValues={{ status: "planned" }} size="large">
+      <Form
+        layout="vertical"
+        form={form}
+        initialValues={{ status: "planned" }}
+        size="large"
+      >
         <Form.Item
           label="Tên chuyến đi"
           name="name"
@@ -59,10 +56,11 @@ export default function TripFormModal({
           <Input placeholder="Ví dụ: Bách Khoa – Sân bay Nội Bài" />
         </Form.Item>
 
-
-
         <Form.Item label="Mô tả" name="description">
-          <Input.TextArea rows={4} placeholder="Nhập mô tả chi tiết về chuyến đi..." />
+          <Input.TextArea
+            rows={4}
+            placeholder="Nhập mô tả chi tiết về chuyến đi..."
+          />
         </Form.Item>
 
         <Row gutter={16}>
@@ -72,7 +70,11 @@ export default function TripFormModal({
               name="start_date"
               rules={[{ required: true, message: "Chọn ngày bắt đầu" }]}
             >
-              <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" placeholder="Chọn ngày bắt đầu" />
+              <DatePicker
+                style={{ width: "100%" }}
+                format="YYYY-MM-DD"
+                placeholder="Chọn ngày bắt đầu"
+              />
             </Form.Item>
           </Col>
           <Col xs={24} sm={12}>
@@ -81,7 +83,11 @@ export default function TripFormModal({
               name="end_date"
               rules={[{ required: true, message: "Chọn ngày kết thúc" }]}
             >
-              <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" placeholder="Chọn ngày kết thúc" />
+              <DatePicker
+                style={{ width: "100%" }}
+                format="YYYY-MM-DD"
+                placeholder="Chọn ngày kết thúc"
+              />
             </Form.Item>
           </Col>
         </Row>

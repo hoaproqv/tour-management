@@ -33,5 +33,3 @@ class ResponseMixin:
 
 class BaseAPIView(ResponseMixin, GenericAPIView):
     """Base API view using the standard response envelope with serializer support."""
-
-    pass

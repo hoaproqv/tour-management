@@ -3,9 +3,12 @@ import logging
 import os
 
 import firebase_admin
-import paho.mqtt.publish as publish
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 from firebase_admin import credentials, messaging
+from paho.mqtt import publish
 
 logger = logging.getLogger(__name__)
 
@@ -90,15 +93,15 @@ def notify_users_by_role(tenant_id, roles, title, message, reference_type="", re
 
 
 def get_firebase_app():
-    if not firebase_admin._apps:
+    if not firebase_admin._apps:  # pylint: disable=protected-access
         cred_path = os.getenv("FIREBASE_CREDENTIALS", "firebase-key.json")
         if os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred)
             return True
-        else:
-            logger.warning(f"Firebase credentials not found at {cred_path}")
-            return False
+
+        logger.warning(f"Firebase credentials not found at {cred_path}")
+        return False
     return True
 
 
@@ -127,3 +130,29 @@ def send_firebase_push_notification(user_id, title, message):
             # Xóa token nếu bị lỗi (do đã hết hạn hoặc user uninstall app)
             if "Requested entity was not found" in str(e) or "The registration token is not a valid FCM registration token" in str(e):
                 device.delete()
+
+
+def send_email_notification(email, title, message):
+    if not email:
+        return
+
+    try:
+        subject = f"[GoTrip] {title}"
+        context = {
+            'title': title,
+            'message': message,
+        }
+        html_content = render_to_string('notifications/email_notification.html', context)
+        text_content = strip_tags(html_content)
+
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send(fail_silently=True)
+        logger.info(f"Email notification sent to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send email notification to {email}: {e}")

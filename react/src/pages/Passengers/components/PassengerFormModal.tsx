@@ -134,46 +134,46 @@ export default function PassengerFormModal({
           </div>
         )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <Form.Item
-              name="trip_id"
-              label="Chuyến đi"
-              rules={[{ required: true, message: "Vui lòng chọn chuyến đi" }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chọn chuyến đi"
-                notFoundContent="Không có chuyến đi"
-                options={trips.map((t) => ({
-                  value: String(t.id),
-                  label: t.name,
-                }))}
-                disabled={!!editingPassenger}
-                onChange={() => form.setFieldValue("trip_bus_id", undefined)}
-              />
-            </Form.Item>
+        <div className="grid grid-cols-2 gap-4">
+          <Form.Item
+            name="trip_id"
+            label="Chuyến đi"
+            rules={[{ required: true, message: "Vui lòng chọn chuyến đi" }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Chọn chuyến đi"
+              notFoundContent="Không có chuyến đi"
+              options={trips.map((t) => ({
+                value: String(t.id),
+                label: t.name,
+              }))}
+              disabled={!!editingPassenger}
+              onChange={() => form.setFieldValue("trip_bus_id", undefined)}
+            />
+          </Form.Item>
 
-            <Form.Item name="trip_bus_id" label="Gán vào xe (Tùy chọn)">
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chọn xe"
-                allowClear
-                disabled={!selectedTripId}
-                options={tripBuses.map((tb) => {
-                  const currentCount = getBusPassengerCount(String(tb.id));
-                  const isFull = currentCount >= (tb.capacity || 0);
+          <Form.Item name="trip_bus_id" label="Gán vào xe (Tùy chọn)">
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Chọn xe"
+              allowClear
+              disabled={!selectedTripId}
+              options={tripBuses.map((tb) => {
+                const currentCount = getBusPassengerCount(String(tb.id));
+                const isFull = currentCount >= (tb.capacity || 0);
 
-                  return {
-                    value: String(tb.id),
-                    label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${currentCount}/${tb.capacity || 0} chỗ)${isFull ? " - Đã đầy" : ""}`,
-                    disabled: isFull,
-                  };
-                })}
-              />
-            </Form.Item>
-          </div>
+                return {
+                  value: String(tb.id),
+                  label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${currentCount}/${tb.capacity || 0} chỗ)${isFull ? " - Đã đầy" : ""}`,
+                  disabled: isFull,
+                };
+              })}
+            />
+          </Form.Item>
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <Form.Item

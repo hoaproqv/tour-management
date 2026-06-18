@@ -49,9 +49,7 @@ export default function TripRoundManagementModal({
       open={open}
       onCancel={onClose}
       footer={null}
-      title={
-        trip ? `Xem hành trình - ${trip.name}` : "Xem hành trình"
-      }
+      title={trip ? `Xem hành trình - ${trip.name}` : "Xem hành trình"}
       width={640}
       destroyOnClose
     >

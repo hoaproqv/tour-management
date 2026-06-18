@@ -6,4 +6,4 @@ class PassengersConfig(AppConfig):
     name = "passengers"
 
     def ready(self):
-        import passengers.signals  # noqa: F401
+        import passengers.signals  # noqa: F401 # pylint: disable=unused-import

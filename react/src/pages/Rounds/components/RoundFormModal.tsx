@@ -207,9 +207,14 @@ export default function RoundFormModal({
           });
 
           const headerRow = (json[0] as any[]) || [];
-          const headerStr = headerRow.map((h: any) => String(h || "").toLowerCase()).join(" ");
-          
-          if (!headerStr.includes("tên chặng") && !headerStr.includes("địa điểm")) {
+          const headerStr = headerRow
+            .map((h: any) => String(h || "").toLowerCase())
+            .join(" ");
+
+          if (
+            !headerStr.includes("tên chặng") &&
+            !headerStr.includes("địa điểm")
+          ) {
             isValidFormat = false;
             return;
           }
@@ -231,7 +236,9 @@ export default function RoundFormModal({
         });
 
         if (!isValidFormat) {
-          message.error("Sai định dạng file Excel. Vui lòng sử dụng đúng template Chặng.");
+          message.error(
+            "Sai định dạng file Excel. Vui lòng sử dụng đúng template Chặng.",
+          );
           setFile(null);
           setPreviewData([]);
           return;

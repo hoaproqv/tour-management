@@ -48,7 +48,10 @@ export const removeAccents = (str: string): string => {
     .replace(/Đ/g, "D");
 };
 
-export const compareVietnameseNames = (nameA: string, nameB: string): number => {
+export const compareVietnameseNames = (
+  nameA: string,
+  nameB: string,
+): number => {
   const getSortKeys = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
     const firstName = parts[parts.length - 1] || "";
@@ -60,27 +63,36 @@ export const compareVietnameseNames = (nameA: string, nameB: string): number => 
   const keysA = getSortKeys(nameA);
   const keysB = getSortKeys(nameB);
 
-  const cmpFirst = keysA.firstName.localeCompare(keysB.firstName, 'vi', { sensitivity: 'base' });
+  const cmpFirst = keysA.firstName.localeCompare(keysB.firstName, "vi", {
+    sensitivity: "base",
+  });
   if (cmpFirst !== 0) return cmpFirst;
 
-  const cmpMiddle = keysA.middleName.localeCompare(keysB.middleName, 'vi', { sensitivity: 'base' });
+  const cmpMiddle = keysA.middleName.localeCompare(keysB.middleName, "vi", {
+    sensitivity: "base",
+  });
   if (cmpMiddle !== 0) return cmpMiddle;
 
-  return keysA.lastName.localeCompare(keysB.lastName, 'vi', { sensitivity: 'base' });
+  return keysA.lastName.localeCompare(keysB.lastName, "vi", {
+    sensitivity: "base",
+  });
 };
 
-export const extractApiError = (error: any, defaultMessage: string = "Có lỗi xảy ra"): string => {
+export const extractApiError = (
+  error: any,
+  defaultMessage: string = "Có lỗi xảy ra",
+): string => {
   if (error?.response?.data?.detail) {
     return String(error.response.data.detail);
   }
   if (error?.response?.data?.message) {
     return String(error.response.data.message);
   }
-  if (typeof error?.detail === 'string') {
-     return error.detail;
+  if (typeof error?.detail === "string") {
+    return error.detail;
   }
-  if (typeof error?.message === 'string') {
-     return error.message;
+  if (typeof error?.message === "string") {
+    return error.message;
   }
   if (error instanceof Error) {
     return error.message;

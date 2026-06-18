@@ -59,7 +59,9 @@ export default function ImportPassengerModal({
 
   const [validPassengers, setValidPassengers] = useState<any[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
-  const [conflictResolutions, setConflictResolutions] = useState<Record<number, "keep" | "update">>({});
+  const [conflictResolutions, setConflictResolutions] = useState<
+    Record<number, "keep" | "update">
+  >({});
 
   const { data: tripsResponse } = useQuery({
     queryKey: ["trips"],
@@ -68,7 +70,9 @@ export default function ImportPassengerModal({
   });
   const trips = React.useMemo(() => {
     const all = Array.isArray(tripsResponse?.data) ? tripsResponse.data : [];
-    return all.filter((t: Trip) => t.status === "planned" || t.status === "doing");
+    return all.filter(
+      (t: Trip) => t.status === "planned" || t.status === "doing",
+    );
   }, [tripsResponse]);
 
   const checkMutation = useMutation({
@@ -126,16 +130,25 @@ export default function ImportPassengerModal({
     try {
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      const sheets = wb.SheetNames.filter((name: string) => name !== "Quản lý xe");
-      
+      const sheets = wb.SheetNames.filter(
+        (name: string) => name !== "Quản lý xe",
+      );
+
       // Validate format
       for (const name of sheets) {
         const ws = wb.Sheets[name];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
         if (rows.length > 0) {
-          const headerStr = (rows[0] as any[]).map(h => String(h || "").toLowerCase()).join(" ");
-          if (!headerStr.includes("họ và tên") && !headerStr.includes("số điện thoại")) {
-            throw new Error("Sai định dạng file Excel. Vui lòng tải và sử dụng đúng file mẫu Hành khách.");
+          const headerStr = (rows[0] as any[])
+            .map((h) => String(h || "").toLowerCase())
+            .join(" ");
+          if (
+            !headerStr.includes("họ và tên") &&
+            !headerStr.includes("số điện thoại")
+          ) {
+            throw new Error(
+              "Sai định dạng file Excel. Vui lòng tải và sử dụng đúng file mẫu Hành khách.",
+            );
           }
         }
       }
@@ -143,14 +156,16 @@ export default function ImportPassengerModal({
       return sheets.map((name: string) => {
         const ws = wb.Sheets[name];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
-        const dataRows = rows.slice(1).filter(
-          (r) =>
-            Array.isArray(r) &&
-            r.length > 1 &&
-            r[1] !== null &&
-            r[1] !== undefined &&
-            String(r[1]).trim() !== "",
-        );
+        const dataRows = rows
+          .slice(1)
+          .filter(
+            (r) =>
+              Array.isArray(r) &&
+              r.length > 1 &&
+              r[1] !== null &&
+              r[1] !== undefined &&
+              String(r[1]).trim() !== "",
+          );
         return { name, rowCount: dataRows.length };
       });
     } catch (e: any) {
@@ -209,11 +224,11 @@ export default function ImportPassengerModal({
       fd.append("trip_start_date", vals.dates[0].format("YYYY-MM-DD"));
       fd.append("trip_end_date", vals.dates[1].format("YYYY-MM-DD"));
     }
-    
+
     // Map conflict resolutions: phone -> update | keep
     const resolutionsMap: Record<string, string> = {};
     conflicts.forEach((c, idx) => {
-        resolutionsMap[c.existing.phone] = conflictResolutions[idx];
+      resolutionsMap[c.existing.phone] = conflictResolutions[idx];
     });
     fd.append("conflict_resolutions", JSON.stringify(resolutionsMap));
 
@@ -241,45 +256,62 @@ export default function ImportPassengerModal({
     { title: "Kiểm tra" },
     { title: "Xác nhận" },
   ];
-  
+
   const conflictColumns = [
     {
       title: "Thông tin File Excel",
       key: "imported",
       render: (_: any, record: any) => (
         <div>
-          <p><b>Tên:</b> {record.imported.name}</p>
-          <p><b>SĐT:</b> {record.imported.phone}</p>
-          <p><b>Ghi chú:</b> {record.imported.note}</p>
-          <p><b>Thuộc xe:</b> {record.imported.sheet_name}</p>
+          <p>
+            <b>Tên:</b> {record.imported.name}
+          </p>
+          <p>
+            <b>SĐT:</b> {record.imported.phone}
+          </p>
+          <p>
+            <b>Ghi chú:</b> {record.imported.note}
+          </p>
+          <p>
+            <b>Thuộc xe:</b> {record.imported.sheet_name}
+          </p>
         </div>
-      )
+      ),
     },
     {
       title: "Đã có trong hệ thống",
       key: "existing",
       render: (_: any, record: any) => (
         <div>
-          <p><b>Tên:</b> <Text type="danger">{record.existing.name}</Text></p>
-          <p><b>SĐT:</b> {record.existing.phone}</p>
+          <p>
+            <b>Tên:</b> <Text type="danger">{record.existing.name}</Text>
+          </p>
+          <p>
+            <b>SĐT:</b> {record.existing.phone}
+          </p>
         </div>
-      )
+      ),
     },
     {
       title: "Quyết định",
       key: "resolution",
       render: (_: any, __: any, index: number) => (
-        <Radio.Group 
-          value={conflictResolutions[index]} 
-          onChange={(e) => setConflictResolutions(prev => ({...prev, [index]: e.target.value}))}
+        <Radio.Group
+          value={conflictResolutions[index]}
+          onChange={(e) =>
+            setConflictResolutions((prev) => ({
+              ...prev,
+              [index]: e.target.value,
+            }))
+          }
         >
           <Space direction="vertical">
             <Radio value="keep">Giữ tên hiện tại</Radio>
             <Radio value="update">Lấy tên từ file Excel</Radio>
           </Space>
         </Radio.Group>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -309,7 +341,8 @@ export default function ImportPassengerModal({
             description={
               <div className="space-y-1">
                 <p>
-                  Mỗi <strong>sheet</strong> là một xe. Tên Bảng (Sheet) chứa danh sách hành khách chính là Mã xe.
+                  Mỗi <strong>sheet</strong> là một xe. Tên Bảng (Sheet) chứa
+                  danh sách hành khách chính là Mã xe.
                 </p>
                 <p>
                   Mỗi hàng là một hành khách với các cột: <Tag>STT</Tag>
@@ -356,7 +389,8 @@ export default function ImportPassengerModal({
               <Text type="secondary" className="text-sm">
                 Xem trước ({preview.length} sheet):
               </Text>
-              <Table scroll={{ x: "max-content" }}
+              <Table
+                scroll={{ x: "max-content" }}
                 className="mt-2"
                 size="small"
                 pagination={false}
@@ -435,7 +469,11 @@ export default function ImportPassengerModal({
 
           <Space className="flex justify-between mt-4">
             <Button onClick={() => setCurrent(0)}>Quay lại</Button>
-            <Button type="primary" onClick={handleNext} loading={checkMutation.isPending}>
+            <Button
+              type="primary"
+              onClick={handleNext}
+              loading={checkMutation.isPending}
+            >
               Tiếp theo
             </Button>
           </Space>
@@ -458,13 +496,14 @@ export default function ImportPassengerModal({
           />
 
           {conflicts.length > 0 && (
-             <Table scroll={{ x: "max-content" }}
-               size="small"
-               dataSource={conflicts}
-               columns={conflictColumns}
-               rowKey={(_, index) => String(index)}
-               pagination={{ pageSize: 5 }}
-             />
+            <Table
+              scroll={{ x: "max-content" }}
+              size="small"
+              dataSource={conflicts}
+              columns={conflictColumns}
+              rowKey={(_, index) => String(index)}
+              pagination={{ pageSize: 5 }}
+            />
           )}
 
           <Space className="flex justify-between mt-4">
@@ -503,7 +542,8 @@ export default function ImportPassengerModal({
             </Text>
           </div>
 
-          <Table scroll={{ x: "max-content" }}
+          <Table
+            scroll={{ x: "max-content" }}
             size="small"
             pagination={false}
             dataSource={preview.map((s, i) => ({ key: i, ...s }))}

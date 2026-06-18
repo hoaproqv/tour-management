@@ -51,8 +51,6 @@ export const NotificationDropdown: React.FC = () => {
     }
   };
 
-
-
   const getIcon = (type: string) => {
     switch (type) {
       case "WARNING":
@@ -73,7 +71,6 @@ export const NotificationDropdown: React.FC = () => {
       <div className="flex justify-between items-center px-5 py-4 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm">
         <span className="font-bold text-slate-800 text-base">Thông báo</span>
         <div className="flex gap-3">
-
           {unreadCount > 0 && (
             <Button
               type="link"

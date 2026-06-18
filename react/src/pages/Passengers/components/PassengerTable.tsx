@@ -95,7 +95,10 @@ export default function PassengerTable({
   }, [canManage, deleting, onDelete, onEdit]);
 
   return (
-    <Card className={className !== undefined ? className : "mt-6"} styles={{ body: { padding: 0 } }}>
+    <Card
+      className={className !== undefined ? className : "mt-6"}
+      styles={{ body: { padding: 0 } }}
+    >
       <Table
         size="small"
         rowKey="id"
@@ -109,8 +112,12 @@ export default function PassengerTable({
         }
         dataSource={data}
         loading={isLoading}
-        pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
-        scroll={{ x: 'max-content' }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ["5", "10", "20", "50"],
+        }}
+        scroll={{ x: "max-content" }}
         columns={columns}
         locale={{
           emptyText: isLoading ? (

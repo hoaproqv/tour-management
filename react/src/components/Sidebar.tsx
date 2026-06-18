@@ -325,7 +325,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
         {/* Mobile footer info */}
         <div className="border-t border-white/10 px-4 py-3 text-xs text-white/50 flex-shrink-0">
-          Quản lý Chuyến đi v1.0
+          GoTrip v1.0
         </div>
         <SidebarStyles />
       </aside>

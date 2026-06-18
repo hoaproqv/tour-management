@@ -1,22 +1,22 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   ArrowRightOutlined,
   LockOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input } from "antd";
+import { Button, Form, Input, Modal } from "antd";
 import { Link } from "react-router-dom";
 
 import { LogoIcon } from "../../components/LogoIcon";
 import { useLogin } from "../../hooks/useAuth";
 import { ROUTES } from "../../utils/routers";
 
-
 import type { ILoginFormData } from "../../utils/types";
 
 const Login = () => {
   const [form] = Form.useForm<ILoginFormData>();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { mutate: mutateLogin, isPending: isLoggingIn } = useLogin();
 
   useEffect(() => {
@@ -46,11 +46,10 @@ const Login = () => {
               <LogoIcon className="w-8 h-8 drop-shadow-md" />
             </div>
             <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-4">
-              Quản lý <br />{" "}
+              Chào mừng đến với <br />{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-                Chuyến đi
-              </span>{" "}
-              của bạn.
+                GoTrip
+              </span>
             </h1>
             <p className="text-blue-100 text-lg max-w-sm mt-6 font-light leading-relaxed">
               Hệ thống vận hành thông minh giúp bạn theo dõi trực tuyến chặng
@@ -134,16 +133,10 @@ const Login = () => {
 
             <div className="flex items-center justify-between mb-8 mt-2 text-sm">
               <Link
-                to="#"
+                to={ROUTES.FORGOT_PASSWORD}
                 className="text-blue-600 font-semibold hover:text-blue-700 hover:underline transition-all"
               >
                 Quên mật khẩu?
-              </Link>
-              <Link
-                to={ROUTES.REGISTER}
-                className="text-slate-500 font-medium hover:text-slate-800 transition-all"
-              >
-                Chưa có tài khoản? Đăng ký
               </Link>
             </div>
 
@@ -160,15 +153,144 @@ const Login = () => {
             </Form.Item>
           </Form>
 
-          <p className="text-center text-xs text-slate-400 mt-10">
-            Việc bạn tiếp tục đồng nghĩa với việc chấp nhận{" "}
-            <Link to="#" className="text-blue-500 hover:underline">
+          <div className="mt-8 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+            <p className="text-center text-sm text-slate-600 mb-0">
+              Bạn chưa có tài khoản?
+            </p>
+            <p className="text-center text-sm text-slate-600 font-medium mt-1">
+              Hãy liên hệ email{" "}
+              <a
+                href="mailto:hanhoadev@gmail.com"
+                className="text-blue-600 font-bold hover:underline"
+              >
+                hanhoadev@gmail.com
+              </a>{" "}
+              để được cấp tài khoản sử dụng ứng dụng
+            </p>
+          </div>
+
+          <p className="text-center text-xs text-slate-400 mt-6">
+            Việc bạn đăng nhập đồng nghĩa với việc chấp nhận{" "}
+            <span
+              onClick={() => setIsModalOpen(true)}
+              className="text-blue-500 hover:text-blue-600 hover:underline cursor-pointer font-medium"
+            >
               điều khoản sử dụng
-            </Link>{" "}
+            </span>{" "}
             của hệ thống.
           </p>
         </div>
       </div>
+
+      {/* Modal Điều khoản sử dụng */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <LogoIcon className="w-5 h-5 drop-shadow-sm" monochrome />
+            </div>
+            <span className="text-xl font-bold text-slate-800 tracking-tight">
+              Điều khoản sử dụng
+            </span>
+          </div>
+        }
+        open={isModalOpen}
+        onOk={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        closeIcon={
+          <span className="text-slate-400 hover:text-slate-600 text-lg">✕</span>
+        }
+        footer={[
+          <Button
+            key="submit"
+            type="primary"
+            onClick={() => setIsModalOpen(false)}
+            className="bg-blue-600 hover:bg-blue-500 border-0 rounded-xl px-8 h-10 font-medium shadow-md shadow-blue-500/20 transition-all"
+          >
+            Tôi đã hiểu và đồng ý
+          </Button>,
+        ]}
+        width={750}
+        centered
+        className="terms-modal"
+      >
+        <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-4 mt-4 text-slate-600 space-y-6">
+          <section>
+            <h3 className="text-[17px] font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">
+                1
+              </span>
+              Giới thiệu
+            </h3>
+            <p className="leading-relaxed pl-8">
+              Hệ thống GoTrip là nền tảng công nghệ giúp các đơn vị vận tải điều
+              phối xe khách, tài xế và quản lý thông tin hành khách theo thời
+              gian thực. Bằng việc đăng nhập, bạn xác nhận rằng mình là nhân sự
+              hợp lệ được cấp quyền bởi quản lý hệ thống của công ty.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="text-[17px] font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">
+                2
+              </span>
+              Quyền riêng tư & Bảo mật dữ liệu
+            </h3>
+            <ul className="list-disc pl-12 space-y-2 leading-relaxed">
+              <li>
+                Thông tin hành khách bao gồm tên, số điện thoại, điểm đón/trả
+                được bảo mật nghiêm ngặt và chỉ phục vụ duy nhất cho mục đích
+                điều hành chuyến đi.
+              </li>
+              <li>
+                Bạn có trách nhiệm giữ bí mật tuyệt đối đối với các thông tin
+                nhạy cảm của hành khách, không phát tán dưới bất kỳ hình thức
+                nào.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="text-[17px] font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">
+                3
+              </span>
+              Trách nhiệm của tài xế & điều hành viên
+            </h3>
+            <ul className="list-disc pl-12 space-y-2 leading-relaxed">
+              <li>
+                Tuân thủ lộ trình và các chặng (stages) đã được chỉ định trên hệ
+                thống.
+              </li>
+              <li>
+                Cập nhật chính xác và kịp thời trạng thái lên/xuống xe của hành
+                khách để đảm bảo tính đồng bộ dữ liệu toàn hệ thống.
+              </li>
+              <li>
+                <strong className="text-red-500">Nghiêm cấm</strong> việc chia
+                sẻ tài khoản đăng nhập (JWT token/password) cho bất kỳ bên thứ
+                ba nào.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="text-[17px] font-bold text-slate-800 mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm">
+                4
+              </span>
+              Cam kết dịch vụ
+            </h3>
+            <p className="leading-relaxed pl-8">
+              Mọi hành vi can thiệp trái phép, làm sai lệch dữ liệu chuyến đi
+              hoặc thông tin hành khách trên hệ thống sẽ dẫn đến việc khóa tài
+              khoản vĩnh viễn và có thể phải chịu trách nhiệm bồi thường theo
+              quy định của công ty.
+            </p>
+          </section>
+        </div>
+      </Modal>
 
       <style
         dangerouslySetInnerHTML={{

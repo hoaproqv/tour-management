@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 
-import { CheckCircleOutlined, ClockCircleOutlined, EditOutlined, SaveOutlined } from "@ant-design/icons";
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  EditOutlined,
+  SaveOutlined,
+} from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -55,7 +60,8 @@ export default function ImportedBusMapper({
     enabled: Boolean(tripId),
   });
   const tripBuses = React.useMemo(
-    () => (Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : []),
+    () =>
+      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
     [tripBusesResponse],
   );
 
@@ -65,7 +71,7 @@ export default function ImportedBusMapper({
       for (const ib of importedBuses) {
         const sel = selections[ib.id] || {};
         const tripBusId = sel.tripBusId;
-        
+
         if (tripBusId && String(tripBusId) !== String(ib.mapped_trip_bus)) {
           promises.push(mapImportedBus(ib.id, { trip_bus_id: tripBusId }));
         }
@@ -95,9 +101,16 @@ export default function ImportedBusMapper({
       const sel = selections[ib.id] || {};
       const tripBusId = sel.tripBusId;
       if (tripBusId && String(tripBusId) !== String(ib.mapped_trip_bus)) {
-        const selectedTripBus = tripBuses.find((tb) => String(tb.id) === String(tripBusId));
-        if (selectedTripBus && (selectedTripBus.capacity || 0) < ib.passenger_count) {
-          message.error(`Sức chứa của xe ${selectedTripBus.registration_number || selectedTripBus.bus_code} (${selectedTripBus.capacity}) không đủ cho ${ib.sheet_name} (${ib.passenger_count} khách)`);
+        const selectedTripBus = tripBuses.find(
+          (tb) => String(tb.id) === String(tripBusId),
+        );
+        if (
+          selectedTripBus &&
+          (selectedTripBus.capacity || 0) < ib.passenger_count
+        ) {
+          message.error(
+            `Sức chứa của xe ${selectedTripBus.registration_number || selectedTripBus.bus_code} (${selectedTripBus.capacity}) không đủ cho ${ib.sheet_name} (${ib.passenger_count} khách)`,
+          );
           return;
         }
       }
@@ -141,8 +154,10 @@ export default function ImportedBusMapper({
       width: 300,
       render: (_: unknown, record: ImportedBus) => {
         const currentMappedTripBusId = record.mapped_trip_bus;
-        const currentMappedTripBus = tripBuses.find((tb) => String(tb.id) === String(currentMappedTripBusId));
-        
+        const currentMappedTripBus = tripBuses.find(
+          (tb) => String(tb.id) === String(currentMappedTripBusId),
+        );
+
         if (!isEditing || readOnly) {
           return (
             <Text type={record.is_mapped ? "secondary" : undefined}>
@@ -157,13 +172,23 @@ export default function ImportedBusMapper({
           );
         }
 
-        const selectedTripBusId = selections[record.id] !== undefined ? selections[record.id].tripBusId : (currentMappedTripBusId ? String(currentMappedTripBusId) : undefined);
+        const selectedTripBusId =
+          selections[record.id] !== undefined
+            ? selections[record.id].tripBusId
+            : currentMappedTripBusId
+              ? String(currentMappedTripBusId)
+              : undefined;
 
         // Compute which buses are used by other rows
         const usedByOthers = new Set<string>();
         importedBuses.forEach((ib) => {
           if (ib.id !== record.id) {
-            const ibSelected = selections[ib.id] !== undefined ? selections[ib.id].tripBusId : (ib.mapped_trip_bus ? String(ib.mapped_trip_bus) : undefined);
+            const ibSelected =
+              selections[ib.id] !== undefined
+                ? selections[ib.id].tripBusId
+                : ib.mapped_trip_bus
+                  ? String(ib.mapped_trip_bus)
+                  : undefined;
             if (ibSelected) {
               usedByOthers.add(ibSelected);
             }
@@ -236,7 +261,11 @@ export default function ImportedBusMapper({
                 </Button>
               </>
             ) : (
-              <Button type="primary" icon={<EditOutlined />} onClick={() => setIsEditing(true)}>
+              <Button
+                type="primary"
+                icon={<EditOutlined />}
+                onClick={() => setIsEditing(true)}
+              >
                 Sửa
               </Button>
             )}
@@ -260,7 +289,8 @@ export default function ImportedBusMapper({
         />
       ) : null}
 
-      <Table scroll={{ x: "max-content" }}
+      <Table
+        scroll={{ x: "max-content" }}
         rowKey="id"
         dataSource={importedBuses}
         columns={columns}

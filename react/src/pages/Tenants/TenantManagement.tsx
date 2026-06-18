@@ -157,11 +157,17 @@ export default function TenantManagement() {
                       onOk: async () => {
                         const hide = message.loading("Đang xóa...", 0);
                         try {
-                          await bulkDeleteTenants(selectedRowKeys as (string | number)[]);
-                          message.success(`Đã xóa ${selectedRowKeys.length} công ty`);
+                          await bulkDeleteTenants(
+                            selectedRowKeys as (string | number)[],
+                          );
+                          message.success(
+                            `Đã xóa ${selectedRowKeys.length} công ty`,
+                          );
                           setSelectedRowKeys([]);
                           setIsSelectionMode(false);
-                          await queryClient.invalidateQueries({ queryKey: ["tenants"] });
+                          await queryClient.invalidateQueries({
+                            queryKey: ["tenants"],
+                          });
                         } catch {
                           message.error("Lỗi khi xóa công ty");
                         } finally {
@@ -183,7 +189,8 @@ export default function TenantManagement() {
         </div>
 
         <Card className="mt-4" styles={{ body: { padding: 0 } }}>
-          <Table scroll={{ x: "max-content" }}
+          <Table
+            scroll={{ x: "max-content" }}
             size="small"
             rowKey="id"
             rowSelection={
@@ -197,7 +204,11 @@ export default function TenantManagement() {
             }
             dataSource={tenants}
             loading={isLoading}
-            pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: ["5", "10", "20", "50"] }}
+            pagination={{
+              defaultPageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ["5", "10", "20", "50"],
+            }}
             columns={[
               {
                 title: "Tên",
@@ -239,11 +250,7 @@ export default function TenantManagement() {
                       cancelText="Hủy"
                     >
                       <Tooltip title="Xóa">
-                        <Button
-                          type="text"
-                          danger
-                          icon={<DeleteOutlined />}
-                        />
+                        <Button type="text" danger icon={<DeleteOutlined />} />
                       </Tooltip>
                     </Popconfirm>
                   </Space>

@@ -5,7 +5,7 @@ import {
   SettingOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Dropdown, Space, Tooltip } from "antd";
+import { Avatar, Dropdown, Space } from "antd";
 import { Link } from "react-router-dom";
 
 import { useLogout } from "../hooks/useAuth";
@@ -36,10 +36,12 @@ function Header() {
     {
       key: "settings",
       label: (
-        <Space className="font-medium text-slate-700">
-          <SettingOutlined className="text-slate-500" />
-          Cài đặt
-        </Space>
+        <Link to={ROUTES.SETTINGS} className="font-medium text-slate-700">
+          <Space>
+            <SettingOutlined className="text-slate-500" />
+            Cài đặt
+          </Space>
+        </Link>
       ),
     },
     { type: "divider" },
@@ -69,10 +71,10 @@ function Header() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">
-              Quản lý Chuyến đi
+              GoTrip
             </p>
             <p className="text-lg font-bold leading-none text-white tracking-tight">
-              Dashboard
+              Quản Lý Chuyến Đi
             </p>
           </div>
         </Link>
@@ -80,13 +82,6 @@ function Header() {
         <div className="flex items-center gap-4 text-white">
           <div className="flex gap-2 items-center">
             <NotificationDropdown />
-            <Tooltip title="Cài đặt">
-              <Button
-                type="text"
-                className="text-slate-300 hover:text-white hover:bg-white/10 transition-all rounded-full w-10 h-10 flex items-center justify-center"
-                icon={<SettingOutlined className="text-[1.15rem]" />}
-              />
-            </Tooltip>
           </div>
 
           <div className="h-8 w-px bg-white/20 mx-2 hidden sm:block"></div>

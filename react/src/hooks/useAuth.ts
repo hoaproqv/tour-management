@@ -7,6 +7,7 @@ import {
   login,
   logout,
   register,
+  resetPassword,
   updateUserEmail,
 } from "../api/auth";
 import { ROUTES } from "../utils/routers";
@@ -79,14 +80,28 @@ export const useUpdateUserEmail = () => {
 
 export const useForgotPassword = () => {
   return useMutation({
-    mutationFn: (data: { username: number; email: string }) =>
-      forgotPassword(data.username, data.email),
-    onSuccess: () => {
-      message.success("Password reset email sent successfully!");
+    mutationFn: (email: string) => forgotPassword(email),
+    onSuccess: (messageStr) => {
+      message.success(messageStr || "Đã gửi email khôi phục mật khẩu!");
     },
     onError: (error: any) => {
-      message.error(error?.message || "Failed to send password reset email.");
+      message.error(error?.message || "Lỗi khi gửi email khôi phục.");
       console.error("Forgot password error:", error);
+    },
+  });
+};
+
+export const useResetPassword = () => {
+  return useMutation({
+    mutationFn: (data: any) => resetPassword(data),
+    onSuccess: (messageStr) => {
+      message.success(messageStr || "Khôi phục mật khẩu thành công!");
+    },
+    onError: (error: any) => {
+      message.error(
+        error?.message || "Đường dẫn không hợp lệ hoặc đã hết hạn.",
+      );
+      console.error("Reset password error:", error);
     },
   });
 };

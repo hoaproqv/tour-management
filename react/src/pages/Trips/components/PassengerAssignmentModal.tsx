@@ -2,7 +2,17 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { SearchOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Empty, List, Modal, Space, Spin, Tag, Input } from "antd";
+import {
+  Button,
+  Card,
+  Empty,
+  List,
+  Modal,
+  Space,
+  Spin,
+  Tag,
+  Input,
+} from "antd";
 
 function removeVietnameseTones(str: string) {
   if (!str) return "";
@@ -35,7 +45,6 @@ import {
 
 import { type EnrichedTrip } from "./types";
 
-
 type PassengerAssignmentModalProps = {
   trip: EnrichedTrip | null;
   open: boolean;
@@ -50,7 +59,7 @@ export default function PassengerAssignmentModal({
   busLabelMap,
 }: PassengerAssignmentModalProps) {
   const [selectedTripBusId, setSelectedTripBusId] = useState<string>();
-  
+
   const [searchBus, setSearchBus] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
 
@@ -82,14 +91,17 @@ export default function PassengerAssignmentModal({
     enabled: open && Boolean(trip?.id),
   });
 
-  const { data: assignmentsResponse, isLoading: loadingAssignments } = useQuery({
-    queryKey: ["passenger-assignments", trip?.id],
-    queryFn: () => getPassengerAssignments({ trip: trip?.id }),
-    enabled: open && Boolean(trip?.id),
-  });
+  const { data: assignmentsResponse, isLoading: loadingAssignments } = useQuery(
+    {
+      queryKey: ["passenger-assignments", trip?.id],
+      queryFn: () => getPassengerAssignments({ trip: trip?.id }),
+      enabled: open && Boolean(trip?.id),
+    },
+  );
 
   const passengers = useMemo(
-    () => (Array.isArray(passengersResponse?.data) ? passengersResponse.data : []),
+    () =>
+      Array.isArray(passengersResponse?.data) ? passengersResponse.data : [],
     [passengersResponse],
   );
 
@@ -123,31 +135,37 @@ export default function PassengerAssignmentModal({
   const filteredBuses = useMemo(() => {
     if (!debouncedSearchBus) return busesForTrip;
     const lowerSearch = removeVietnameseTones(debouncedSearchBus);
-    return busesForTrip.filter(tb => {
+    return busesForTrip.filter((tb) => {
       const label = tripBusLabelMap.get(tb.id) || "";
       return removeVietnameseTones(label).includes(lowerSearch);
     });
   }, [busesForTrip, debouncedSearchBus, tripBusLabelMap]);
 
   const passengersForSelected = useMemo(() => {
-    let list = passengers
-      .filter((p) => {
-        const assignment = assignmentByPassenger.get(p.id);
-        return selectedTripBus ? assignment?.trip_bus === selectedTripBus.id : false;
-      });
-    
+    let list = passengers.filter((p) => {
+      const assignment = assignmentByPassenger.get(p.id);
+      return selectedTripBus
+        ? assignment?.trip_bus === selectedTripBus.id
+        : false;
+    });
+
     if (debouncedSearchAssigned) {
       const lowerSearch = removeVietnameseTones(debouncedSearchAssigned);
-      list = list.filter(p => 
-        removeVietnameseTones(p.name).includes(lowerSearch) || 
-        removeVietnameseTones(p.phone || "").includes(lowerSearch)
+      list = list.filter(
+        (p) =>
+          removeVietnameseTones(p.name).includes(lowerSearch) ||
+          removeVietnameseTones(p.phone || "").includes(lowerSearch),
       );
     }
     return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [assignmentByPassenger, passengers, selectedTripBus, debouncedSearchAssigned]);
+  }, [
+    assignmentByPassenger,
+    passengers,
+    selectedTripBus,
+    debouncedSearchAssigned,
+  ]);
 
   // Remove filteredAllPassengers, assignMutation and handleAssign
-
 
   return (
     <Modal
@@ -155,11 +173,7 @@ export default function PassengerAssignmentModal({
       onCancel={onClose}
       footer={null}
       width={800}
-      title={
-        trip
-          ? `Xem Hành khách - ${trip.name}`
-          : "Xem Hành khách"
-      }
+      title={trip ? `Xem Hành khách - ${trip.name}` : "Xem Hành khách"}
       destroyOnClose
     >
       {isLoading || loadingAssignments ? (
@@ -221,7 +235,16 @@ export default function PassengerAssignmentModal({
                 : "Chọn xe để xem"
             }
             className="h-full flex flex-col"
-            styles={{ body: { padding: 0, minHeight: 360, flex: 1, display: 'flex', flexDirection: 'column' }, header: { padding: '0 12px' } }}
+            styles={{
+              body: {
+                padding: 0,
+                minHeight: 360,
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+              },
+              header: { padding: "0 12px" },
+            }}
             extra={
               <Input
                 placeholder="Tìm khách..."
@@ -235,13 +258,22 @@ export default function PassengerAssignmentModal({
               />
             }
           >
-            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 250px)' }}>
+            <div
+              className="flex-1 overflow-y-auto p-3 custom-scrollbar"
+              style={{ maxHeight: "calc(100vh - 250px)" }}
+            >
               {!selectedTripBus && (
-                <Empty description="Chọn xe để xem danh sách" className="mt-8" />
+                <Empty
+                  description="Chọn xe để xem danh sách"
+                  className="mt-8"
+                />
               )}
 
               {selectedTripBus && passengersForSelected.length === 0 && (
-                <Empty description="Không có hành khách nào trên xe này" className="mt-8" />
+                <Empty
+                  description="Không có hành khách nào trên xe này"
+                  className="mt-8"
+                />
               )}
 
               {selectedTripBus && passengersForSelected.length > 0 && (
@@ -252,9 +284,22 @@ export default function PassengerAssignmentModal({
                     <List.Item className="!p-0 !mb-1.5 border border-slate-100 rounded-md overflow-hidden bg-slate-50">
                       <div className="flex justify-between items-center w-full px-3 py-2">
                         <div className="flex flex-col min-w-0 flex-1">
-                          <span className="font-medium text-[13px] leading-snug truncate text-slate-800">{p.name}</span>
-                          {p.phone && <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap mt-0.5">{p.phone}</span>}
-                          {p.note && <Tag className="!m-0 !mt-1 !text-[10px] !leading-3 border-transparent bg-slate-200 text-slate-600 shrink-0 self-start" color="default">{p.note}</Tag>}
+                          <span className="font-medium text-[13px] leading-snug truncate text-slate-800">
+                            {p.name}
+                          </span>
+                          {p.phone && (
+                            <span className="text-[12px] text-slate-500 shrink-0 whitespace-nowrap mt-0.5">
+                              {p.phone}
+                            </span>
+                          )}
+                          {p.note && (
+                            <Tag
+                              className="!m-0 !mt-1 !text-[10px] !leading-3 border-transparent bg-slate-200 text-slate-600 shrink-0 self-start"
+                              color="default"
+                            >
+                              {p.note}
+                            </Tag>
+                          )}
                         </div>
                       </div>
                     </List.Item>
@@ -267,5 +312,4 @@ export default function PassengerAssignmentModal({
       )}
     </Modal>
   );
-
 }
