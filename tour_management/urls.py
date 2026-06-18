@@ -19,6 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic.base import RedirectView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from core.dashboard import DashboardOverviewAPIView
@@ -47,6 +48,7 @@ urlpatterns = [
     ),
     # Health check endpoint
     path("health/", health_check, name="health_check"),
+    path("favicon.ico", RedirectView.as_view(url=settings.STATIC_URL + "favicon.ico", permanent=True)),
     path("", IndexPageAPIView.as_view(), name="index_page"),
     path("view/", include("core.urls")),
     path("api/", include(api_patterns)),

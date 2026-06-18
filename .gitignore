@@ -188,3 +188,4 @@ yarn-error.log*
 # Key
 sample_data.json
 firebase-key.json
+docker-compose.yml

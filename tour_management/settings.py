@@ -216,7 +216,8 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, "static"),
-    # Extra lookup directories for collectstatic to find static files
+    os.path.join(BASE_DIR, "react", "builded"),
+    os.path.join(BASE_DIR, "react", "public"),
 )
 
 # Media files
