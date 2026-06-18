@@ -56,6 +56,7 @@ urlpatterns = [
     path("api/", include("passengers.urls")),
     path("api/", include("rounds.urls")),
     path("api/", include("transactions.urls")),
+    path("api/notifications/", include("notifications.urls")),
 ]
 
 # Serve static and media files in development

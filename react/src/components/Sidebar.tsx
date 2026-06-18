@@ -202,7 +202,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   if (!isMobile) {
     return (
       <aside
-        className="bg-[#1c2a3a] text-white h-full flex-shrink-0 flex flex-col"
+        className="bg-slate-900 text-white h-full flex-shrink-0 flex flex-col border-r border-slate-800"
         style={{
           width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
           transition: "all 0.35s cubic-bezier(0.25, 1, 0.5, 1)",
@@ -276,7 +276,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       {/* Drawer */}
       <aside
-        className="fixed top-0 left-0 h-full bg-[#1c2a3a] text-white z-50 flex flex-col shadow-2xl"
+        className="fixed top-0 left-0 h-full bg-slate-900 text-white z-50 flex flex-col shadow-[10px_0_40px_rgba(0,0,0,0.5)] border-r border-slate-800"
         style={{
           width: 260,
           transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
@@ -368,25 +368,32 @@ function SidebarStyles() {
           color: #fff !important;
         }
         .custom-sidebar-menu .ant-menu-item-selected {
-          background: rgba(255,255,255,0.14) !important;
-          color: #fff !important;
+          background: linear-gradient(90deg, rgba(56, 189, 248, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%) !important;
+          color: #38bdf8 !important;
+          box-shadow: inset 3px 0 0 0 #38bdf8;
         }
         .custom-sidebar-menu .ant-menu-item:hover,
         .custom-sidebar-menu .ant-menu-submenu-title:hover {
-          background: rgba(255,255,255,0.08) !important;
+          background: rgba(255,255,255,0.05) !important;
           color: #fff !important;
         }
         .custom-sidebar-menu .ant-menu-item:hover .ant-menu-title-content,
         .custom-sidebar-menu .ant-menu-item-selected .ant-menu-title-content,
         .custom-sidebar-menu .ant-menu-submenu-title:hover .ant-menu-title-content {
-          color: #fff !important;
+          color: inherit !important;
+        }
+        .custom-sidebar-menu .ant-menu-item-selected .ant-menu-item-icon {
+          color: #38bdf8 !important;
         }
         .custom-sidebar-menu .ant-menu-submenu-arrow {
           color: rgba(255,255,255,0.6);
         }
         /* Ant collapsed popup (submenu flyout) */
         .ant-menu-submenu-popup .ant-menu {
-          background: #1c2a3a !important;
+          background: #0f172a !important;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 8px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
         }
         .ant-menu-submenu-popup .ant-menu-item {
           color: #fff !important;

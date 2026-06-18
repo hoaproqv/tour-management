@@ -1,7 +1,6 @@
 import React from "react";
 
 import {
-  BellOutlined,
   ExportOutlined,
   HomeOutlined,
   SettingOutlined,
@@ -14,6 +13,8 @@ import { useLogout } from "../hooks/useAuth";
 import { getAccountFromLocalStorage } from "../utils/helper";
 import { ROUTES } from "../utils/routers";
 
+import NotificationDropdown from "./NotificationDropdown";
+
 import type { MenuProps } from "antd";
 
 function Header() {
@@ -24,9 +25,9 @@ function Header() {
     {
       key: "profile",
       label: (
-        <Link to={ROUTES.PROFILE}>
+        <Link to={ROUTES.PROFILE} className="font-medium text-slate-700">
           <Space>
-            <UserOutlined />
+            <UserOutlined className="text-blue-500" />
             Thông tin cá nhân
           </Space>
         </Link>
@@ -35,8 +36,8 @@ function Header() {
     {
       key: "settings",
       label: (
-        <Space>
-          <SettingOutlined />
+        <Space className="font-medium text-slate-700">
+          <SettingOutlined className="text-slate-500" />
           Cài đặt
         </Space>
       ),
@@ -46,7 +47,7 @@ function Header() {
       key: "logout",
       danger: true,
       label: (
-        <div onClick={() => logout()}>
+        <div onClick={() => logout()} className="font-medium">
           <Space>
             <ExportOutlined />
             Đăng xuất
@@ -57,48 +58,51 @@ function Header() {
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full h-header-height bg-sky-700 shadow-md z-50 flex items-center">
-      <div className="w-full flex items-center justify-between px-5">
+    <header className="fixed top-0 left-0 right-0 w-full h-header-height bg-slate-900/95 backdrop-blur-md border-b border-white/10 shadow-sm z-50 flex items-center">
+      <div className="w-full flex items-center justify-between px-6">
         <Link
           to={ROUTES.DASHBOARD}
-          className="flex items-center gap-3 text-white"
+          className="flex items-center gap-3 text-white group"
         >
-          <div className="bg-white/20 rounded-full h-10 w-10 flex items-center justify-center">
-            <HomeOutlined className="text-xl" />
+          <div className="bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl h-10 w-10 flex items-center justify-center shadow-lg group-hover:shadow-cyan-500/50 transition-all duration-300">
+            <HomeOutlined className="text-xl text-white" />
           </div>
           <div>
-            <p className="text-sm leading-tight">Quản lý Chuyến đi</p>
-            <p className="text-lg font-semibold leading-tight">Dashboard</p>
+            <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">Quản lý Chuyến đi</p>
+            <p className="text-lg font-bold leading-none text-white tracking-tight">Dashboard</p>
           </div>
         </Link>
 
-        <div className="flex items-center gap-3 text-white">
-          <Tooltip title="Thông báo">
-            <Button
-              type="text"
-              className="text-white"
-              icon={<BellOutlined className="text-lg" />}
-            />
-          </Tooltip>
-          <Tooltip title="Cài đặt">
-            <Button
-              type="text"
-              className="text-white"
-              icon={<SettingOutlined className="text-lg" />}
-            />
-          </Tooltip>
+        <div className="flex items-center gap-4 text-white">
+          <div className="flex gap-2 items-center">
+            <NotificationDropdown />
+            <Tooltip title="Cài đặt">
+              <Button
+                type="text"
+                className="text-slate-300 hover:text-white hover:bg-white/10 transition-all rounded-full w-10 h-10 flex items-center justify-center"
+                icon={<SettingOutlined className="text-[1.15rem]" />}
+              />
+            </Tooltip>
+          </div>
 
-          <Dropdown menu={{ items }} placement="bottomRight" arrow>
-            <div className="flex items-center gap-2 cursor-pointer">
-              <Avatar
-                size={36}
-                style={{ backgroundColor: "#fff", color: "#0f4bb8" }}
-              >
-                {(account?.name || "User").charAt(0).toUpperCase()}
-              </Avatar>
+          <div className="h-8 w-px bg-white/20 mx-2 hidden sm:block"></div>
+
+          <Dropdown menu={{ items }} placement="bottomRight" arrow={{ pointAtCenter: true }} trigger={['click']}>
+            <div className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-1.5 pr-3 rounded-full transition-all border border-transparent hover:border-white/10">
+              <div className="p-[2px] rounded-full bg-gradient-to-r from-cyan-400 to-blue-500">
+                <Avatar
+                  size={36}
+                  style={{ backgroundColor: "#1e293b", color: "#38bdf8", border: "2px solid #1e293b" }}
+                >
+                  {(account?.name || "User").charAt(0).toUpperCase()}
+                </Avatar>
+              </div>
               <div className="leading-tight hidden sm:block">
-                <p className="font-semibold">{account?.name || "My Name"}</p>
-                <p className="text-xs text-white/80">Online</p>
+                <p className="font-bold text-sm text-white mb-0.5">{account?.name || "My Name"}</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
+                  <p className="text-[11px] font-medium text-slate-300 uppercase tracking-wider">Online</p>
+                </div>
               </div>
             </div>
           </Dropdown>

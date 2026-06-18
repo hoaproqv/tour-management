@@ -126,7 +126,21 @@ export default function ImportPassengerModal({
     try {
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array" });
-      return wb.SheetNames.filter((name: string) => name !== "Quản lý xe").map((name: string) => {
+      const sheets = wb.SheetNames.filter((name: string) => name !== "Quản lý xe");
+      
+      // Validate format
+      for (const name of sheets) {
+        const ws = wb.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
+        if (rows.length > 0) {
+          const headerStr = (rows[0] as any[]).map(h => String(h || "").toLowerCase()).join(" ");
+          if (!headerStr.includes("họ và tên") && !headerStr.includes("số điện thoại")) {
+            throw new Error("Sai định dạng file Excel. Vui lòng tải và sử dụng đúng file mẫu Hành khách.");
+          }
+        }
+      }
+
+      return sheets.map((name: string) => {
         const ws = wb.Sheets[name];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][];
         const dataRows = rows.slice(1).filter(
@@ -139,16 +153,22 @@ export default function ImportPassengerModal({
         );
         return { name, rowCount: dataRows.length };
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error("Lỗi khi đọc file Preview:", e);
-      return [];
+      throw e;
     }
   };
 
   const handleFileSelect = async (f: File) => {
-    setFile(f);
-    const sheets = await parsePreview(f);
-    setPreview(sheets);
+    try {
+      const sheets = await parsePreview(f);
+      setFile(f);
+      setPreview(sheets);
+    } catch (e: any) {
+      message.error(e.message || "Không thể đọc file Excel");
+      setFile(null);
+      setPreview([]);
+    }
   };
 
   const handleNext = async () => {

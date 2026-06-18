@@ -53,6 +53,7 @@ export interface RoundItem {
   name: string;
   location: string;
   sequence: number;
+  round_date: string | null;
   estimate_time: string | null;
   actual_time: string | null;
   status: "planned" | "doing" | "done";
@@ -145,7 +146,8 @@ export interface PassengerAssignment {
   id: string;
   passenger: string;
   trip: string;
-  trip_bus: string;
+  trip_bus: string | null;
+  imported_bus: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -588,8 +590,8 @@ export const exportRounds = async (tripId: string): Promise<Blob> => {
   return response.data as Blob;
 };
 
-export const downloadRoundTemplate = async (): Promise<Blob> => {
-  const response = await axiosInstance.get("/rounds/import/template/", {
+export const downloadRoundTemplate = async (tripId: string): Promise<Blob> => {
+  const response = await axiosInstance.get(`/rounds/import/template/?trip=${tripId}`, {
     responseType: "blob",
   });
   return response.data as Blob;

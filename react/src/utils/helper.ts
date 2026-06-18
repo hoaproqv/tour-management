@@ -68,3 +68,22 @@ export const compareVietnameseNames = (nameA: string, nameB: string): number => 
 
   return keysA.lastName.localeCompare(keysB.lastName, 'vi', { sensitivity: 'base' });
 };
+
+export const extractApiError = (error: any, defaultMessage: string = "Có lỗi xảy ra"): string => {
+  if (error?.response?.data?.detail) {
+    return String(error.response.data.detail);
+  }
+  if (error?.response?.data?.message) {
+    return String(error.response.data.message);
+  }
+  if (typeof error?.detail === 'string') {
+     return error.detail;
+  }
+  if (typeof error?.message === 'string') {
+     return error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return defaultMessage;
+};

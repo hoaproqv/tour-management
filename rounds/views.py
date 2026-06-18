@@ -458,26 +458,94 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
         except Exception as exc:
             return Response({"detail": f"Cannot read Excel file: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        action = request.data.get("action", "") # 'overwrite', 'skip', or ''
-        
-        ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        data_rows = rows[1:] if rows else []
-
-        imported_count = 0
         from django.db import transaction
         from django.utils.dateparse import parse_datetime
         import datetime
+
+        action = request.data.get("action", "") # 'overwrite', 'skip', or ''
         
-        # Collect new locations to check for duplicates
+        # Calculate valid trip dates
+        num_days = (trip.end_date - trip.start_date).days + 1
+        valid_dates = {}
+        for i in range(num_days):
+            dt = trip.start_date + datetime.timedelta(days=i)
+            valid_dates[dt.strftime("%d-%m-%Y")] = dt
+
+        imported_count = 0
+        parsed_rounds = []
         new_locations = set()
-        for row in data_rows:
-            if not row or len(row) < 5:
+
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            rows = list(ws.iter_rows(values_only=True))
+            data_rows = rows[1:] if rows else []
+
+            # Check for "empty sheet"
+            if not data_rows:
                 continue
-            loc = str(row[2]).strip() if row[2] else ""
-            if loc:
-                new_locations.add(loc)
+            
+
+
+            if sheet_name not in valid_dates:
+                return Response(
+                    {"detail": f"Sheet {sheet_name} không hợp lệ so với lịch chuyến đi (Từ {trip.start_date.strftime('%d-%m-%Y')} đến {trip.end_date.strftime('%d-%m-%Y')})."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            sheet_date = valid_dates[sheet_name]
+
+            for row in data_rows:
+                if not row or len(row) < 2:
+                    continue
                 
+                name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                location = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+                estimate_time_val = row[3] if len(row) > 3 else None
+                sequence_str = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+
+                if not name or not sequence_str.isdigit():
+                    continue
+                    
+                sequence = int(sequence_str)
+                
+                # Time parsing
+                parsed_time = None
+                if isinstance(estimate_time_val, datetime.datetime):
+                    parsed_time = estimate_time_val.time()
+                elif isinstance(estimate_time_val, datetime.time):
+                    parsed_time = estimate_time_val
+                elif isinstance(estimate_time_val, (float, int)):
+                    try:
+                        dt = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=float(estimate_time_val))
+                        parsed_time = dt.time()
+                    except (OverflowError, ValueError):
+                        pass
+                else:
+                    time_str = str(estimate_time_val).strip()
+                    for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%H:%M:%S", "%H:%M"):
+                        try:
+                            parsed_time = datetime.datetime.strptime(time_str, fmt).time()
+                            break
+                        except ValueError:
+                            pass
+                
+                if estimate_time_val and not parsed_time:
+                    # Time provided but invalid format -> can just leave it None or continue, let's leave it None
+                    pass
+
+                parsed_rounds.append({
+                    "name": name,
+                    "location": location,
+                    "round_date": sheet_date,
+                    "estimate_time": parsed_time,
+                    "raw_seq": sequence
+                })
+                if location:
+                    new_locations.add(location)
+
+        if not parsed_rounds:
+            return Response({"detail": "Không có dữ liệu chặng hợp lệ trong các sheet."}, status=status.HTTP_400_BAD_REQUEST)
+
         existing_rounds = Round.objects.filter(trip=trip, location__in=new_locations)
         if existing_rounds.exists() and not action:
             duplicates = [r.location for r in existing_rounds]
@@ -490,64 +558,80 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
             )
 
         with transaction.atomic():
-            for row in data_rows:
-                if not row or len(row) < 5:
-                    continue
-                
-                name = str(row[1]).strip() if row[1] else ""
-                location = str(row[2]).strip() if row[2] else ""
-                estimate_time_val = row[3] if len(row) > 3 else None
-                sequence_str = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+            # Sắp xếp theo ngày rồi theo thứ tự nhập
+            parsed_rounds.sort(key=lambda x: (x["round_date"], x["raw_seq"]))
 
-                if not name or not location or not sequence_str.isdigit() or not estimate_time_val:
-                    continue
-                    
-                sequence = int(sequence_str)
-                if isinstance(estimate_time_val, datetime.datetime):
-                    estimate_time = estimate_time_val
-                elif isinstance(estimate_time_val, (float, int)):
-                    import datetime
-                    try:
-                        estimate_time = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=float(estimate_time_val))
-                    except (OverflowError, ValueError):
-                        estimate_time = None
+            # Đánh lại sequence tuần tự từ 1 (chia theo từng ngày)
+            seq_by_date = {}
+            for r in parsed_rounds:
+                date_key = r["round_date"]
+                seq_by_date[date_key] = seq_by_date.get(date_key, 0) + 1
+                r["sequence"] = seq_by_date[date_key]
+
+            # Để tránh lỗi Unique Constraint (trip, round_date, sequence), đẩy tất cả sequence của chặng hiện tại lên 999xxx
+            existing_planned = Round.objects.filter(trip=trip, status=Round.Status.PLANNED)
+            for r in existing_planned:
+                r.sequence = 999000 + r.id
+                r.save(update_fields=["sequence"])
+
+            processed_round_ids = set()
+            for r_data in parsed_rounds:
+                name = r_data["name"]
+                location = r_data["location"]
+                round_date = r_data["round_date"]
+                estimate_time = r_data["estimate_time"]
+                sequence = r_data["sequence"]
+
+                if name.lower() == "tập trung và xuất phát":
+                    existing_round = Round.objects.filter(trip=trip, round_date=round_date, name__iexact="tập trung và xuất phát").exclude(id__in=processed_round_ids).first()
                 else:
-                    time_str = str(estimate_time_val).strip()
-                    estimate_time = parse_datetime(time_str)
-                    if not estimate_time:
-                        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d/%m/%y %H:%M:%S", "%d/%m/%y %H:%M"):
-                            try:
-                                estimate_time = datetime.datetime.strptime(time_str, fmt)
-                                break
-                            except ValueError:
-                                pass
-                if not estimate_time:
-                    continue
+                    existing_round = Round.objects.filter(trip=trip, round_date=round_date, location=location).exclude(id__in=processed_round_ids).first()
 
-                existing_round = Round.objects.filter(trip=trip, location=location).first()
                 if existing_round:
+                    processed_round_ids.add(existing_round.id)
                     if action == "skip":
-                        continue
-                    elif action == "overwrite":
-                        existing_round.name = name
                         existing_round.sequence = sequence
+                        existing_round.round_date = round_date
+                        existing_round.estimate_time = estimate_time
+                        existing_round.save(update_fields=["sequence", "round_date", "estimate_time"])
+                        continue
+                    elif action == "overwrite" or not action:
+                        existing_round.name = name
+                        existing_round.location = location
+                        existing_round.sequence = sequence
+                        existing_round.round_date = round_date
                         existing_round.estimate_time = estimate_time
                         existing_round.save()
                         imported_count += 1
                 else:
-                    Round.objects.update_or_create(
+                    new_r = Round.objects.create(
                         trip=trip,
                         sequence=sequence,
-                        defaults={
-                            "name": name,
-                            "location": location,
-                            "estimate_time": estimate_time,
-                            "status": Round.Status.PLANNED
-                        }
+                        name=name,
+                        location=location,
+                        round_date=round_date,
+                        estimate_time=estimate_time,
+                        status=Round.Status.PLANNED
                     )
+                    processed_round_ids.add(new_r.id)
                     imported_count += 1
+            
+            # Re-normalize sequences for leftovers
+            leftovers = Round.objects.filter(trip=trip, sequence__gte=999000).order_by("round_date", "sequence")
+            from collections import defaultdict
+            max_seq_by_date = defaultdict(int)
+            for r_data in parsed_rounds:
+                max_seq_by_date[r_data["round_date"]] = max(max_seq_by_date[r_data["round_date"]], r_data["sequence"])
+            
+            for r in leftovers:
+                max_seq_by_date[r.round_date] += 1
+                r.sequence = max_seq_by_date[r.round_date]
+                r.save(update_fields=["sequence"])
                 
-        return Response({"detail": f"Imported {imported_count} rounds successfully."}, status=status.HTTP_201_CREATED)
+        if imported_count == 0 and action == "skip":
+            return Response({"detail": "Đã bỏ qua các chặng trùng lặp. Không có chặng mới nào được cập nhật."}, status=status.HTTP_201_CREATED)
+            
+        return Response({"detail": f"Đã import thành công {imported_count} chặng."}, status=status.HTTP_201_CREATED)
 
 
 class RoundExportView(TenantScopedMixin, generics.GenericAPIView):
@@ -618,14 +702,38 @@ class RoundTemplateDownloadView(generics.GenericAPIView):
         tags=["Rounds"],
     )
     def get(self, request, *args, **kwargs):
+        trip_id = request.query_params.get("trip")
+        if not trip_id:
+            from rest_framework.response import Response
+            from rest_framework import status
+            return Response({"detail": "Vui lòng chọn chuyến đi trước khi tải template."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from trips.models import Trip
+        try:
+            # We don't apply TenantScopedMixin here since it doesn't inherit from it, but we can check if it exists
+            trip = Trip.objects.get(pk=trip_id)
+        except Trip.DoesNotExist:
+            from rest_framework.response import Response
+            from rest_framework import status
+            return Response({"detail": "Không tìm thấy chuyến đi."}, status=status.HTTP_404_NOT_FOUND)
+
         import io
         import openpyxl
         from django.http import HttpResponse
+        from datetime import timedelta
 
         wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Sheet1"
-        ws.append(ROUND_COLUMNS)
+        # Remove default sheet
+        wb.remove(wb.active)
+
+        # Calculate days
+        num_days = (trip.end_date - trip.start_date).days + 1
+        for i in range(num_days):
+            current_date = trip.start_date + timedelta(days=i)
+            sheet_name = current_date.strftime("%d-%m-%Y")
+            ws = wb.create_sheet(title=sheet_name)
+            ws.append(ROUND_COLUMNS)
+            ws.append([1, "Tập trung và xuất phát", "", "", 1])
 
         buf = io.BytesIO()
         wb.save(buf)

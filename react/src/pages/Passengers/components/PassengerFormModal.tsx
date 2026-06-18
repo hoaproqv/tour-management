@@ -16,7 +16,7 @@ import type { FormInstance } from "antd/es/form";
 
 export interface PassengerFormValues {
   name: string;
-  phone?: string;
+  phone: string;
   extra_info?: string;
   note?: string;
   trip_id?: string;
@@ -49,18 +49,23 @@ export default function PassengerFormModal({
   const { data: tripBusesResponse } = useQuery({
     queryKey: ["trip-buses", { trip: selectedTripId }],
     queryFn: () => getTripBuses({ trip: selectedTripId, page: 1, limit: 1000 }),
-    enabled: open && Boolean(selectedTripId) && !editingPassenger,
-  });
-
-  const tripBuses = Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [];
-
-  const { data: passengersResponse } = useQuery({
-    queryKey: ["passengers", { trip: selectedTripId }],
-    queryFn: () => getPassengers({ trip: selectedTripId, page: 1, limit: 1000 }),
     enabled: open && Boolean(selectedTripId),
   });
 
-  const passengers = Array.isArray(passengersResponse?.data) ? passengersResponse.data : [];
+  const tripBuses = Array.isArray(tripBusesResponse?.data)
+    ? tripBusesResponse.data
+    : [];
+
+  const { data: passengersResponse } = useQuery({
+    queryKey: ["passengers", { trip: selectedTripId }],
+    queryFn: () =>
+      getPassengers({ trip: selectedTripId, page: 1, limit: 1000 }),
+    enabled: open && Boolean(selectedTripId),
+  });
+
+  const passengers = Array.isArray(passengersResponse?.data)
+    ? passengersResponse.data
+    : [];
 
   const getBusPassengerCount = (busId: string) => {
     return passengers.filter((p: Passenger) => {
@@ -90,7 +95,7 @@ export default function PassengerFormModal({
       onCancel={onCancel}
       onOk={onSubmit}
       confirmLoading={confirmLoading}
-      title={editingPassenger ? "Sửa passenger" : "Tạo passenger mới"}
+      title={editingPassenger ? "Sửa hành khách" : "Tạo hành khách mới"}
       okText={editingPassenger ? "Cập nhật" : "Tạo"}
       cancelText="Hủy"
       destroyOnClose
@@ -129,7 +134,6 @@ export default function PassengerFormModal({
           </div>
         )}
 
-        {!editingPassenger && (
           <div className="grid grid-cols-2 gap-4">
             <Form.Item
               name="trip_id"
@@ -141,15 +145,16 @@ export default function PassengerFormModal({
                 optionFilterProp="label"
                 placeholder="Chọn chuyến đi"
                 notFoundContent="Không có chuyến đi"
-                options={trips.map((t) => ({ value: String(t.id), label: t.name }))}
+                options={trips.map((t) => ({
+                  value: String(t.id),
+                  label: t.name,
+                }))}
+                disabled={!!editingPassenger}
                 onChange={() => form.setFieldValue("trip_bus_id", undefined)}
               />
             </Form.Item>
 
-            <Form.Item
-              name="trip_bus_id"
-              label="Gán vào xe (Tùy chọn)"
-            >
+            <Form.Item name="trip_bus_id" label="Gán vào xe (Tùy chọn)">
               <Select
                 showSearch
                 optionFilterProp="label"
@@ -159,29 +164,37 @@ export default function PassengerFormModal({
                 options={tripBuses.map((tb) => {
                   const currentCount = getBusPassengerCount(String(tb.id));
                   const isFull = currentCount >= (tb.capacity || 0);
-                  
+
                   return {
                     value: String(tb.id),
-                    label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${currentCount}/${tb.capacity || 0} chỗ)${isFull ? ' - Đã đầy' : ''}`,
+                    label: `${tb.registration_number || tb.bus_code || `Bus #${tb.id}`} (${currentCount}/${tb.capacity || 0} chỗ)${isFull ? " - Đã đầy" : ""}`,
                     disabled: isFull,
                   };
                 })}
               />
             </Form.Item>
           </div>
-        )}
 
-        <Form.Item
-          name="name"
-          label="Họ và tên"
-          rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
-        >
-          <Input placeholder="Nhập họ tên hành khách" autoFocus={!!editingPassenger} />
-        </Form.Item>
+        <div className="grid grid-cols-2 gap-4">
+          <Form.Item
+            name="name"
+            label="Họ và tên"
+            rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
+          >
+            <Input
+              placeholder="Nhập họ tên hành khách"
+              autoFocus={!!editingPassenger}
+            />
+          </Form.Item>
 
-        <Form.Item name="phone" label="Số điện thoại">
-          <Input placeholder="Nhập số điện thoại (nếu có)" />
-        </Form.Item>
+          <Form.Item
+            name="phone"
+            label="Số điện thoại"
+            rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
+          >
+            <Input placeholder="0912345678" />
+          </Form.Item>
+        </div>
 
         <Form.Item name="extra_info" label="Thông tin thêm (Tuỳ chọn)">
           <Input placeholder="Ví dụ: Phòng ban, vị trí, công ty..." />

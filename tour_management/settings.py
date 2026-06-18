@@ -53,6 +53,7 @@ LOCAL_APPS = [
     "rounds",
     "transactions",
     "core",
+    "notifications",
 ]
 
 THIRD_PARTY_APPS = [

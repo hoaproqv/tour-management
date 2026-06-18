@@ -11,5 +11,6 @@ export const ROUTES = {
   TRANSACTIONS: "/view/transactions",
   PROFILE: "/view/profile",
   GUIDE: "/view/guide",
+  NOTIFICATIONS: "/view/notifications",
   NOT_FOUND: "*",
 };

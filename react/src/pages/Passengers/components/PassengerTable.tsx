@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { Button, Card, Empty, Popconfirm, Table, Tooltip, Space, Tag } from "antd";
+import { Button, Card, Empty, Popconfirm, Table, Tooltip, Space } from "antd";
 
 import { type Passenger } from "../../../api/trips";
 
@@ -17,6 +17,7 @@ type PassengerTableProps = {
   selectedRowKeys?: React.Key[];
   onSelectChange?: (_selectedRowKeys: React.Key[]) => void;
   isSelectionMode?: boolean;
+  className?: string;
 };
 
 export default function PassengerTable({
@@ -29,6 +30,7 @@ export default function PassengerTable({
   selectedRowKeys = [],
   onSelectChange,
   isSelectionMode,
+  className,
 }: PassengerTableProps) {
   const columns: ColumnsType<Passenger> = useMemo(() => {
     const base: ColumnsType<Passenger> = [
@@ -50,22 +52,6 @@ export default function PassengerTable({
         title: "Ghi chú",
         dataIndex: "note",
         render: (val: string) => val || "—",
-      },
-      {
-        title: "Các chuyến đi",
-        dataIndex: "trips",
-        render: (trips: Array<{ id: string; name: string }> | undefined) => {
-          if (!trips || trips.length === 0) return "—";
-          return (
-            <div className="flex flex-wrap gap-1 max-w-[250px]">
-              {trips.map((t) => (
-                <Tag key={t.id} color="cyan">
-                  {t.name}
-                </Tag>
-              ))}
-            </div>
-          );
-        },
       },
     ];
 
@@ -109,7 +95,7 @@ export default function PassengerTable({
   }, [canManage, deleting, onDelete, onEdit]);
 
   return (
-    <Card className="mt-6" styles={{ body: { padding: 0 } }}>
+    <Card className={className !== undefined ? className : "mt-6"} styles={{ body: { padding: 0 } }}>
       <Table
         size="small"
         rowKey="id"

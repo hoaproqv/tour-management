@@ -1,148 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import {
-  EditOutlined,
-  DeleteOutlined,
-  FileExcelOutlined,
-  MenuOutlined,
-} from "@ant-design/icons";
-import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import {
-  SortableContext,
-  arrayMove,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Button,
-  Card,
-  Empty,
-  Form,
-  Input,
-  Popconfirm,
-  Select,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-  message,
-  Space,
-  Modal,
-} from "antd";
+import { DeleteOutlined, FileExcelOutlined, EditOutlined } from "@ant-design/icons";
+import { arrayMove } from "@dnd-kit/sortable";
+import { Button, Card, Form, Input, Select, Typography, Tabs } from "antd";
 import dayjs from "dayjs";
 
-import {
-  createRound,
-  getRounds,
-  getTripBuses,
-  getTrips,
-  updateRound,
-  deleteRound,
-  bulkDeleteRounds,
-  exportRounds,
-  reorderRounds,
-  type RoundItem,
-  type RoundPayload,
-  type TripBus,
-  type Trip,
-} from "../../api/trips";
 import { useGetAccountInfo } from "../../hooks/useAuth";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
 import { canManageCatalog, removeAccents } from "../../utils/helper";
 
+
 import RoundFormModal, {
   type RoundFormValues,
 } from "./components/RoundFormModal";
+import { RoundTable } from "./components/RoundTable";
+import { useRoundData } from "./hooks/useRoundData";
+import { statusMeta } from "./utils/constants";
+import { validateTripRounds } from "./utils/validation";
 
+import type { RoundItem, Trip } from "../../api/trips";
 import type { IUser } from "../../utils/types";
+import type { DragEndEvent } from "@dnd-kit/core";
 
 const { Title, Text } = Typography;
-
-const statusMeta: Record<
-  RoundItem["status"],
-  { label: string; color: string }
-> = {
-  planned: { label: "Chưa đến", color: "blue" },
-  doing: { label: "Đang đến", color: "orange" },
-  done: { label: "Đã hoàn thành", color: "green" },
-};
-
-interface RowProps extends React.HTMLAttributes<HTMLTableRowElement> {
-  "data-row-key": string;
-}
-
-const RoundContext = React.createContext<RoundItem[]>([]);
-
-const DraggableRow = ({ children, ...props }: RowProps) => {
-  const isPlaceholder =
-    props.className?.includes("ant-table-placeholder") ||
-    !props["data-row-key"];
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: props["data-row-key"] || "empty",
-  });
-
-  const localRounds = React.useContext(RoundContext);
-  const rowId = props["data-row-key"];
-  const isFirstRound =
-    localRounds.find((r) => String(r.id) === String(rowId))?.sequence === 1;
-
-  if (isPlaceholder) {
-    return <tr {...props}>{children}</tr>;
-  }
-
-  const style: React.CSSProperties = {
-    ...props.style,
-    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
-    transition,
-    ...(isDragging
-      ? { position: "relative", zIndex: 9999, background: "#fafafa" }
-      : {}),
-  };
-
-  return (
-    <tr {...props} ref={setNodeRef} style={style} {...attributes}>
-      {React.Children.map(children, (child) => {
-        if ((child as React.ReactElement).key === "drag-handle") {
-          const isPlanned = localRounds.find((r) => String(r.id) === String(rowId))?.status === "planned";
-          return React.cloneElement(child as React.ReactElement<any>, {
-            children: isFirstRound || !isPlanned ? (
-              <MenuOutlined
-                style={{
-                  touchAction: "none",
-                  cursor: "not-allowed",
-                  color: "#cbd5e1",
-                }}
-              />
-            ) : (
-              <MenuOutlined
-                style={{ touchAction: "none", cursor: "grab", color: "#999" }}
-                {...listeners}
-              />
-            ),
-          });
-        }
-        return child;
-      })}
-    </tr>
-  );
-};
 
 export default function RoundManagement() {
   const [search, setSearch] = useState("");
@@ -155,358 +36,281 @@ export default function RoundManagement() {
   const [localRounds, setLocalRounds] = useState<RoundItem[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isEditingAll, setIsEditingAll] = useState(false);
+  const [activeTabDay, setActiveTabDay] = useState<string>("");
 
   const [form] = Form.useForm<RoundFormValues>();
-  const queryClient = useQueryClient();
   const { data: accountInfo } = useGetAccountInfo();
   const currentUser = accountInfo as IUser | undefined;
   const canManage = canManageCatalog(currentUser);
 
-  const { data: tripsResponse } = useQuery({
-    queryKey: ["trips"],
-    queryFn: () => getTrips({ page: 1, limit: 1000 }),
-  });
-  const { data: tripBusesResponse } = useQuery({
-    queryKey: ["trip-buses", "for-rounds"],
-    queryFn: () => getTripBuses({ page: 1, limit: 1000 }),
-  });
-
-  const { data: roundsResponse, isLoading } = useQuery({
-    queryKey: ["rounds"],
-    queryFn: () => getRounds({ page: 1, limit: 1000 }),
-  });
+  const {
+    trips: originalTrips,
+    tripBuses,
+    rounds,
+    isLoading,
+    reorderMutation,
+    createMutation,
+    updateMutation,
+    deleteMutation,
+    handleExport,
+    handleBulkDelete,
+    createRound,
+  } = useRoundData();
 
   const trips = useMemo(() => {
-    const arr = Array.isArray(tripsResponse?.data)
-      ? [...tripsResponse.data]
-      : [];
-    return arr.sort((a, b) => {
+    return [...originalTrips].sort((a, b) => {
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return timeB - timeA;
     });
-  }, [tripsResponse]);
+  }, [originalTrips]);
 
   const [tripFilter, setTripFilter] = useGlobalTripFilter(true);
 
-  const rounds = useMemo(
-    () => (Array.isArray(roundsResponse?.data) ? roundsResponse.data : []),
-    [roundsResponse],
+  const tripBusesArray = useMemo(
+    () => (Array.isArray(tripBuses) ? tripBuses : []),
+    [tripBuses],
   );
 
-  const tripBuses = useMemo(
-    () =>
-      Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
-    [tripBusesResponse],
+  const activeTripObj = useMemo(
+    () => trips.find((t) => String(t.id) === String(tripFilter)),
+    [trips, tripFilter],
   );
 
-  const tripDefaultBusMap = useMemo(() => {
-    const grouped = new Map<string, Array<string | number>>();
-    tripBuses.forEach((tb: TripBus) => {
-      const tripKey = String(tb.trip);
-      const list = grouped.get(tripKey) ?? [];
-      list.push(tb.bus);
-      grouped.set(tripKey, list);
-    });
-    return grouped;
-  }, [tripBuses]);
-
-  const filteredRounds = useMemo(() => {
-    const term = removeAccents(debouncedSearch).trim().toLowerCase();
-    const filtered = (Array.isArray(rounds) ? rounds : []).filter((round) => {
-      const matchTrip = String(round.trip) === String(tripFilter);
-      const matchStatus =
-        statusFilter === "all" ? true : round.status === statusFilter;
-      const matchTerm = term
-        ? removeAccents(round.name).toLowerCase().includes(term) ||
-          removeAccents(round.location).toLowerCase().includes(term)
-        : true;
-      return matchTrip && matchStatus && matchTerm;
-    });
-    return filtered.sort((a, b) => a.sequence - b.sequence);
-  }, [rounds, tripFilter, statusFilter, debouncedSearch]);
+  const tripDays = useMemo(() => {
+    if (!activeTripObj) return [];
+    if (!activeTripObj.start_date || !activeTripObj.end_date) return [];
+    const start = dayjs(activeTripObj.start_date);
+    const end = dayjs(activeTripObj.end_date);
+    const days: string[] = [];
+    let current = start;
+    while (current.isBefore(end) || current.isSame(end, "day")) {
+      days.push(current.format("YYYY-MM-DD"));
+      current = current.add(1, "day");
+    }
+    return days;
+  }, [activeTripObj]);
 
   useEffect(() => {
-    setLocalRounds(filteredRounds);
-  }, [filteredRounds]);
+    if (
+      tripDays.length > 0 &&
+      (!activeTabDay || !tripDays.includes(activeTabDay))
+    ) {
+      setActiveTabDay(tripDays[0]);
+    } else if (tripDays.length === 0) {
+      setActiveTabDay("");
+    }
+  }, [tripDays, activeTabDay]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
+  useEffect(() => {
+    if (rounds.length > 0) {
+      setLocalRounds(rounds);
+    } else {
+      setLocalRounds([]);
+    }
+  }, [rounds]);
+
+  const tripDefaultBusMap = useMemo(() => {
+    const map = new Map<number, number[]>();
+    for (const tb of tripBusesArray) {
+      const tId = tb.trip;
+      const bId = tb.bus;
+      const current = map.get(tId) || [];
+      if (!current.includes(bId)) {
+        current.push(bId);
+      }
+      map.set(tId, current);
+    }
+    return map;
+  }, [tripBusesArray]);
+
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      setLocalRounds((prev) => {
+        const oldIndex = prev.findIndex(
+          (r) => String(r.id) === String(active.id),
+        );
+        const overIndex = prev.findIndex(
+          (r) => String(r.id) === String(over.id),
+        );
+
+        if (oldIndex === -1 || overIndex === -1) return prev;
+
+        const maxDoingSequence = prev
+          .filter(
+            (r) =>
+              r.round_date === activeTabDay &&
+              (r.status === "doing" || r.status === "done"),
+          )
+          .reduce((max, r) => Math.max(max, r.sequence), 0);
+
+        const overItem = prev[overIndex];
+        // Cannot drag a planned round above or among doing/done rounds
+        if (
+          overItem?.round_date === activeTabDay &&
+          overItem.sequence <= maxDoingSequence
+        ) {
+          // Instead of message.warning which triggers side effects inside a reducer-like function,
+          // it's better to just return prev. (In a real scenario, you might dispatch a toast elsewhere).
+          return prev;
+        }
+
+        const newArr = arrayMove(prev, oldIndex, overIndex);
+        const activeDayItems = newArr.filter(
+          (r) => r.round_date === activeTabDay,
+        );
+        const otherItems = newArr.filter((r) => r.round_date !== activeTabDay);
+
+        activeDayItems.forEach((item, index) => {
+          item.sequence = index + 1;
+        });
+
+        return [...otherItems, ...activeDayItems];
+      });
+    },
+    [activeTabDay],
   );
 
-  const reorderMutation = useMutation({
-    mutationFn: (items: Array<{ id: string | number; sequence: number }>) =>
-      reorderRounds(items),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["rounds"] });
-    },
-    onError: () => {
-      message.error("Lỗi khi cập nhật thứ tự chặng");
-      queryClient.invalidateQueries({ queryKey: ["rounds"] });
-    },
-  });
-
-  const onDragEnd = ({ active, over }: any) => {
-    if (active.id !== over?.id) {
-      setLocalRounds((prev) => {
-        const activeItem = prev.find((i) => String(i.id) === String(active.id));
-
-        if (activeItem?.status !== "planned") {
-          message.warning(
-            "Không thể thay đổi thứ tự của chặng đã đến hoặc đang đến",
-          );
-          return prev;
-        }
-
-        if (activeItem?.sequence === 1) {
-          message.warning(
-            "Không thể thay đổi thứ tự của chặng 'Tập trung và xuất phát'",
-          );
-          return prev;
-        }
-
-        const activeIndex = prev.findIndex(
-          (i) => String(i.id) === String(active.id),
-        );
-        let overIndex = prev.findIndex(
-          (i) => String(i.id) === String(over?.id),
-        );
-
-        if (overIndex === 0) {
-          overIndex = 1;
-        }
-
-        const newArr = arrayMove(prev, activeIndex, overIndex);
-
-        const updatedArr = newArr.map((item, index) => ({
-          ...item,
-          sequence: index + 1,
-        }));
-
-        const payload = updatedArr.map((i) => ({
-          id: i.id,
-          sequence: i.sequence,
-        }));
-        reorderMutation.mutate(payload);
-
-        return updatedArr;
+  const displayRounds = useMemo(() => {
+    let filtered = localRounds.filter((r) => r.round_date === activeTabDay);
+    if (tripFilter && tripFilter !== "all") {
+      filtered = filtered.filter((r) => String(r.trip) === tripFilter);
+    }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((r) => r.status === statusFilter);
+    }
+    if (debouncedSearch) {
+      const lower = removeAccents(debouncedSearch.toLowerCase());
+      filtered = filtered.filter((r) => {
+        const n = removeAccents((r.name || "").toLowerCase());
+        const l = removeAccents((r.location || "").toLowerCase());
+        return n.includes(lower) || l.includes(lower);
       });
     }
-  };
-
-  const createMutation = useMutation({
-    mutationFn: (payload: RoundPayload) => createRound(payload),
-    onSuccess: async () => {
-      message.success("Tạo chặng thành công");
-      setShowCreate(false);
-      form.resetFields();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["rounds"] }),
-        queryClient.invalidateQueries({ queryKey: ["round-buses"] }),
-      ]);
-    },
-    onError: () => message.error("Tạo chặng thất bại"),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: RoundPayload }) =>
-      updateRound(data.id, data.payload),
-    onSuccess: async () => {
-      message.success("Cập nhật chặng thành công");
-      setEditingRound(null);
-      form.resetFields();
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["rounds"] }),
-        queryClient.invalidateQueries({ queryKey: ["round-buses"] }),
-      ]);
-    },
-    onError: () => message.error("Cập nhật chặng thất bại"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteRound(id),
-    onSuccess: async () => {
-      message.success("Xóa round thành công");
-      await queryClient.invalidateQueries({ queryKey: ["rounds"] });
-    },
-    onError: () => message.error("Xóa chặng thất bại"),
-  });
-
-  const { mutate: deleteRoundMutate, status: deleteStatus } = deleteMutation;
-
-  const openCreate = () => {
-    if (!canManage) {
-      message.warning("Bạn không có quyền chỉnh sửa round");
-      return;
-    }
-    setEditingRound(null);
-    form.resetFields();
-    setShowCreate(true);
-  };
+    return filtered.sort((a, b) => a.sequence - b.sequence);
+  }, [localRounds, tripFilter, statusFilter, debouncedSearch, activeTabDay]);
 
   const openEdit = useCallback(
     (round: RoundItem) => {
-      if (!canManage) {
-        message.warning("Bạn không có quyền chỉnh sửa round");
-        return;
-      }
       setEditingRound(round);
+      let t = null;
+      if (round.estimate_time) {
+        const [h, m] = round.estimate_time.split(":");
+        t = dayjs().hour(Number(h)).minute(Number(m)).second(0);
+      }
       form.setFieldsValue({
         trip: String(round.trip),
         name: round.name,
         location: round.location,
-        estimate_time: round.estimate_time
-          ? dayjs(round.estimate_time)
-          : undefined,
+        estimate_date: round.round_date || undefined,
+        estimate_time_only: t,
       });
       setShowCreate(true);
     },
-    [canManage, form],
+    [form],
   );
 
-  const handleSubmit = () => {
+  const openCreate = () => {
+    setEditingRound(null);
+    form.resetFields();
+    form.setFieldsValue({
+      trip: tripFilter && tripFilter !== "all" ? String(tripFilter) : undefined,
+      estimate_date: activeTabDay,
+    });
+    setShowCreate(true);
+  };
+
+  const onFinishForm = () => {
     form
       .validateFields()
-      .then((values) => {
-        const payload: RoundPayload = {
-          trip: values.trip,
-          name: values.name,
-          location: values.location,
-          estimate_time: values.estimate_time
-            ? values.estimate_time.format()
-            : null,
+      .then(async (values) => {
+        let finalEstimateTime = null;
+        if (values.estimate_time_only) {
+          finalEstimateTime = dayjs(values.estimate_time_only).format(
+            "HH:mm:ss",
+          );
+        }
+
+        const payload = {
+          trip: String(values.trip),
+          name: values.name || "",
+          location: values.location || "",
+          round_date: values.estimate_date || null,
+          estimate_time: finalEstimateTime,
           sequence: editingRound
             ? editingRound.sequence
-            : localRounds.length + 1,
-          bus_ids: tripDefaultBusMap.get(values.trip) || [],
+            : displayRounds.length + 1,
+          bus_ids: tripDefaultBusMap.get(Number(values.trip)) || [],
         };
-        if (editingRound) {
-          updateMutation.mutate({ id: editingRound.id, payload });
+
+        if (editingRound && String(editingRound.id) !== "mock-1") {
+          updateMutation.mutate({ id: String(editingRound.id), payload });
         } else {
+          // If sequence 1 doesn't exist, create it first
+          const roundsForActiveDay = localRounds.filter(
+            (r) => r.round_date === (values.estimate_date || null),
+          );
+          if (!editingRound && roundsForActiveDay.length === 0) {
+            try {
+              await createRound({
+                trip: String(values.trip),
+                name: "Tập trung và xuất phát",
+                location: "",
+                round_date: values.estimate_date || null,
+                estimate_time: null,
+                sequence: 1,
+                bus_ids: tripDefaultBusMap.get(Number(values.trip)) || [],
+              });
+            } catch {
+              // Ignore if it fails (e.g. unique constraint)
+            }
+          }
           createMutation.mutate(payload);
         }
-        handleCancel();
+        setShowCreate(false);
+        setEditingRound(null);
       })
       .catch(() => undefined);
   };
 
-  const handleCancel = () => {
-    setShowCreate(false);
-    setEditingRound(null);
+  const handleLockRounds = () => {
+    const { isValid, errorDay } = validateTripRounds(
+      tripDays,
+      localRounds,
+      Number(tripFilter),
+    );
+
+    if (!isValid && errorDay) {
+      setActiveTabDay(errorDay);
+      return;
+    }
+
+    // Apply sequences
+    const diffs: RoundItem[] = [];
+    localRounds.forEach((lr) => {
+      const orig = rounds.find((r) => String(r.id) === String(lr.id));
+      if (orig && orig.sequence !== lr.sequence) {
+        diffs.push(lr);
+      }
+    });
+    if (diffs.length > 0) {
+      reorderMutation.mutate(
+        diffs.map((d) => ({ id: d.id, sequence: d.sequence })),
+      );
+    }
+    setIsEditingAll(false);
   };
 
-  const columns = useMemo(() => {
-    const base = [
-      ...(canManage
-        ? [
-            {
-              title: "Sắp xếp",
-              key: "drag-handle",
-              width: 50,
-              align: "center" as const,
-              render: () => null,
-            },
-          ]
-        : []),
-      {
-        title: "Thứ tự",
-        width: 50,
-        align: "center" as const,
-        dataIndex: "sequence",
-      },
-      {
-        title: "Tên chặng",
-        dataIndex: "name",
-        width: 250,
-        ellipsis: true,
-        render: (val: string) => (
-          <Tooltip title={val}>
-            <div className="truncate w-full" style={{ maxWidth: 230 }}>
-              {val}
-            </div>
-          </Tooltip>
-        ),
-      },
-      {
-        title: "Địa điểm",
-        dataIndex: "location",
-      },
-      {
-        title: "Ước tính",
-        dataIndex: "estimate_time",
-        render: (val: string | null) =>
-          val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
-      },
-      {
-        title: "Thực tế",
-        dataIndex: "actual_time",
-        render: (val: string | null) =>
-          val ? dayjs(val).format("DD/MM/YYYY HH:mm") : "—",
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "status",
-        render: (val: RoundItem["status"]) => {
-          const meta = statusMeta[val];
-          return <Tag color={meta.color}>{meta.label}</Tag>;
-        },
-      },
-    ];
-
-    if (!canManage) return base;
-
-    return [
-      ...base,
-      {
-        title: "Thao tác",
-        dataIndex: "actions",
-        render: (_: unknown, record: RoundItem) => {
-          const isPlanned = record.status === "planned";
-          return (
-            <Space>
-              <Tooltip title={isPlanned ? "Sửa" : "Không thể sửa chặng đã đến hoặc đang đến"}>
-                <Button
-                  type="text"
-                  icon={<EditOutlined />}
-                  onClick={() => openEdit(record)}
-                  style={{ color: isPlanned ? "#2563eb" : undefined }}
-                  disabled={!isPlanned}
-                />
-              </Tooltip>
-              {record.sequence === 1 ? (
-                <Tooltip title="Không thể xóa chặng đầu tiên">
-                  <Button type="text" disabled icon={<DeleteOutlined />} />
-                </Tooltip>
-              ) : (
-                <Popconfirm
-                  title="Xóa chặng này?"
-                  description="Thao tác này không thể hoàn tác."
-                  onConfirm={() => deleteRoundMutate(String(record.id))}
-                  okText="Xóa"
-                  cancelText="Hủy"
-                  disabled={!isPlanned}
-                >
-                  <Tooltip title={isPlanned ? "Xóa" : "Không thể xóa chặng đã đến hoặc đang đến"}>
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      loading={deleteStatus === "pending"}
-                      disabled={!isPlanned}
-                    />
-                  </Tooltip>
-                </Popconfirm>
-              )}
-            </Space>
-          );
-        },
-      },
-    ];
-  }, [canManage, deleteRoundMutate, deleteStatus, openEdit]);
+  const handleCancelEditRounds = () => {
+    setLocalRounds(rounds); // Revert to original
+    setIsEditingAll(false);
+    setIsSelectionMode(false);
+    setSelectedRowKeys([]);
+  };
 
   return (
     <div className="w-full bg-[#f4f7fb] h-full py-6">
@@ -531,7 +335,6 @@ export default function RoundManagement() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full sm:w-64"
             />
-
             <Select
               value={statusFilter}
               onChange={(val) => setStatusFilter(val)}
@@ -547,22 +350,9 @@ export default function RoundManagement() {
             {canManage && (
               <Button
                 icon={<FileExcelOutlined />}
-                onClick={async () => {
-                  if (!tripFilter) {
-                    message.warning("Vui lòng chọn một chuyến đi");
-                    return;
-                  }
-                  try {
-                    const blob = await exportRounds(tripFilter);
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `rounds_${tripFilter}.xlsx`;
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                  } catch {
-                    message.error("Lỗi khi export");
-                  }
+                onClick={() => {
+                  if (!tripFilter) return;
+                  handleExport(tripFilter);
                 }}
                 className="text-emerald-600 border-emerald-200 hover:border-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 shadow-sm"
               >
@@ -573,7 +363,7 @@ export default function RoundManagement() {
               <Button
                 type="primary"
                 onClick={openCreate}
-                className="bg-sky-600 hover:bg-sky-700 shadow-sm px-5"
+                className="bg-sky-600 hover:bg-sky-700 shadow-sm"
               >
                 + Tạo mới
               </Button>
@@ -587,7 +377,11 @@ export default function RoundManagement() {
               Chuyến đi:
             </span>
             <Select
-              value={trips.some(t => String(t.id) === tripFilter) ? tripFilter : undefined}
+              value={
+                trips.some((t) => String(t.id) === tripFilter)
+                  ? tripFilter
+                  : undefined
+              }
               onChange={(val) => setTripFilter(val)}
               className="w-full sm:w-64"
               showSearch
@@ -601,9 +395,29 @@ export default function RoundManagement() {
               ]}
               placeholder="Chọn chuyến đi"
             />
+            {canManage && isEditingAll && (
+              <div className="flex gap-2">
+                <Button onClick={handleCancelEditRounds}>
+                  Hủy
+                </Button>
+                <Button type="primary" onClick={handleLockRounds}>
+                  Chốt chặng
+                </Button>
+              </div>
+            )}
+            {canManage && !isEditingAll && (
+              <Button
+                type="dashed"
+                className="border-blue-400 text-blue-500 hover:text-blue-600 hover:border-blue-500 font-medium"
+                icon={<EditOutlined />}
+                onClick={() => setIsEditingAll(true)}
+              >
+                Sửa lịch trình
+              </Button>
+            )}
           </div>
 
-          {canManage && (
+          {canManage && isEditingAll && (
             <div className="flex justify-end">
               {isSelectionMode ? (
                 <div className="flex gap-2">
@@ -620,31 +434,9 @@ export default function RoundManagement() {
                       danger
                       icon={<DeleteOutlined />}
                       onClick={() => {
-                        Modal.confirm({
-                          title: "Xóa nhiều chặng?",
-                          content: `Bạn chắc chắn muốn xóa ${selectedRowKeys.length} chặng đã chọn?`,
-                          okText: "Xóa",
-                          cancelText: "Hủy",
-                          onOk: async () => {
-                            const hide = message.loading("Đang xóa...", 0);
-                            try {
-                              await bulkDeleteRounds(
-                                selectedRowKeys as string[],
-                              );
-                              message.success(
-                                `Đã xóa ${selectedRowKeys.length} chặng`,
-                              );
-                              setSelectedRowKeys([]);
-                              setIsSelectionMode(false);
-                              await queryClient.invalidateQueries({
-                                queryKey: ["rounds"],
-                              });
-                            } catch {
-                              message.error("Lỗi khi xóa chặng");
-                            } finally {
-                              hide();
-                            }
-                          },
+                        handleBulkDelete(selectedRowKeys as string[], () => {
+                          setSelectedRowKeys([]);
+                          setIsSelectionMode(false);
                         });
                       }}
                     >
@@ -662,63 +454,49 @@ export default function RoundManagement() {
         </div>
 
         <Card styles={{ body: { padding: 0 } }}>
-          <DndContext
-            sensors={sensors}
-            modifiers={[restrictToVerticalAxis]}
+          {tripDays.length > 0 && (
+            <div className="px-4 pt-4">
+              <Tabs
+                activeKey={activeTabDay}
+                onChange={(key) => setActiveTabDay(key)}
+                items={tripDays.map((day) => ({
+                  label: dayjs(day).format("DD/MM/YYYY"),
+                  key: day,
+                }))}
+              />
+            </div>
+          )}
+          <RoundTable
+            rounds={displayRounds}
+            isLoading={isLoading}
+            canManage={canManage}
+            isEditing={isEditingAll}
+            isSelectionMode={isSelectionMode}
+            selectedRowKeys={selectedRowKeys}
+            setSelectedRowKeys={setSelectedRowKeys}
+            onEdit={openEdit}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            deleteStatus={deleteMutation.status}
             onDragEnd={onDragEnd}
-          >
-            <SortableContext
-              items={localRounds.map((i) => i.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <RoundContext.Provider value={localRounds}>
-                <Table
-                  components={{ body: { row: DraggableRow } }}
-                  size="small"
-                  rowKey="id"
-                  rowSelection={
-                    isSelectionMode
-                      ? {
-                          selectedRowKeys,
-                          onChange: (newSelectedRowKeys) =>
-                            setSelectedRowKeys(newSelectedRowKeys),
-                          getCheckboxProps: (record) => ({
-                            disabled: record.status !== "planned" || record.sequence === 1,
-                          }),
-                        }
-                      : undefined
-                  }
-                  dataSource={localRounds}
-                  loading={isLoading}
-                  pagination={false}
-                  scroll={{ x: "max-content" }}
-                  columns={columns}
-                  locale={{
-                    emptyText: isLoading ? (
-                      <span>Đang tải...</span>
-                    ) : (
-                      <Empty description="Chưa có dữ liệu" />
-                    ),
-                  }}
-                />
-              </RoundContext.Provider>
-            </SortableContext>
-          </DndContext>
+            emptyDescription={
+              tripDays.length > 0 ? "Không có lịch trình" : "Chưa có dữ liệu"
+            }
+          />
         </Card>
       </div>
 
       <RoundFormModal
         open={showCreate}
-        onCancel={handleCancel}
-        onSubmit={handleSubmit}
-        confirmLoading={
-          createMutation.status === "pending" ||
-          updateMutation.status === "pending"
-        }
+        onCancel={() => {
+          setShowCreate(false);
+          setEditingRound(null);
+        }}
+        onSubmit={onFinishForm}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
         form={form}
         trips={trips}
         editingRound={editingRound}
-        tripFilter={tripFilter ?? undefined}
+        tripFilter={tripFilter && tripFilter !== "all" ? String(tripFilter) : undefined}
       />
     </div>
   );

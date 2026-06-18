@@ -17,10 +17,11 @@ import {
   Upload,
   Typography,
   message,
-  Table,
   Button,
-  DatePicker,
+  TimePicker,
+  Table,
 } from "antd";
+import dayjs from "dayjs";
 import * as XLSX from "xlsx";
 
 import { downloadRoundTemplate, importRounds } from "../../../api/trips";
@@ -32,10 +33,11 @@ const { Dragger } = Upload;
 const { Text } = Typography;
 
 export interface RoundFormValues {
-  trip: string;
-  name: string;
-  location: string;
-  estimate_time?: any;
+  trip?: string | number;
+  name?: string;
+  location?: string;
+  estimate_date?: string;
+  estimate_time_only?: any;
 }
 
 interface RoundFormModalProps {
@@ -47,15 +49,6 @@ interface RoundFormModalProps {
   trips: Trip[];
   editingRound?: RoundItem | null;
   tripFilter?: string;
-}
-
-interface PreviewRecord {
-  key: number;
-  stt: string;
-  name: string;
-  location: string;
-  estimateTime: string;
-  sequence: string;
 }
 
 export default function RoundFormModal({
@@ -73,9 +66,28 @@ export default function RoundFormModal({
 
   const [activeTab, setActiveTab] = useState("manual");
   const [file, setFile] = useState<File | null>(null);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [activePreviewTab, setActivePreviewTab] = useState<string>("");
   const [importing, setImporting] = useState(false);
-  const [previewData, setPreviewData] = useState<PreviewRecord[]>([]);
 
+  const activeTripObj = React.useMemo(() => {
+    return trips.find((t) => String(t.id) === String(tripValue));
+  }, [trips, tripValue]);
+
+  const tripDays = React.useMemo(() => {
+    if (!activeTripObj?.start_date || !activeTripObj?.end_date) return [];
+    const start = dayjs(activeTripObj.start_date);
+    const end = dayjs(activeTripObj.end_date);
+    const days = [];
+    let current = start;
+    while (current.isBefore(end) || current.isSame(end, "day")) {
+      days.push(current.format("YYYY-MM-DD"));
+      current = current.add(1, "day");
+    }
+    return days;
+  }, [activeTripObj]);
+
+  // Sync open/close states
   useEffect(() => {
     if (open) {
       setActiveTab("manual");
@@ -98,8 +110,12 @@ export default function RoundFormModal({
   }, [open, tripFilter, form, editingRound]);
 
   const handleDownloadTemplate = async () => {
+    if (!tripValue) {
+      message.warning("Vui lòng chọn chuyến đi trước khi tải template mẫu.");
+      return;
+    }
     try {
-      const blob = await downloadRoundTemplate();
+      const blob = await downloadRoundTemplate(String(tripValue));
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -129,7 +145,7 @@ export default function RoundFormModal({
         fd.append("action", action);
       }
 
-      const res = await importRounds(tripValue, fd);
+      const res = await importRounds(String(tripValue), fd);
       message.success(res.detail || "Import thành công");
       await queryClient.invalidateQueries({ queryKey: ["rounds"] });
       onCancel();
@@ -177,26 +193,58 @@ export default function RoundFormModal({
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          raw: false,
+
+        let allParsed: any[] = [];
+        let keyIdx = 0;
+        let isValidFormat = true;
+
+        workbook.SheetNames.forEach((sheetName) => {
+          if (!isValidFormat) return;
+          const worksheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet, {
+            header: 1,
+            raw: false,
+          });
+
+          const headerRow = (json[0] as any[]) || [];
+          const headerStr = headerRow.map((h: any) => String(h || "").toLowerCase()).join(" ");
+          
+          if (!headerStr.includes("tên chặng") && !headerStr.includes("địa điểm")) {
+            isValidFormat = false;
+            return;
+          }
+
+          // Skip header row
+          const rows = json
+            .slice(1)
+            .filter((r: any) => r && r[1] && r.length >= 2);
+          const parsed = rows.map((r: any) => ({
+            key: keyIdx++,
+            sheet: sheetName,
+            stt: r[0] || "",
+            name: r[1] || "",
+            location: r[2] || "",
+            estimateTime: r[3] || "",
+            sequence: r[4] || "",
+          }));
+          allParsed = [...allParsed, ...parsed];
         });
 
-        // Skip header row
-        const rows = json.slice(1).filter((r: any) => r && r.length >= 4);
-        const parsed = rows.map((r: any, idx: number) => ({
-          key: idx,
-          stt: r[0] || "",
-          name: r[1] || "",
-          location: r[2] || "",
-          estimateTime: r[3] || "",
-          sequence: r[4] || "",
-        }));
-        setPreviewData(parsed);
+        if (!isValidFormat) {
+          message.error("Sai định dạng file Excel. Vui lòng sử dụng đúng template Chặng.");
+          setFile(null);
+          setPreviewData([]);
+          return;
+        }
+
+        setPreviewData(allParsed);
+        if (workbook.SheetNames.length > 0) {
+          setActivePreviewTab(workbook.SheetNames[0]);
+        }
       } catch {
         message.error("Không thể đọc file Excel");
+        setFile(null);
+        setPreviewData([]);
       }
     };
     reader.readAsBinaryString(f);
@@ -212,8 +260,8 @@ export default function RoundFormModal({
             { required: activeTab === "manual", message: "Nhập tên chặng" },
           ]}
         >
-          <Input 
-            placeholder="Ví dụ: Tập huấn tại Cam Ranh" 
+          <Input
+            placeholder="Ví dụ: Tập huấn tại Cam Ranh"
             disabled={editingRound?.sequence === 1}
           />
         </Form.Item>
@@ -229,13 +277,30 @@ export default function RoundFormModal({
           <Input placeholder="Địa điểm" />
         </Form.Item>
       </Col>
-      <Col span={24}>
-        <Form.Item label="Thời gian đến dự kiến" name="estimate_time">
-          <DatePicker
-            showTime
-            format="YYYY-MM-DD HH:mm"
+      <Col span={12}>
+        <Form.Item
+          label="Ngày"
+          name="estimate_date"
+          rules={[{ required: activeTab === "manual", message: "Chọn ngày" }]}
+        >
+          <Select placeholder="Chọn ngày">
+            {tripDays.map((d) => (
+              <Select.Option key={d} value={d}>
+                {dayjs(d).format("DD/MM/YYYY")}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item
+          label="Giờ đến dự kiến (dạng 24 giờ)"
+          name="estimate_time_only"
+        >
+          <TimePicker
+            format="HH:mm"
             style={{ width: "100%" }}
-            placeholder="Chọn thời gian"
+            placeholder="Chọn giờ"
           />
         </Form.Item>
       </Col>
@@ -291,6 +356,31 @@ export default function RoundFormModal({
                 label: "Import từ Excel",
                 children: (
                   <div className="mt-2 mb-4">
+                    <div className="mb-4 bg-orange-50 border-l-4 border-orange-500 p-3 rounded">
+                      <p className="text-orange-800 font-semibold mb-1">
+                        Lưu ý quan trọng:
+                      </p>
+                      <ul className="list-disc pl-5 text-sm text-orange-700">
+                        <li>
+                          <strong>Chọn đúng chuyến đi ở trên</strong> để có
+                          template chuẩn theo chuyến đi đó.
+                        </li>
+                        <li>
+                          <strong>Không được thay đổi tên các sheet</strong>{" "}
+                          trong file Excel. Tên sheet chính là ngày thực hiện
+                          chặng.
+                        </li>
+                        <li>
+                          Chặng đầu tiên luôn là{" "}
+                          <strong>"Tập trung và xuất phát"</strong>, vui lòng
+                          không thay đổi.
+                        </li>
+                        <li>
+                          Những ngày nghỉ (không có lịch đi đâu), vui lòng{" "}
+                          <strong>để trống sheet đó</strong> (không sửa gì cả).
+                        </li>
+                      </ul>
+                    </div>
                     <div className="flex items-center justify-between mb-2">
                       <Text strong>File Excel</Text>
                       <a
@@ -336,29 +426,43 @@ export default function RoundFormModal({
                             Chọn file khác
                           </Button>
                         </div>
-                        <Table
-                          size="small"
-                          dataSource={previewData}
-                          pagination={{ pageSize: 5 }}
-                          columns={[
-                            { title: "STT", dataIndex: "stt", width: 60 },
-                            {
-                              title: "Tên chặng",
-                              dataIndex: "name",
-                              ellipsis: true,
-                            },
-                            { title: "Địa điểm", dataIndex: "location" },
-                            {
-                              title: "TG Dự kiến (DD/MM/YYYY HH:MM)",
-                              dataIndex: "estimateTime",
-                              ellipsis: true,
-                            },
-                            {
-                              title: "Thứ tự",
-                              dataIndex: "sequence",
-                              width: 80,
-                            },
-                          ]}
+                        <Tabs
+                          activeKey={activePreviewTab}
+                          onChange={setActivePreviewTab}
+                          items={Array.from(
+                            new Set(previewData.map((d) => d.sheet)),
+                          ).map((sheet) => ({
+                            key: sheet,
+                            label: sheet,
+                            children: (
+                              <Table
+                                size="small"
+                                dataSource={previewData.filter(
+                                  (d) => d.sheet === sheet,
+                                )}
+                                pagination={{ pageSize: 10 }}
+                                columns={[
+                                  { title: "STT", dataIndex: "stt", width: 60 },
+                                  {
+                                    title: "Tên chặng",
+                                    dataIndex: "name",
+                                    ellipsis: true,
+                                  },
+                                  { title: "Địa điểm", dataIndex: "location" },
+                                  {
+                                    title: "Thời gian",
+                                    dataIndex: "estimateTime",
+                                    ellipsis: true,
+                                  },
+                                  {
+                                    title: "Thứ tự",
+                                    dataIndex: "sequence",
+                                    width: 80,
+                                  },
+                                ]}
+                              />
+                            ),
+                          }))}
                         />
                       </div>
                     )}

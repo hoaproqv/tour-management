@@ -14,6 +14,7 @@ import BusManagement from "./pages/Bus/BusManagement";
 import DashboardPage from "./pages/Dashboard";
 import GuidePage from "./pages/GuidePage/GuidePage";
 import NotFoundPage from "./pages/NotFound";
+import NotificationList from "./pages/Notifications/NotificationList";
 import PassengerManagement from "./pages/Passengers/PassengerManagement";
 import Profile from "./pages/ProfilePage/Profile";
 import RoundManagement from "./pages/Rounds/RoundManagement";
@@ -47,6 +48,7 @@ function App() {
             <Route path={ROUTES.ACCOUNT} element={<Account />} />
             <Route path={ROUTES.PROFILE} element={<Profile />} />
             <Route path={ROUTES.GUIDE} element={<GuidePage />} />
+            <Route path={ROUTES.NOTIFICATIONS} element={<NotificationList />} />
             <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
           </Route>
         </Route>

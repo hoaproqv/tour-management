@@ -18,8 +18,9 @@ class Round(models.Model):
     sequence = models.PositiveIntegerField(
         help_text="Order of this round within the trip"
     )
-    estimate_time = models.DateTimeField(null=True, blank=True)
-    actual_time = models.DateTimeField(null=True, blank=True)
+    round_date = models.DateField(null=True, blank=True)
+    estimate_time = models.TimeField(null=True, blank=True)
+    actual_time = models.TimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -29,8 +30,8 @@ class Round(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["trip", "sequence"]
-        unique_together = ("trip", "sequence")
+        ordering = ["trip", "round_date", "sequence"]
+        unique_together = ("trip", "round_date", "sequence")
 
     def __str__(self) -> str:
         return f"{self.trip.name} - {self.name}"

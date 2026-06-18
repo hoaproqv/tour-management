@@ -89,6 +89,44 @@ class PassengerSerializer(serializers.ModelSerializer):
         )
         return passenger
 
+    def update(self, instance, validated_data):
+        tenant = self.context.get("tenant")
+        trip_id = validated_data.pop("trip_id", None)
+        trip_bus_id = validated_data.pop("trip_bus_id", None)
+
+        passenger = super().update(instance, validated_data)
+
+        if trip_id:
+            from trips.models import Trip, TripBus
+            try:
+                trip = Trip.objects.get(id=trip_id, tenant=tenant)
+                
+                trip_bus = None
+                if trip_bus_id:
+                    try:
+                        trip_bus = TripBus.objects.get(id=trip_bus_id, trip=trip)
+                    except TripBus.DoesNotExist:
+                        raise ValidationError({"trip_bus_id": "Xe khách không hợp lệ cho chuyến đi này."})
+                elif "trip_bus_id" in self.initial_data and self.initial_data.get("trip_bus_id") in ["", None]:
+                    # They explicitly unassigned
+                    trip_bus = None
+                else:
+                    # Not provided, maybe we don't update it, or we do?
+                    # The form sends trip_bus_id as undefined if not selected, but initial_data might not have it.
+                    pass
+
+                # If trip_bus_id is in initial_data, update the assignment
+                if "trip_bus_id" in self.initial_data:
+                    PassengerBusAssignment.objects.update_or_create(
+                        passenger=passenger,
+                        trip=trip,
+                        defaults={"trip_bus": trip_bus}
+                    )
+            except Trip.DoesNotExist:
+                pass # Ignore if trip doesn't exist on update
+
+        return passenger
+
 
 class PassengerTransferSerializer(serializers.ModelSerializer):
     trip = serializers.SerializerMethodField(read_only=True)

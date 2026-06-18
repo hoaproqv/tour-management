@@ -19,14 +19,53 @@ def create_round_buses_for_round(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender="trips.Trip")
 def create_initial_round_for_trip(sender, instance, created, **kwargs):
-    """When a Trip is created, ensure an initial Round exists."""
-    if not created:
-        return
+    """(Removed) We no longer auto-create rounds in DB when a trip is created. UI handles this."""
+    pass
 
-    from rounds.models import Round
-    Round.objects.create(
-        trip=instance,
-        name="Tập trung và xuất phát",
-        location="",
-        sequence=1,
-    )
+from django.db.models.signals import pre_save
+from notifications.services import notify_users_by_role
+
+@receiver(pre_save, sender="rounds.RoundBus")
+def round_bus_pre_save(sender, instance, **kwargs):
+    if instance.pk:
+        from .models import RoundBus
+        try:
+            old_instance = RoundBus.objects.get(pk=instance.pk)
+            instance._old_finalized_at = old_instance.finalized_at
+            instance._old_checkout_finalized_at = old_instance.checkout_finalized_at
+        except RoundBus.DoesNotExist:
+            instance._old_finalized_at = None
+            instance._old_checkout_finalized_at = None
+    else:
+        instance._old_finalized_at = None
+        instance._old_checkout_finalized_at = None
+
+@receiver(post_save, sender="rounds.RoundBus")
+def round_bus_post_save(sender, instance, created, **kwargs):
+    old_finalized_at = getattr(instance, '_old_finalized_at', None)
+    old_checkout_finalized_at = getattr(instance, '_old_checkout_finalized_at', None)
+
+    manager = instance.trip_bus.manager
+    manager_name = manager.name if manager else "Ai đó"
+    bus_reg = instance.trip_bus.bus.registration_number
+    tenant_id = instance.round.trip.tenant_id
+
+    if instance.finalized_at and not old_finalized_at:
+        notify_users_by_role(
+            tenant_id=tenant_id,
+            roles=['tour_manager'],
+            title="Chốt sổ điểm danh lên xe",
+            message=f"Trưởng xe {manager_name} đã chốt sổ điểm danh lên xe {bus_reg} ở chặng '{instance.round.name}'",
+            reference_type='ROUND',
+            reference_id=str(instance.round.id)
+        )
+
+    if instance.checkout_finalized_at and not old_checkout_finalized_at:
+        notify_users_by_role(
+            tenant_id=tenant_id,
+            roles=['tour_manager'],
+            title="Chốt sổ điểm danh xuống xe",
+            message=f"Trưởng xe {manager_name} đã chốt sổ điểm danh xuống xe {bus_reg} ở chặng '{instance.round.name}'",
+            reference_type='ROUND',
+            reference_id=str(instance.round.id)
+        )

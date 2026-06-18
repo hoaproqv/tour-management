@@ -112,20 +112,28 @@ export default function GuidePage() {
                     <Tag color="green">Thêm mới</Tag>
                   </Text>
                   Từ trang danh sách hoặc trong Chi tiết chuyến đi, bấm{" "}
-                  <Text mark>Thêm mới chặng</Text>. Bạn cần chọn: Chuyến đi gốc, 
-                  điểm đầu, điểm cuối và thời gian chạy dự kiến.
+                  <Text mark>Thêm mới chặng</Text>. Bạn cần nhập: Thuộc chuyến đi, 
+                  Tên chặng, Địa điểm, Ngày và Giờ đến dự kiến (dạng 24 giờ).
                 </Paragraph>
                 <Paragraph className="mb-2">
                   <Text strong>
                     <Tag color="orange">Sửa lộ trình</Tag>
                   </Text>
-                  Sử dụng tính năng sửa để cập nhật lại thời gian hoặc các điểm đón/trả nếu có sự cố trước khi chặng khởi hành.
+                  Sử dụng tính năng sửa để cập nhật lại thời gian hoặc địa điểm nếu có thay đổi.{" "}
+                  <Text type="danger" strong>Lưu ý:</Text> Chỉ được sửa các chặng ở ngày chưa đi. Trong ngày đang đi, chỉ được sửa các chặng chưa đến. Không thể sửa chặng đã đến hoặc đang đi.
+                </Paragraph>
+                <Paragraph className="mb-2">
+                  <Text strong>
+                    <Tag color="purple">Sắp xếp thứ tự</Tag>
+                  </Text>
+                  Bạn có thể kéo thả trực tiếp các dòng trong bảng để thay đổi thứ tự các chặng.{" "}
+                  <Text type="danger" strong>Lưu ý:</Text> Không được kéo và sắp xếp các chặng chưa đến lên trước các chặng đang thực hiện (đang đi).
                 </Paragraph>
                 <Paragraph className="mb-0">
                   <Text strong>
                     <Tag color="red">Xóa</Tag>
                   </Text>
-                  Xóa các chặng tạo nhầm. Tương tự, chỉ xóa được chặng chưa có
+                  Hệ thống sẽ yêu cầu xác nhận khi xóa. Chỉ xóa được chặng chưa có
                   dữ liệu điểm danh.
                 </Paragraph>
               </div>
@@ -222,9 +230,9 @@ export default function GuidePage() {
                 cho một chuyến đi.
                 <Text type="danger" strong>
                   {" "}
-                  LƯU Ý QUAN TRỌNG: Sau khi import hành khách từ Excel, bạn bắt
-                  buộc phải vào chuyến đi để gắn xe (phân bổ) cho hành khách thì
-                  họ mới hiển thị trên app của tài xế.
+                  LƯU Ý QUAN TRỌNG: Sau khi import hành khách từ Excel hoặc tạo tay, bạn bắt
+                  buộc phải gắn xe thực tế cho họ thì họ mới hiển thị trên app của tài xế. 
+                  Khi gắn xe, hệ thống sẽ tự động gộp danh sách hành khách của xe import vào chung tab với xe thực tế.
                 </Text>
               </Paragraph>
               <Paragraph className="mb-2">
@@ -232,7 +240,7 @@ export default function GuidePage() {
                   <Tag color="purple">Phân bổ hành khách</Tag>
                 </Text>
                 Trong màn hình chi tiết Chuyến đi, bạn có thể chọn nhiều hành
-                khách và gán họ vào một Chặng (Xe) cụ thể.
+                khách và gán họ vào một Chặng (Xe) cụ thể. Các hành khách đã được gán sẽ tự động được gộp chung danh sách với xe thực tế theo thứ tự bảng chữ cái.
               </Paragraph>
               <Paragraph className="mb-2">
                 <Text strong>
@@ -269,8 +277,9 @@ export default function GuidePage() {
               <Text type="warning" strong>
                 *Lưu ý (Dành riêng cho Quản lý chuyến đi): 
               </Text>{" "}
-              Khi chuyến đi đến ngày khởi hành, màn hình Điểm danh sẽ xuất hiện nút <Text strong>Xuất phát</Text>. 
-              Quản lý chuyến đi bắt buộc phải bấm nút này để kích hoạt trạng thái chuyến đi, từ đó tài xế mới có thể bắt đầu thao tác điểm danh lên xe.
+              Quản lý chuyến đi bắt buộc phải bấm nút <Text strong>XUẤT PHÁT</Text> ở phía trên cùng của màn hình để bắt đầu chuyến đi. Nút này sẽ kiểm tra ngày của chặng bạn đang chọn. Nếu chưa đến ngày, hệ thống sẽ hiển thị <Text type="secondary">"Xuất phát ngày..."</Text> và chặn thao tác để tránh xuất phát nhầm ngày.
+              <br/>
+              Đồng thời, hệ thống sẽ tự động kiểm tra số lượng hành khách. Nếu còn <Text type="danger" strong>hành khách chưa được gán xe</Text>, hệ thống sẽ cảnh báo và chặn xuất phát để đảm bảo không sót khách.
             </Paragraph>
 
             <Divider orientation="left" plain>
@@ -284,31 +293,29 @@ export default function GuidePage() {
                 current={5}
                 items={[
                   {
-                    title: <Text strong>Bước 1: Chọn Chuyến đi và Chặng</Text>,
+                    title: <Text strong>Bước 1: Chọn Chuyến đi và Ngày</Text>,
                     description:
-                      'Tại màn hình "Điểm danh hành khách", chọn Chuyến đi đang hoạt động. Ở thanh bên trái, chọn Chặng (checkpoint) hiện tại theo lịch trình.',
+                      'Tại màn hình "Điểm danh", chọn Chuyến đi. Sau đó chọn Ngày trên các tab để lọc danh sách các chặng tương ứng trong ngày.',
                   },
                   {
-                    title: <Text strong>Bước 2: Chọn Xe (nếu áp dụng)</Text>,
+                    title: <Text strong>Bước 2: Chọn Chặng (Timeline)</Text>,
                     description:
-                      "Nếu bạn là Quản lý, bạn sẽ thấy các tab tương ứng với từng xe khách trong chặng. Nếu là Tài xế/Trưởng xe, bạn thao tác trên xe mình được phân công.",
+                      'Bấm vào các mốc chặng trên thanh Timeline để xem danh sách xe. Cần chốt điểm danh lần lượt theo thứ tự của các chặng.',
                   },
                   {
-                    title: <Text strong>Bước 3: Điểm danh lên/xuống xe</Text>,
+                    title: <Text strong>Bước 3: Chọn Xe khách</Text>,
                     description:
-                      'Trong danh sách khách: Bấm vào nút hành động tương ứng với từng khách để đánh dấu "Lên xe" hoặc "Xuống xe" thủ công.',
+                      "Bên dưới sẽ hiển thị các tab xe khách. Quản lý sẽ thấy tất cả xe, còn Tài xế/Trưởng xe chỉ thấy xe mình phụ trách.",
                   },
                   {
-                    title: (
-                      <Text strong>Bước 4: Theo dõi & Điểm danh chéo</Text>
-                    ),
+                    title: <Text strong>Bước 4: Điểm danh lên/xuống xe</Text>,
                     description:
-                      'Bạn có thể xem được sĩ số khách đang có mặt, vắng mặt. Ngoài ra có thể thao tác "Điểm danh chéo" nếu phát hiện khách lên nhầm sang xe khác trong cùng chặng.',
+                      'Bấm vào nút hành động để đánh dấu "Lên xe" hoặc "Xuống xe". Có thể sử dụng tính năng "Điểm danh thành viên xe khác" nếu khách lên nhầm xe.',
                   },
                   {
                     title: <Text strong>Bước 5: Chốt danh sách</Text>,
                     description:
-                      'Khi toàn bộ khách đã lên đủ hoặc xuống đủ, nhấn nút "Chốt danh sách". Sau khi chốt, dữ liệu điểm danh sẽ bị khóa và không thể thay đổi.',
+                      'Khi đã hoàn tất, nhấn "Chốt điểm danh" để khóa dữ liệu chặng hiện tại và tiếp tục thao tác ở chặng tiếp theo.',
                   },
                 ]}
               />

@@ -16,6 +16,7 @@ import {
   type TransactionItem,
   type PassengerTransfer,
 } from "../../../api/trips";
+import { extractApiError } from "../../../utils/helper";
 
 export function useTransactionsMutations({
   activeTripId,
@@ -51,7 +52,7 @@ export function useTransactionsMutations({
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
     onError: (error: any) => {
-      message.error(error.response?.data?.detail || "Điểm danh thất bại");
+      message.error(extractApiError(error, "Điểm danh thất bại"));
     },
   });
 
@@ -69,7 +70,8 @@ export function useTransactionsMutations({
       message.success("Đã điểm danh xuống xe");
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
-    onError: () => message.error("Điểm danh xuống thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Điểm danh xuống thất bại")),
   });
 
   const undoCheckInMutation = useMutation({
@@ -80,7 +82,8 @@ export function useTransactionsMutations({
       message.success("Đã hủy điểm danh lên xe");
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
-    onError: () => message.error("Hủy điểm danh lên thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Hủy điểm danh lên thất bại")),
   });
 
   const undoCheckOutMutation = useMutation({
@@ -96,13 +99,18 @@ export function useTransactionsMutations({
       message.success("Đã hủy điểm danh xuống xe");
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
-    onError: () => message.error("Hủy điểm danh xuống thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Hủy điểm danh xuống thất bại")),
   });
 
-
-
   const bulkCheckOutMutation = useMutation({
-    mutationFn: async ({ transactionIds, checkOutTime }: { transactionIds: (string | number)[]; checkOutTime: string }) => {
+    mutationFn: async ({
+      transactionIds,
+      checkOutTime,
+    }: {
+      transactionIds: (string | number)[];
+      checkOutTime: string;
+    }) => {
       return bulkCheckOutTransactions({
         transaction_ids: transactionIds,
         check_out: checkOutTime,
@@ -112,7 +120,10 @@ export function useTransactionsMutations({
       message.success("Đã điểm danh xuống xe hàng loạt");
       await queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
-    onError: () => message.error("Điểm danh xuống hàng loạt thất bại"),
+    onError: (error: any) =>
+      message.error(
+        extractApiError(error, "Điểm danh xuống hàng loạt thất bại"),
+      ),
   });
 
   const upsertTransferMutation = useMutation({
@@ -135,7 +146,8 @@ export function useTransactionsMutations({
         queryKey: ["passenger-transfers", activeTripId],
       });
     },
-    onError: () => message.error("Lưu chuyển xe thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Lưu chuyển xe thất bại")),
   });
 
   const deleteTransferMutation = useMutation({
@@ -146,7 +158,8 @@ export function useTransactionsMutations({
         queryKey: ["passenger-transfers", activeTripId],
       });
     },
-    onError: () => message.error("Huỷ chuyển xe thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Huỷ chuyển xe thất bại")),
   });
 
   const switchBusMutation = useMutation({
@@ -192,7 +205,7 @@ export function useTransactionsMutations({
       });
     },
     onError: (error: any) => {
-      message.error(error.response?.data?.detail || "Chuyển xe thất bại");
+      message.error(extractApiError(error, "Chuyển xe thất bại"));
     },
   });
 
@@ -211,7 +224,8 @@ export function useTransactionsMutations({
         queryKey: ["passenger-transfers", activeTripId],
       });
     },
-    onError: () => message.error("Huỷ chuyển thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Huỷ chuyển thất bại")),
   });
 
   const finalizeRoundBusMutation = useMutation({
@@ -231,7 +245,8 @@ export function useTransactionsMutations({
       await queryClient.invalidateQueries({ queryKey: ["round-buses"] });
       await queryClient.invalidateQueries({ queryKey: ["trips"] });
     },
-    onError: () => message.error("Cập nhật trạng thái xe thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Cập nhật trạng thái xe thất bại")),
   });
 
   const finalizeRoundBusCheckoutMutation = useMutation({
@@ -244,12 +259,18 @@ export function useTransactionsMutations({
       finalized: boolean;
       snapshotData?: any;
     }) => {
-      return finalizeRoundBusCheckout(roundBusId, finalized, undefined, snapshotData);
+      return finalizeRoundBusCheckout(
+        roundBusId,
+        finalized,
+        undefined,
+        snapshotData,
+      );
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["round-buses"] });
     },
-    onError: () => message.error("Cập nhật trạng thái xe thất bại"),
+    onError: (error: any) =>
+      message.error(extractApiError(error, "Cập nhật trạng thái xe thất bại")),
   });
 
   const startTripMutation = useMutation({
@@ -259,7 +280,9 @@ export function useTransactionsMutations({
       message.success("Đã bắt đầu chuyến đi!");
       await queryClient.invalidateQueries({ queryKey: ["trips"] });
     },
-    onError: () => message.error("Không thể bắt đầu chuyến đi"),
+    onError: (error: any) => {
+      message.error(extractApiError(error, "Không thể bắt đầu chuyến đi"));
+    },
   });
 
   const isMutationBusy =

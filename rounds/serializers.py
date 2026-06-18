@@ -16,6 +16,8 @@ class RoundSerializer(serializers.ModelSerializer):
     )
     buses = serializers.SerializerMethodField(read_only=True)
 
+    location = serializers.CharField(allow_blank=True, required=False)
+
     class Meta:
         model = Round
         fields = [
@@ -24,6 +26,7 @@ class RoundSerializer(serializers.ModelSerializer):
             "name",
             "location",
             "sequence",
+            "round_date",
             "estimate_time",
             "actual_time",
             "status",
@@ -36,13 +39,15 @@ class RoundSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         trip = attrs.get("trip") or getattr(self.instance, "trip", None)
         sequence = attrs.get("sequence") or getattr(self.instance, "sequence", None)
+        round_date = attrs.get("round_date") or getattr(self.instance, "round_date", None)
+        
         if trip and sequence is not None:
-            qs = Round.objects.filter(trip=trip, sequence=sequence)
+            qs = Round.objects.filter(trip=trip, sequence=sequence, round_date=round_date)
             if self.instance:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
-                    {"sequence": "Sequence must be unique per trip."}
+                    {"sequence": "Sequence must be unique per trip and date."}
                 )
         return attrs
 

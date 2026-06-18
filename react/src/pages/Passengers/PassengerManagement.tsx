@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 
 import { DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Form, Input, Select, Typography, message, Modal } from "antd";
+import { Button, Form, Input, Select, Typography, message, Modal, Tabs } from "antd";
 
 import {
   createPassenger,
@@ -10,6 +10,8 @@ import {
   exportPassengers,
   getImportedBuses,
   getPassengers,
+  getPassengerAssignments,
+  getTripBuses,
   getTrips,
   updatePassenger,
   bulkDeletePassengers,
@@ -98,6 +100,34 @@ export default function PassengerManagement() {
     [passengersResponse],
   );
 
+  const { data: tripBusesResponse } = useQuery({
+    queryKey: ["trip-buses", { trip: tripFilter }],
+    queryFn: () => getTripBuses({ trip: tripFilter as string, page: 1, limit: 1000 }),
+    enabled: tripFilter !== "all" && Boolean(tripFilter),
+  });
+
+  const tripBuses = useMemo(
+    () => Array.isArray(tripBusesResponse?.data) ? tripBusesResponse.data : [],
+    [tripBusesResponse]
+  );
+
+  const { data: assignmentsResponse } = useQuery({
+    queryKey: ["passenger-assignments", tripFilter],
+    queryFn: () => getPassengerAssignments({ trip: tripFilter as string }),
+    enabled: tripFilter !== "all" && Boolean(tripFilter),
+  });
+
+  const assignments = useMemo(
+    () => Array.isArray(assignmentsResponse) ? assignmentsResponse : [],
+    [assignmentsResponse]
+  );
+
+  const assignmentMap = useMemo(() => {
+    const map = new Map<string, any>();
+    assignments.forEach(a => map.set(a.passenger, a));
+    return map;
+  }, [assignments]);
+
   const tripMap = useMemo(
     () =>
       new Map(
@@ -127,6 +157,66 @@ export default function PassengerManagement() {
     });
   }, [passengers, debouncedSearch]);
 
+  const groupedPassengers = useMemo(() => {
+    if (tripFilter === "all" || !tripFilter) return { all: filteredPassengers };
+    
+    const groups: Record<string, Passenger[]> = {
+      unassigned: [],
+    };
+    
+    tripBuses.forEach(tb => {
+      groups[`trip_bus_${tb.id}`] = [];
+    });
+    
+    importedBusesForTrip.forEach(ib => {
+      if (!ib.is_mapped) {
+        groups[`imported_bus_${ib.id}`] = [];
+      }
+    });
+
+    filteredPassengers.forEach(p => {
+      const assign = assignmentMap.get(p.id);
+      if (!assign) {
+        groups.unassigned.push(p);
+      } else if (assign.trip_bus) {
+        if (groups[`trip_bus_${assign.trip_bus}`]) {
+          groups[`trip_bus_${assign.trip_bus}`].push(p);
+        } else {
+          groups.unassigned.push(p);
+        }
+      } else if (assign.imported_bus) {
+        const importedBus = importedBusesForTrip.find(ib => String(ib.id) === String(assign.imported_bus));
+        if (importedBus) {
+          if (!importedBus.is_mapped) {
+            if (groups[`imported_bus_${assign.imported_bus}`]) {
+              groups[`imported_bus_${assign.imported_bus}`].push(p);
+            } else {
+              groups.unassigned.push(p);
+            }
+          } else if (importedBus.mapped_trip_bus) {
+            if (groups[`trip_bus_${importedBus.mapped_trip_bus}`]) {
+              groups[`trip_bus_${importedBus.mapped_trip_bus}`].push(p);
+            } else {
+              groups.unassigned.push(p);
+            }
+          } else {
+            groups.unassigned.push(p);
+          }
+        } else {
+          groups.unassigned.push(p);
+        }
+      } else {
+        groups.unassigned.push(p);
+      }
+    });
+
+    Object.keys(groups).forEach((key) => {
+      groups[key].sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    return groups;
+  }, [filteredPassengers, tripFilter, tripBuses, importedBusesForTrip, assignmentMap]);
+
   const createMutation = useMutation({
     mutationFn: (payload: PassengerPayload) => createPassenger(payload),
     onSuccess: async () => {
@@ -136,6 +226,7 @@ export default function PassengerManagement() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["passengers"] }),
         queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+        queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
       ]);
     },
     onError: () => message.error("Tạo passenger thất bại"),
@@ -151,6 +242,7 @@ export default function PassengerManagement() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["passengers"] }),
         queryClient.invalidateQueries({ queryKey: ["trip-buses"] }),
+        queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
       ]);
     },
     onError: () => message.error("Cập nhật passenger thất bại"),
@@ -160,7 +252,10 @@ export default function PassengerManagement() {
     mutationFn: (id: string) => deletePassenger(id),
     onSuccess: async () => {
       message.success("Xóa passenger thành công");
-      await queryClient.invalidateQueries({ queryKey: ["passengers"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["passengers"] }),
+        queryClient.invalidateQueries({ queryKey: ["passenger-assignments"] }),
+      ]);
     },
     onError: () => message.error("Xóa passenger thất bại"),
   });
@@ -184,11 +279,20 @@ export default function PassengerManagement() {
       return;
     }
     setEditingPassenger(passenger);
+    const assign = assignmentMap.get(passenger.id);
+    
+    // Default to the current global tripFilter if available, otherwise fallback to assignment's trip
+    const defaultTripId = (tripFilter !== "all" && tripFilter) 
+      ? String(tripFilter) 
+      : (assign ? String(assign.trip) : undefined);
+
     form.setFieldsValue({
       name: passenger.name,
       phone: passenger.phone,
       extra_info: passenger.extra_info,
       note: passenger.note,
+      trip_id: defaultTripId,
+      trip_bus_id: assign && assign.trip_bus ? String(assign.trip_bus) : undefined,
     });
     setShowCreate(true);
   };
@@ -206,6 +310,9 @@ export default function PassengerManagement() {
           note: values.note || "",
         };
         if (editingPassenger) {
+          payload.trip_id = values.trip_id;
+          // Explicitly pass null if undefined so the backend knows to clear the assignment
+          payload.trip_bus_id = values.trip_bus_id || null as any;
           updateMutation.mutate({ id: editingPassenger.id, payload });
         } else {
           payload.trip_id = values.trip_id;
@@ -399,17 +506,90 @@ export default function PassengerManagement() {
           </div>
         )}
 
-        <PassengerTable
-          data={filteredPassengers}
-          isLoading={isLoading}
-          deleting={deleteMutation.status === "pending"}
-          canManage={canManage}
-          selectedRowKeys={selectedRowKeys}
-          onSelectChange={setSelectedRowKeys}
-          isSelectionMode={isSelectionMode}
-          onDelete={(id) => deleteMutation.mutate(id)}
-          onEdit={openEdit}
-        />
+        {tripFilter === "all" || !tripFilter ? (
+          <PassengerTable
+            data={filteredPassengers}
+            isLoading={isLoading}
+            deleting={deleteMutation.status === "pending"}
+            canManage={canManage}
+            selectedRowKeys={selectedRowKeys}
+            onSelectChange={setSelectedRowKeys}
+            isSelectionMode={isSelectionMode}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onEdit={openEdit}
+          />
+        ) : (
+          <Tabs
+            className="mt-6 passenger-bus-tabs"
+            type="card"
+            items={[
+              ...tripBuses
+                .filter((tb) => (groupedPassengers[`trip_bus_${tb.id}`]?.length || 0) > 0)
+                .map((tb) => {
+                  const mappedSheets = importedBusesForTrip
+                    .filter((ib) => String(ib.mapped_trip_bus) === String(tb.id))
+                    .map((ib) => ib.sheet_name);
+                  const prefix = mappedSheets.length > 0 ? `${mappedSheets.join(', ')} - ` : '';
+                  return {
+                  key: `trip_bus_${tb.id}`,
+                  label: `${prefix}${tb.registration_number || tb.bus_code || `Xe #${tb.id}`} (${groupedPassengers[`trip_bus_${tb.id}`]?.length || 0})`,
+                  children: (
+                    <PassengerTable
+                      className=""
+                    data={groupedPassengers[`trip_bus_${tb.id}`] || []}
+                    isLoading={isLoading}
+                    deleting={deleteMutation.status === "pending"}
+                    canManage={canManage}
+                    selectedRowKeys={selectedRowKeys}
+                    onSelectChange={setSelectedRowKeys}
+                    isSelectionMode={isSelectionMode}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                    onEdit={openEdit}
+                  />
+                ),
+              };
+            }),
+              ...importedBusesForTrip
+                .filter((ib) => !ib.is_mapped)
+                .map((ib) => ({
+                  key: `imported_bus_${ib.id}`,
+                  label: `${ib.sheet_name} (${groupedPassengers[`imported_bus_${ib.id}`]?.length || 0})`,
+                  children: (
+                    <PassengerTable
+                      className=""
+                      data={groupedPassengers[`imported_bus_${ib.id}`] || []}
+                      isLoading={isLoading}
+                      deleting={deleteMutation.status === "pending"}
+                      canManage={canManage}
+                      selectedRowKeys={selectedRowKeys}
+                      onSelectChange={setSelectedRowKeys}
+                      isSelectionMode={isSelectionMode}
+                      onDelete={(id) => deleteMutation.mutate(id)}
+                      onEdit={openEdit}
+                    />
+                  ),
+                })),
+              {
+                key: "unassigned",
+                label: `Chưa gán (${groupedPassengers.unassigned?.length || 0})`,
+                children: (
+                  <PassengerTable
+                    className=""
+                    data={groupedPassengers.unassigned || []}
+                    isLoading={isLoading}
+                    deleting={deleteMutation.status === "pending"}
+                    canManage={canManage}
+                    selectedRowKeys={selectedRowKeys}
+                    onSelectChange={setSelectedRowKeys}
+                    isSelectionMode={isSelectionMode}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                    onEdit={openEdit}
+                  />
+                ),
+              },
+            ]}
+          />
+        )}
       </div>
 
       <ImportPassengerModal

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+import { SendOutlined } from "@ant-design/icons";
 import {
   Badge,
   Card,
@@ -187,7 +188,7 @@ export default function TransactionManagement() {
     );
     if (unassignedPassengers.length > 0) {
       return message.error(
-        "Có hành khách chưa được gán xe. Vui lòng kiểm tra lại!",
+        `Có ${unassignedPassengers.length} hành khách chưa được gán xe. Vui lòng gán xe cho tất cả hành khách trước khi xuất phát!`,
       );
     }
 
@@ -199,7 +200,14 @@ export default function TransactionManagement() {
       return message.error("Chuyến đi đã quá hạn, không thể xuất phát!");
     }
 
-    if (!tripStatusInfo?.isStarted) {
+    const targetDate = activeTabDay || activeTripObj?.start_date;
+    const targetDateDayjs = dayjs(targetDate).startOf("day");
+    const todayDayjs = dayjs().startOf("day");
+
+    if (targetDateDayjs.isBefore(todayDayjs, "day")) {
+      return message.error("Đã quá ngày xuất phát, không thể bắt đầu chuyến đi!");
+    }
+    if (targetDateDayjs.isAfter(todayDayjs, "day")) {
       return message.error("Chưa đến ngày bắt đầu chuyến đi!");
     }
 
@@ -549,18 +557,55 @@ export default function TransactionManagement() {
     undoTransferMutation.mutate({ passengerId });
   };
 
+  const [activeTabDay, setActiveTabDay] = useState<string>("");
+
+  const tripDays = useMemo(() => {
+    if (!activeTripObj?.start_date || !activeTripObj?.end_date) return [];
+    const start = dayjs(activeTripObj.start_date);
+    const end = dayjs(activeTripObj.end_date);
+    const days = [];
+    let current = start;
+    while (current.isBefore(end) || current.isSame(end, "day")) {
+      days.push(current.format("YYYY-MM-DD"));
+      current = current.add(1, "day");
+    }
+    return days;
+  }, [activeTripObj]);
+
+  useEffect(() => {
+    if (tripDays.length > 0 && (!activeTabDay || !tripDays.includes(activeTabDay))) {
+      // By default, try to find the day of the openRoundId
+      if (openRoundId) {
+        const openRound = tripRoundsSorted.find(r => String(r.id) === String(openRoundId));
+        if (openRound?.round_date) {
+          const openDay = openRound.round_date;
+          if (tripDays.includes(openDay)) {
+            setActiveTabDay(openDay);
+            return;
+          }
+        }
+      }
+      setActiveTabDay(tripDays[0]);
+    } else if (tripDays.length === 0) {
+      setActiveTabDay("");
+    }
+  }, [tripDays, activeTabDay, openRoundId, tripRoundsSorted]);
+
   const loading = isLoadingData || isRefreshingData;
-  const timelineItems = useMemo(
-    () =>
-      tripRoundsSorted.map((round, index) => ({
-        id: round.id,
-        label: round.location || round.name,
-        number: round.sequence ?? index + 1,
-        status: getRoundVisualStatus(String(round.id), index),
-        isActive: String(activeRoundId) === String(round.id),
-      })),
-    [tripRoundsSorted, getRoundVisualStatus, activeRoundId],
-  );
+  const timelineItems = useMemo(() => {
+    const items = tripRoundsSorted.map((round, index) => ({
+      id: round.id,
+      label: round.location || round.name,
+      number: round.sequence ?? index + 1,
+      status: getRoundVisualStatus(String(round.id), index),
+      isActive: String(activeRoundId) === String(round.id),
+      round_date: round.round_date,
+      estimate_time: round.estimate_time,
+    }));
+    
+    if (!activeTabDay) return items;
+    return items.filter(r => r.round_date && r.round_date === activeTabDay);
+  }, [tripRoundsSorted, getRoundVisualStatus, activeRoundId, activeTabDay]);
 
   const activeRoundIndex = tripRoundsSorted.findIndex(
     (r) => String(r.id) === String(activeRoundId),
@@ -804,39 +849,79 @@ export default function TransactionManagement() {
               className="w-full sm:w-64"
               notFoundContent="Không có chuyến đi"
             />
-            {tripStatusInfo && (
-              <div className="flex items-center gap-3">
-                {tripStatusInfo.status === "planned" &&
-                  !tripStatusInfo.isOverdue &&
-                  !tripStatusInfo.isStarted &&
-                  activeTripObj?.start_date && (
-                    <Tag color="cyan" className="m-0 text-sm">
-                      Bắt đầu:{" "}
-                      {dayjs(activeTripObj.start_date).format("DD/MM/YYYY")}
-                    </Tag>
+            {tripStatusInfo && (() => {
+              if (tripStatusInfo.status !== "planned" || tripStatusInfo.isOverdue) return null;
+              const targetDate = activeTabDay || activeTripObj?.start_date;
+              if (!targetDate) return null;
+
+              const targetDateDayjs = dayjs(targetDate).startOf("day");
+              const todayDayjs = dayjs().startOf("day");
+
+              const isSameDay = targetDateDayjs.isSame(todayDayjs, "day");
+              const isPastDay = targetDateDayjs.isBefore(todayDayjs, "day");
+              const isFutureDay = targetDateDayjs.isAfter(todayDayjs, "day");
+              
+              return (
+                <div className="flex items-center gap-3">
+                  {isFutureDay && (
+                    <Button 
+                      disabled
+                      className="font-medium text-slate-500 bg-slate-100 border-none"
+                    >
+                      Xuất phát ngày {dayjs(targetDate).format("DD/MM/YYYY")}
+                    </Button>
                   )}
-                {tripStatusInfo.status === "planned" &&
-                  !tripStatusInfo.isOverdue &&
-                  tripStatusInfo.isStarted &&
-                  isTourManagerLike(currentUser) && (
+                  {isPastDay && (
+                    <Button 
+                      type="dashed"
+                      danger
+                      className="font-medium cursor-default"
+                      style={{ pointerEvents: "none" }}
+                    >
+                      Đã quá ngày xuất phát
+                    </Button>
+                  )}
+                  {isSameDay && isTourManagerLike(currentUser) && (
                     <Button
                       type="primary"
+                      icon={<SendOutlined />}
+                      className="font-bold tracking-wide shadow-md hover:shadow-lg"
                       style={{
-                        backgroundColor: "#22c55e",
-                        borderColor: "#22c55e",
+                        backgroundColor: "#16a34a",
+                        borderColor: "#16a34a",
                       }}
                       onClick={handleStartTrip}
                       loading={startTripMutation.isPending}
                     >
-                      Xuất phát
+                      XUẤT PHÁT
                     </Button>
                   )}
-              </div>
-            )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
-        <RoundTimeline items={timelineItems} onSelect={setActiveRoundId} />
+        {tripDays.length > 0 && (
+          <div className="mb-4">
+            <Tabs
+              activeKey={activeTabDay}
+              onChange={setActiveTabDay}
+              items={tripDays.map((dayStr) => ({
+                key: dayStr,
+                label: dayjs(dayStr).format("DD/MM/YYYY"),
+              }))}
+            />
+          </div>
+        )}
+
+        {timelineItems.length > 0 ? (
+          <RoundTimeline items={timelineItems} onSelect={setActiveRoundId} />
+        ) : (
+          <div className="py-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-100">
+            Không có lịch trình di chuyển trong ngày này.
+          </div>
+        )}
 
         <Card className="mt-6" styles={{ body: { padding: 0 } }}>
           <div className="p-4">

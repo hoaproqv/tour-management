@@ -76,8 +76,8 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         if role == "fleet_lead":
             raise PermissionDenied("Trưởng xe không có quyền cập nhật toàn bộ chuyến đi.")
             
-        if request.data.get("status") == "doing" and role != "fleet_lead":
-            raise PermissionDenied("Chỉ Trưởng xe mới có quyền khởi hành chuyến đi.")
+        if request.data.get("status") == "doing" and role not in ["tour_manager", "admin"]:
+            raise PermissionDenied("Chỉ Quản lý chuyến đi mới có quyền khởi hành chuyến đi.")
             
         return super().put(request, *args, **kwargs)
 
@@ -100,8 +100,8 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("Trưởng xe chỉ có quyền cập nhật trạng thái chuyến đi.")
                 
         # If trying to start the trip, ONLY fleet_lead is allowed
-        if request.data.get("status") == "doing" and role != "fleet_lead":
-            raise PermissionDenied("Chỉ Trưởng xe mới có quyền khởi hành chuyến đi.")
+        if request.data.get("status") == "doing" and role not in ["tour_manager", "admin"]:
+            raise PermissionDenied("Chỉ Quản lý chuyến đi mới có quyền khởi hành chuyến đi.")
 
         return super().patch(request, *args, **kwargs)
 
