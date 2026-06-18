@@ -8,8 +8,10 @@ import {
 import { Button, Form, Input } from "antd";
 import { Link } from "react-router-dom";
 
+import { LogoIcon } from "../../components/LogoIcon";
 import { useLogin } from "../../hooks/useAuth";
 import { ROUTES } from "../../utils/routers";
+
 
 import type { ILoginFormData } from "../../utils/types";
 
@@ -41,20 +43,7 @@ const Login = () => {
           <div className="absolute inset-0 bg-blue-500/10 mix-blend-overlay"></div>
           <div className="relative z-10">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 border border-white/20 backdrop-blur-md mb-8 shadow-lg">
-              <svg
-                className="w-6 h-6 text-cyan-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
+              <LogoIcon className="w-8 h-8 drop-shadow-md" />
             </div>
             <h1 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-4">
               Quản lý <br />{" "}
@@ -124,7 +113,7 @@ const Login = () => {
             >
               <Input
                 prefix={<UserOutlined className="text-slate-400 mr-1" />}
-                placeholder="VD: admin, manager..."
+                placeholder="username"
                 className="rounded-xl px-4 py-3 bg-slate-50 border-slate-200 hover:border-blue-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
               />
             </Form.Item>

@@ -258,7 +258,7 @@ class TripBusSerializer(serializers.ModelSerializer):
         reg_num = attrs.get("registration_number")
         b_code = attrs.get("bus_code")
         cap = attrs.get("capacity")
-        
+
         if "registration_number" in attrs and reg_num:
             bus, created = Bus.objects.get_or_create(
                 registration_number=reg_num,

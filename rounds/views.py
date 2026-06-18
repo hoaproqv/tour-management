@@ -8,11 +8,10 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 
 from core.permissions import (
-    IsAdminOrTourManagerOrReadOnly,
     IsAdminOrTourManagerOrFleetLeadOrReadOnly,
+    IsAdminOrTourManagerOrReadOnly,
     TenantScopedMixin,
 )
-
 from rounds.models import Round, RoundBus
 from rounds.serializers import RoundBusSerializer, RoundSerializer
 
@@ -155,12 +154,12 @@ class RoundReorderView(generics.GenericAPIView):
 
         rounds_qs = Round.objects.filter(pk__in=ids)
         round_map = {r.pk: r for r in rounds_qs}
-        
+
         if not rounds_qs.exists():
             return Response({"detail": "Reordered successfully."}, status=status.HTTP_200_OK)
-            
+
         trip_id = rounds_qs.first().trip_id
-        
+
         from django.db.models import Max
         max_seq_aggr = Round.objects.filter(trip_id=trip_id).exclude(status=Round.Status.PLANNED).aggregate(Max('sequence'))
         non_planned_max_seq = max_seq_aggr['sequence__max'] or 0
@@ -423,7 +422,7 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
     """POST /api/v1/rounds/import/?trip=<trip_id>"""
 
     permission_classes = [permissions.IsAuthenticated]
-    
+
     from rest_framework.parsers import MultiPartParser
     parser_classes = [MultiPartParser]
 
@@ -432,10 +431,9 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
         description="Upload a .xlsx file to import rounds. Requires 'file' field and 'trip' query parameter.",
         tags=["Rounds"],
     )
-    def post(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):  # noqa: C901
         from rest_framework.response import Response
-        from rest_framework.views import APIView
-        
+
         trip_id = request.query_params.get("trip")
         if not trip_id:
             return Response({"detail": "trip query param required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -458,12 +456,12 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
         except Exception as exc:
             return Response({"detail": f"Cannot read Excel file: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        from django.db import transaction
-        from django.utils.dateparse import parse_datetime
         import datetime
 
+        from django.db import transaction
+
         action = request.data.get("action", "") # 'overwrite', 'skip', or ''
-        
+
         # Calculate valid trip dates
         num_days = (trip.end_date - trip.start_date).days + 1
         valid_dates = {}
@@ -483,8 +481,6 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
             # Check for "empty sheet"
             if not data_rows:
                 continue
-            
-
 
             if sheet_name not in valid_dates:
                 return Response(
@@ -497,7 +493,7 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
             for row in data_rows:
                 if not row or len(row) < 2:
                     continue
-                
+
                 name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
                 location = str(row[2]).strip() if len(row) > 2 and row[2] else ""
                 estimate_time_val = row[3] if len(row) > 3 else None
@@ -505,9 +501,9 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
 
                 if not name or not sequence_str.isdigit():
                     continue
-                    
+
                 sequence = int(sequence_str)
-                
+
                 # Time parsing
                 parsed_time = None
                 if isinstance(estimate_time_val, datetime.datetime):
@@ -528,7 +524,7 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
                             break
                         except ValueError:
                             pass
-                
+
                 if estimate_time_val and not parsed_time:
                     # Time provided but invalid format -> can just leave it None or continue, let's leave it None
                     pass
@@ -615,22 +611,22 @@ class RoundImportView(TenantScopedMixin, generics.GenericAPIView):
                     )
                     processed_round_ids.add(new_r.id)
                     imported_count += 1
-            
+
             # Re-normalize sequences for leftovers
             leftovers = Round.objects.filter(trip=trip, sequence__gte=999000).order_by("round_date", "sequence")
             from collections import defaultdict
             max_seq_by_date = defaultdict(int)
             for r_data in parsed_rounds:
                 max_seq_by_date[r_data["round_date"]] = max(max_seq_by_date[r_data["round_date"]], r_data["sequence"])
-            
+
             for r in leftovers:
                 max_seq_by_date[r.round_date] += 1
                 r.sequence = max_seq_by_date[r.round_date]
                 r.save(update_fields=["sequence"])
-                
+
         if imported_count == 0 and action == "skip":
             return Response({"detail": "Đã bỏ qua các chặng trùng lặp. Không có chặng mới nào được cập nhật."}, status=status.HTTP_201_CREATED)
-            
+
         return Response({"detail": f"Đã import thành công {imported_count} chặng."}, status=status.HTTP_201_CREATED)
 
 
@@ -646,7 +642,7 @@ class RoundExportView(TenantScopedMixin, generics.GenericAPIView):
     )
     def get(self, request, *args, **kwargs):
         from rest_framework.response import Response
-        
+
         trip_id = request.query_params.get("trip")
         if not trip_id:
             return Response({"detail": "trip query param required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -660,6 +656,7 @@ class RoundExportView(TenantScopedMixin, generics.GenericAPIView):
             return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
 
         import io
+
         import openpyxl
         from django.http import HttpResponse
 
@@ -704,8 +701,8 @@ class RoundTemplateDownloadView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         trip_id = request.query_params.get("trip")
         if not trip_id:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "Vui lòng chọn chuyến đi trước khi tải template."}, status=status.HTTP_400_BAD_REQUEST)
 
         from trips.models import Trip
@@ -713,14 +710,15 @@ class RoundTemplateDownloadView(generics.GenericAPIView):
             # We don't apply TenantScopedMixin here since it doesn't inherit from it, but we can check if it exists
             trip = Trip.objects.get(pk=trip_id)
         except Trip.DoesNotExist:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "Không tìm thấy chuyến đi."}, status=status.HTTP_404_NOT_FOUND)
 
         import io
+        from datetime import timedelta
+
         import openpyxl
         from django.http import HttpResponse
-        from datetime import timedelta
 
         wb = openpyxl.Workbook()
         # Remove default sheet
@@ -746,9 +744,11 @@ class RoundTemplateDownloadView(generics.GenericAPIView):
         response["Content-Disposition"] = 'attachment; filename="round_import_template.xlsx"'
         return response
 
+
 class RoundBulkDeleteView(RoundListCreateView):
-    from rest_framework import serializers
     from drf_spectacular.utils import inline_serializer
+    from rest_framework import serializers
+
     from common.views import BaseAPIView
 
     @extend_schema(
@@ -757,9 +757,9 @@ class RoundBulkDeleteView(RoundListCreateView):
         request=inline_serializer("RoundBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
         responses={
             200: inline_serializer(
-                "RoundBulkDeleteResponse", 
+                "RoundBulkDeleteResponse",
                 fields={
-                    "success": serializers.BooleanField(), 
+                    "success": serializers.BooleanField(),
                     "data": inline_serializer("RoundBulkDeleteData", fields={"deleted": serializers.IntegerField()})
                 }
             )
@@ -772,11 +772,11 @@ class RoundBulkDeleteView(RoundListCreateView):
         if not ids:
             return BaseAPIView().error("No ids provided")
         qs = self.get_queryset().filter(id__in=ids)
-        
+
         for r in qs:
             if r.status != "planned":
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Không thể xóa chặng đã đến hoặc đang đến.")
-                
+
         deleted, _ = qs.delete()
         return BaseAPIView().success({"deleted": deleted})

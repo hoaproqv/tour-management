@@ -1,8 +1,10 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
 from .models import Notification
 from .serializers import NotificationSerializer
+
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer
@@ -30,7 +32,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             FCMDevice.objects.get_or_create(user=request.user, token=token)
             return Response({'status': 'registered'})
         return Response({'error': 'Token is required'}, status=400)
-        
+
     @action(detail=False, methods=['post'])
     def test_notification(self, request):
         # Demo endpoint để test bắn thông báo

@@ -1,19 +1,23 @@
 import json
 import logging
 import os
+
+import firebase_admin
 import paho.mqtt.publish as publish
 from django.conf import settings
+from firebase_admin import credentials, messaging
 
 logger = logging.getLogger(__name__)
+
 
 def publish_mqtt_notification(notification_id):
     try:
         from .models import Notification
         notification = Notification.objects.get(id=notification_id)
-        
+
         user_id = notification.user.id
         topic = f"notifications/user_{user_id}"
-        
+
         payload = {
             'type': 'new_notification',
             'data': {
@@ -61,17 +65,19 @@ def publish_mqtt_notification(notification_id):
     except Exception as e:
         logger.error(f"Failed to publish MQTT notification: {str(e)}")
 
+
 def notify_users_by_role(tenant_id, roles, title, message, reference_type="", reference_id=""):
     """
     Tạo notification cho tất cả user thuộc một tenant và có role nằm trong list `roles`.
     """
     from accounts.models import User
+
     from .models import Notification
-    
+
     users = User.objects.filter(role__name__in=roles, is_active=True)
     if tenant_id:
         users = users.filter(tenant_id=tenant_id)
-        
+
     for user in users:
         Notification.objects.create(
             user=user,
@@ -82,8 +88,6 @@ def notify_users_by_role(tenant_id, roles, title, message, reference_type="", re
             reference_id=reference_id
         )
 
-import firebase_admin
-from firebase_admin import credentials, messaging
 
 def get_firebase_app():
     if not firebase_admin._apps:
@@ -97,10 +101,11 @@ def get_firebase_app():
             return False
     return True
 
+
 def send_firebase_push_notification(user_id, title, message):
     if not get_firebase_app():
         return
-        
+
     from .models import FCMDevice
     devices = FCMDevice.objects.filter(user_id=user_id)
     if not devices.exists():

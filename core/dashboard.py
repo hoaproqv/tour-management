@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from passengers.models import Passenger
-from trips.models import Trip, TripBus
 from rounds.models import Round
+from trips.models import Trip, TripBus
 
 
 class DashboardOverviewAPIView(APIView):
@@ -88,8 +88,9 @@ class DashboardOverviewAPIView(APIView):
         payload = {}
 
         if is_admin:
-            from accounts.models import Tenant
             from django.contrib.auth import get_user_model
+
+            from accounts.models import Tenant
             User = get_user_model()
 
             # Tenant stats
@@ -108,7 +109,7 @@ class DashboardOverviewAPIView(APIView):
             user_total = User.objects.count()
             user_active = User.objects.filter(is_active=True).count()
             user_inactive = user_total - user_active
-            
+
             recent_users_qs = User.objects.select_related("role", "tenant").order_by("-created_at")[:5]
             recent_users = [
                 {
@@ -182,7 +183,7 @@ class DashboardOverviewAPIView(APIView):
             arriving_locations_qs = Round.objects.filter(status=Round.Status.DOING).select_related("trip")
             if tenant_id:
                 arriving_locations_qs = arriving_locations_qs.filter(trip__tenant_id=tenant_id)
-            
+
             arriving_locations_qs = arriving_locations_qs.order_by("-updated_at")[:5]
             arriving_locations = [
                 {

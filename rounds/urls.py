@@ -1,15 +1,15 @@
 from django.urls import path
 
 from rounds.views import (
+    RoundBulkDeleteView,
     RoundBusDetailView,
     RoundBusListCreateView,
     RoundDetailView,
+    RoundExportView,
+    RoundImportView,
     RoundListCreateView,
     RoundReorderView,
-    RoundImportView,
-    RoundExportView,
     RoundTemplateDownloadView,
-    RoundBulkDeleteView,
 )
 
 urlpatterns = [

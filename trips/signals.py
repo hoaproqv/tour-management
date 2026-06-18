@@ -2,8 +2,10 @@
 Auto-create RoundBus records for every Round in the trip
 whenever a TripBus is created.
 """
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+
+from notifications.models import Notification
 
 
 @receiver(post_save, sender="trips.TripBus")
@@ -21,8 +23,6 @@ def create_round_buses_for_trip_bus(sender, instance, created, **kwargs):
             round=rnd,
         )
 
-from django.db.models.signals import pre_save
-from notifications.models import Notification
 
 @receiver(pre_save, sender="trips.TripBus")
 def trip_bus_pre_save(sender, instance, **kwargs):
@@ -39,6 +39,7 @@ def trip_bus_pre_save(sender, instance, **kwargs):
         instance._old_manager_id = None
         instance._old_driver_id = None
 
+
 @receiver(post_save, sender="trips.TripBus")
 def trip_bus_assignment_notification(sender, instance, created, **kwargs):
     old_manager_id = getattr(instance, '_old_manager_id', None)
@@ -54,7 +55,7 @@ def trip_bus_assignment_notification(sender, instance, created, **kwargs):
                 reference_type='TRIP',
                 reference_id=str(instance.trip.id)
             )
-            
+
     if created or old_driver_id != instance.driver_id:
         if instance.driver:
             Notification.objects.create(

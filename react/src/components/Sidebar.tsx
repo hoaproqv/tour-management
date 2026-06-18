@@ -108,7 +108,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const menuItems = useMemo(() => {
     let items = baseMenuItems;
-    const roleSlug = (currentUser?.role_name || currentUser?.role || "").toString().toLowerCase();
+    const roleSlug = (currentUser?.role_name || currentUser?.role || "")
+      .toString()
+      .toLowerCase();
     const isCompanyManager = roleSlug === "company_manager";
 
     if (isAdmin) {
@@ -131,7 +133,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           item?.key === ROUTES.GUIDE,
       );
       // Change label to "Nhân viên" for company manager
-      items = items.map(item => {
+      items = items.map((item) => {
         if (item?.key === ROUTES.ACCOUNT) {
           return { ...item, label: "Nhân viên" };
         }
@@ -157,7 +159,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           item?.key === ROUTES.GUIDE,
       );
     }
-    
+
     return items;
   }, [hideManagement, isAdmin, isTourManager, currentUser]);
 
@@ -222,7 +224,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         >
           {!collapsed && (
             <span className="text-base font-semibold whitespace-nowrap">
-              Điều hướng
+              Menu
             </span>
           )}
           <Button

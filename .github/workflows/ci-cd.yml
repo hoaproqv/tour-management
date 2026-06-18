@@ -89,4 +89,4 @@ jobs:
           python -m isort --atomic .
           python -m flake8 -v --count --show-source --statistics
           mkdir logs
-          python -m pylint --rcfile=.pylintrc core/ tour_management/ utils/ common/
+          python -m pylint --rcfile=.pylintrc accounts/ common/ core/ fleet/ notifications/ passengers/ rounds/ tour_management/ transactions/ trips/ utils/

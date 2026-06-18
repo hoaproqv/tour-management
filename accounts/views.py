@@ -8,6 +8,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import Role, Tenant
 from accounts.serializers import (
+    ChangePasswordSerializer,
+    CheckPasswordSerializer,
     CsrfSerializer,
     LoginResponseSerializer,
     LoginSerializer,
@@ -17,11 +19,9 @@ from accounts.serializers import (
     TenantSerializer,
     TokenPairSerializer,
     UserCreateSerializer,
+    UserMeUpdateSerializer,
     UserSerializer,
     UserUpdateSerializer,
-    UserMeUpdateSerializer,
-    ChangePasswordSerializer,
-    CheckPasswordSerializer,
 )
 from common.views import BaseAPIView
 
@@ -132,7 +132,7 @@ class UserListCreateView(generics.ListCreateAPIView):
         base_qs = User.objects.select_related("tenant", "role").exclude(
             role__name__in=["admin", "Manager"]
         ).exclude(is_superuser=True)
-        
+
         role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
         if not self._is_admin(user):
             if getattr(user, "tenant_id", None):
@@ -154,10 +154,10 @@ class UserListCreateView(generics.ListCreateAPIView):
         if search_param:
             from django.db.models import Q
             base_qs = base_qs.filter(
-                Q(name__icontains=search_param) |
-                Q(username__icontains=search_param) |
-                Q(email__icontains=search_param) |
-                Q(phone__icontains=search_param)
+                Q(name__icontains=search_param)
+                | Q(username__icontains=search_param)
+                | Q(email__icontains=search_param)
+                | Q(phone__icontains=search_param)
             )
 
         return base_qs
@@ -165,16 +165,16 @@ class UserListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
-        
+
         if not self._is_admin(user) and role_name != "company_manager":
             raise PermissionDenied("Only admin or company managers can create users.")
-            
+
         if role_name == "company_manager":
             serializer.validated_data['tenant'] = user.tenant
             target_role = serializer.validated_data.get('role')
             if target_role and target_role.name in ["admin", "company_manager", "Manager"]:
                 raise PermissionDenied("Company managers cannot create admins or company managers.")
-                
+
         serializer.save()
 
     @extend_schema(
@@ -214,40 +214,40 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
         qs = User.objects.select_related("tenant", "role").all()
         if self._is_admin(user):
             return qs
-            
+
         role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
         if role_name == "company_manager" and getattr(user, "tenant_id", None):
             return qs.filter(tenant_id=user.tenant_id).exclude(role__name="company_manager")
-            
+
         return User.objects.none()
 
     def perform_update(self, serializer):
         user = self.request.user
         role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
-        
+
         if not self._is_admin(user) and role_name != "company_manager":
             raise PermissionDenied("Only admin or company managers can update users.")
-            
+
         if role_name == "company_manager":
             serializer.validated_data['tenant'] = user.tenant
             target_role = serializer.validated_data.get('role')
             if target_role and target_role.name in ["admin", "company_manager", "Manager"]:
                 raise PermissionDenied("Company managers cannot assign admin or company manager roles.")
-                
+
         serializer.save()
 
     def perform_destroy(self, instance):
         user = self.request.user
         role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
-        
+
         if not self._is_admin(user) and role_name != "company_manager":
             raise PermissionDenied("Only admin or company managers can delete users.")
-            
+
         if role_name == "company_manager":
             target_role_name = (getattr(getattr(instance, "role", None), "name", "") or "").lower()
             if target_role_name in ["admin", "company_manager", "manager"]:
                 raise PermissionDenied("Company managers cannot delete admins or company managers.")
-                
+
         instance.delete()
 
 
@@ -401,11 +401,11 @@ class ChangePasswordView(BaseAPIView):
         serializer = ChangePasswordSerializer(data=request.data)
         if not serializer.is_valid():
             return self.error("Dữ liệu không hợp lệ", errors=serializer.errors)
-        
+
         user = request.user
         if not user.check_password(serializer.validated_data["current_password"]):
             return self.error("Mật khẩu hiện tại không chính xác")
-            
+
         user.set_password(serializer.validated_data["new_password"])
         user.save()
         return self.success("Đổi mật khẩu thành công")
@@ -469,6 +469,7 @@ def csrf_token(_request):
     """Set CSRF cookie"""
     return BaseAPIView().success({"csrf": "set"})
 
+
 class UserBulkDeleteView(UserListCreateView):
     @extend_schema(
         summary="Bulk delete users",
@@ -476,9 +477,9 @@ class UserBulkDeleteView(UserListCreateView):
         request=inline_serializer("UserBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
         responses={
             200: inline_serializer(
-                "UserBulkDeleteResponse", 
+                "UserBulkDeleteResponse",
                 fields={
-                    "success": serializers.BooleanField(), 
+                    "success": serializers.BooleanField(),
                     "data": inline_serializer("UserBulkDeleteData", fields={"deleted": serializers.IntegerField()})
                 }
             )
@@ -490,17 +491,18 @@ class UserBulkDeleteView(UserListCreateView):
         role_name = (getattr(getattr(user, "role", None), "name", "") or "").lower()
         if not self._is_admin(user) and role_name != "company_manager":
             raise PermissionDenied("Only admin or company managers can delete users.")
-            
+
         ids = request.data.get("ids", [])
         if not ids:
             return BaseAPIView().error("No ids provided")
-            
+
         qs = self.get_queryset().filter(id__in=ids)
         if role_name == "company_manager":
             qs = qs.exclude(role__name__in=["admin", "company_manager", "Manager"])
-            
+
         deleted, _ = qs.delete()
         return BaseAPIView().success({"deleted": deleted})
+
 
 class TenantBulkDeleteView(TenantListCreateView):
     @extend_schema(
@@ -509,9 +511,9 @@ class TenantBulkDeleteView(TenantListCreateView):
         request=inline_serializer("TenantBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
         responses={
             200: inline_serializer(
-                "TenantBulkDeleteResponse", 
+                "TenantBulkDeleteResponse",
                 fields={
-                    "success": serializers.BooleanField(), 
+                    "success": serializers.BooleanField(),
                     "data": inline_serializer("TenantBulkDeleteData", fields={"deleted": serializers.IntegerField()})
                 }
             )
@@ -550,9 +552,9 @@ class CheckPasswordView(BaseAPIView):
         serializer = CheckPasswordSerializer(data=request.data)
         if not serializer.is_valid():
             return self.error("Dữ liệu không hợp lệ")
-        
+
         user = request.user
         if not user.check_password(serializer.validated_data["current_password"]):
             return self.error("Mật khẩu hiện tại không chính xác")
-            
+
         return self.success(True)

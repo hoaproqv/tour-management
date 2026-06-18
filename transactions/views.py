@@ -3,25 +3,21 @@ import logging
 
 import paho.mqtt.publish as publish
 from django.conf import settings
-from drf_spectacular.utils import extend_schema
-from rest_framework import generics, permissions
-from rest_framework.response import Response
-
 from django.db import transaction
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
+from rest_framework import generics, status
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
 
 from core.permissions import (
     IsAdminOrFleetLeadOrReadOnly,
     IsAdminOrTourManagerOrFleetLeadOrReadOnly,
-    get_role_name,
     TenantScopedMixin,
 )
-
+from passengers.models import PassengerTransfer
 from transactions.models import Transaction
 from transactions.serializers import TransactionSerializer
-from passengers.models import PassengerTransfer
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +113,7 @@ class SwitchBusView(APIView):
                 )
                 if from_txn_id:
                     existing_txn = existing_txn.exclude(id=from_txn_id)
-                
+
                 existing_txn = existing_txn.select_related('round_bus__trip_bus').first()
 
                 if existing_txn:
@@ -146,10 +142,10 @@ class SwitchBusView(APIView):
                 # 3. Handle transfer
                 transfer_action = request.data.get("transfer_action")
                 existing_transfer_id = request.data.get("existing_transfer_id")
-                
-                from passengers.views import publish_transfer_to_mqtt
+
                 from passengers.serializers import PassengerTransferSerializer
-                
+                from passengers.views import publish_transfer_to_mqtt
+
                 if transfer_action == "delete" and existing_transfer_id:
                     PassengerTransfer.objects.filter(id=existing_transfer_id).delete()
                     publish_transfer_to_mqtt({
@@ -412,13 +408,13 @@ class TransactionDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPI
         # We need the ID before deleting
         instance = self.get_object()
         txn_id = instance.id
-        
+
         response = super().delete(request, *args, **kwargs)
-        
+
         if response.status_code == 204:
             publish_transaction_to_mqtt({
                 "id": txn_id,
                 "deleted": True
             })
-            
+
         return response

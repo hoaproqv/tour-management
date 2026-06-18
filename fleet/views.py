@@ -1,9 +1,8 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework import generics, permissions, filters
+from rest_framework import filters, generics, permissions
 from rest_framework.views import APIView
 
 from core.permissions import IsAdminOrTourManagerOrReadOnly, TenantScopedMixin
-
 from fleet.models import Bus
 from fleet.serializers import BusSerializer
 
@@ -95,7 +94,7 @@ class BusImportView(TenantScopedMixin, APIView):
     """POST /api/v1/buses/import/"""
 
     permission_classes = [permissions.IsAuthenticated]
-    
+
     from rest_framework.parsers import MultiPartParser
     parser_classes = [MultiPartParser]
 
@@ -107,16 +106,16 @@ class BusImportView(TenantScopedMixin, APIView):
     def post(self, request, *args, **kwargs):
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             import openpyxl
             wb = openpyxl.load_workbook(uploaded_file, read_only=True, data_only=True)
         except Exception as exc:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": f"Cannot read Excel file: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
 
         ws = wb.active
@@ -129,7 +128,7 @@ class BusImportView(TenantScopedMixin, APIView):
             for row in data_rows:
                 if not row or len(row) < 4:
                     continue
-                
+
                 registration_number = str(row[1]).strip() if row[1] else ""
                 bus_code = str(row[2]).strip() if row[2] else ""
                 capacity = str(row[3]).strip() if row[3] else ""
@@ -139,7 +138,7 @@ class BusImportView(TenantScopedMixin, APIView):
                     continue
 
                 tenant_id = self.get_user_tenant()
-                
+
                 Bus.objects.update_or_create(
                     registration_number=registration_number,
                     defaults={
@@ -150,8 +149,8 @@ class BusImportView(TenantScopedMixin, APIView):
                     }
                 )
                 imported_count += 1
-        from rest_framework.response import Response
         from rest_framework import status
+        from rest_framework.response import Response
         return Response({"detail": f"Imported {imported_count} buses successfully."}, status=status.HTTP_201_CREATED)
 
 
@@ -167,6 +166,7 @@ class BusExportView(TenantScopedMixin, APIView):
     )
     def get(self, request, *args, **kwargs):
         import io
+
         import openpyxl
         from django.http import HttpResponse
 
@@ -210,6 +210,7 @@ class BusTemplateDownloadView(APIView):
     )
     def get(self, request, *args, **kwargs):
         import io
+
         import openpyxl
         from django.http import HttpResponse
 
@@ -229,9 +230,11 @@ class BusTemplateDownloadView(APIView):
         response["Content-Disposition"] = 'attachment; filename="bus_import_template.xlsx"'
         return response
 
+
 class BusBulkDeleteView(BusListCreateView):
-    from rest_framework import serializers
     from drf_spectacular.utils import inline_serializer
+    from rest_framework import serializers
+
     from common.views import BaseAPIView
 
     @extend_schema(
@@ -240,9 +243,9 @@ class BusBulkDeleteView(BusListCreateView):
         request=inline_serializer("BusBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
         responses={
             200: inline_serializer(
-                "BusBulkDeleteResponse", 
+                "BusBulkDeleteResponse",
                 fields={
-                    "success": serializers.BooleanField(), 
+                    "success": serializers.BooleanField(),
                     "data": inline_serializer("BusBulkDeleteData", fields={"deleted": serializers.IntegerField()})
                 }
             )

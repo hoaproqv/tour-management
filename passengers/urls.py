@@ -5,6 +5,7 @@ from passengers.views import (
     ImportedBusMapView,
     PassengerAssignmentDetailView,
     PassengerAssignmentListCreateView,
+    PassengerBulkDeleteView,
     PassengerDetailView,
     PassengerExportView,
     PassengerImportCheckView,
@@ -13,7 +14,6 @@ from passengers.views import (
     PassengerTemplateDownloadView,
     PassengerTransferDetailView,
     PassengerTransferListCreateView,
-    PassengerBulkDeleteView,
 )
 
 urlpatterns = [

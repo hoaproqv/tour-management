@@ -1,15 +1,16 @@
 import io
+
 import openpyxl
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
-from trips.models import Trip
-from passengers.models import Passenger
+
+from accounts.models import Tenant, User
 from fleet.models import Bus
+from passengers.models import Passenger
 from rounds.models import Round
+from trips.models import Trip
 
-
-from accounts.models import User, Tenant
 
 @pytest.fixture
 def auth_client(db):

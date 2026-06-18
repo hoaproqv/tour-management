@@ -1,7 +1,12 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from passengers.models import ImportedBus, Passenger, PassengerBusAssignment, PassengerTransfer
+from passengers.models import (
+    ImportedBus,
+    Passenger,
+    PassengerBusAssignment,
+    PassengerTransfer,
+)
 
 
 class PassengerSerializer(serializers.ModelSerializer):
@@ -47,7 +52,7 @@ class PassengerSerializer(serializers.ModelSerializer):
             qs = getattr(obj, "bus_assignments", None)
             if qs is None:
                 return []
-        
+
         seen = set()
         result = []
         for a in qs.all() if hasattr(qs, "all") else qs:
@@ -79,9 +84,9 @@ class PassengerSerializer(serializers.ModelSerializer):
 
         if tenant:
             validated_data["tenant"] = tenant
-            
+
         passenger = super().create(validated_data)
-        
+
         PassengerBusAssignment.objects.create(
             passenger=passenger,
             trip=trip,
@@ -100,7 +105,7 @@ class PassengerSerializer(serializers.ModelSerializer):
             from trips.models import Trip, TripBus
             try:
                 trip = Trip.objects.get(id=trip_id, tenant=tenant)
-                
+
                 trip_bus = None
                 if trip_bus_id:
                     try:

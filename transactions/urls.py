@@ -1,6 +1,12 @@
 from django.urls import path
 
-from transactions.views import TransactionDetailView, TransactionListCreateView, SwitchBusView, UndoTransferView, BulkCheckOutView
+from transactions.views import (
+    BulkCheckOutView,
+    SwitchBusView,
+    TransactionDetailView,
+    TransactionListCreateView,
+    UndoTransferView,
+)
 
 urlpatterns = [
     path(

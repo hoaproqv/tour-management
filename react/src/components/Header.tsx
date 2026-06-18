@@ -2,7 +2,6 @@ import React from "react";
 
 import {
   ExportOutlined,
-  HomeOutlined,
   SettingOutlined,
   UserOutlined,
 } from "@ant-design/icons";
@@ -13,7 +12,8 @@ import { useLogout } from "../hooks/useAuth";
 import { getAccountFromLocalStorage } from "../utils/helper";
 import { ROUTES } from "../utils/routers";
 
-import NotificationDropdown from "./NotificationDropdown";
+import { LogoIcon } from "./LogoIcon";
+import { NotificationDropdown } from "./NotificationDropdown";
 
 import type { MenuProps } from "antd";
 
@@ -64,12 +64,16 @@ function Header() {
           to={ROUTES.DASHBOARD}
           className="flex items-center gap-3 text-white group"
         >
-          <div className="bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-xl h-10 w-10 flex items-center justify-center shadow-lg group-hover:shadow-cyan-500/50 transition-all duration-300">
-            <HomeOutlined className="text-xl text-white" />
+          <div className="bg-white/10 border border-white/20 backdrop-blur-md rounded-xl h-10 w-10 flex items-center justify-center shadow-lg group-hover:bg-white/20 transition-all duration-300">
+            <LogoIcon className="w-6 h-6 drop-shadow-sm" />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">Quản lý Chuyến đi</p>
-            <p className="text-lg font-bold leading-none text-white tracking-tight">Dashboard</p>
+            <p className="text-xs uppercase tracking-wider text-cyan-400 font-semibold mb-0.5">
+              Quản lý Chuyến đi
+            </p>
+            <p className="text-lg font-bold leading-none text-white tracking-tight">
+              Dashboard
+            </p>
           </div>
         </Link>
 
@@ -87,21 +91,34 @@ function Header() {
 
           <div className="h-8 w-px bg-white/20 mx-2 hidden sm:block"></div>
 
-          <Dropdown menu={{ items }} placement="bottomRight" arrow={{ pointAtCenter: true }} trigger={['click']}>
+          <Dropdown
+            menu={{ items }}
+            placement="bottomRight"
+            arrow={{ pointAtCenter: true }}
+            trigger={["click"]}
+          >
             <div className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-1.5 pr-3 rounded-full transition-all border border-transparent hover:border-white/10">
               <div className="p-[2px] rounded-full bg-gradient-to-r from-cyan-400 to-blue-500">
                 <Avatar
                   size={36}
-                  style={{ backgroundColor: "#1e293b", color: "#38bdf8", border: "2px solid #1e293b" }}
+                  style={{
+                    backgroundColor: "#1e293b",
+                    color: "#38bdf8",
+                    border: "2px solid #1e293b",
+                  }}
                 >
                   {(account?.name || "User").charAt(0).toUpperCase()}
                 </Avatar>
               </div>
               <div className="leading-tight hidden sm:block">
-                <p className="font-bold text-sm text-white mb-0.5">{account?.name || "My Name"}</p>
+                <p className="font-bold text-sm text-white mb-0.5">
+                  {account?.name || "My Name"}
+                </p>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-                  <p className="text-[11px] font-medium text-slate-300 uppercase tracking-wider">Online</p>
+                  <p className="text-[11px] font-medium text-slate-300 uppercase tracking-wider">
+                    Online
+                  </p>
                 </div>
               </div>
             </div>

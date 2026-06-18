@@ -11,7 +11,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, "builded"),
     filename: "index.js",
-    publicPath: "/",
+    publicPath: "/static/",
     iife: true,
     globalObject: "this",
     clean: true,
@@ -96,6 +96,14 @@ module.exports = {
             fs.copyFileSync(sourceFile, targetFile);
             console.log("✓ Copied index.js to static folder");
           }
+
+          // Copy firebase-messaging-sw.js to static folder
+          const swSource = path.resolve(__dirname, "public/firebase-messaging-sw.js");
+          const swTarget = path.resolve(__dirname, "../static/firebase-messaging-sw.js");
+          if (fs.existsSync(swSource)) {
+            fs.copyFileSync(swSource, swTarget);
+            console.log("✓ Copied firebase-messaging-sw.js to static folder");
+          }
         });
       },
     },
@@ -105,9 +113,10 @@ module.exports = {
   },
   devServer: {
     historyApiFallback: true,
-    static: {
-      directory: path.resolve(__dirname, "builded"),
-    },
+    static: [
+      { directory: path.resolve(__dirname, "builded") },
+      { directory: path.resolve(__dirname, "public") },
+    ],
     compress: true,
     port: 3001, // hoặc cổng bạn muốn
     hot: true, // bật hot reload (HMR)

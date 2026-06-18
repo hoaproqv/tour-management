@@ -1,14 +1,14 @@
 from django.urls import path
 
 from trips.views import (
+    TripBusBulkDeleteView,
     TripBusDetailView,
+    TripBusExportView,
+    TripBusImportView,
     TripBusListCreateView,
+    TripBusTemplateDownloadView,
     TripDetailView,
     TripListCreateView,
-    TripBusBulkDeleteView,
-    TripBusImportView,
-    TripBusExportView,
-    TripBusTemplateDownloadView,
 )
 
 urlpatterns = [

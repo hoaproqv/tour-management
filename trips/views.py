@@ -1,10 +1,8 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
 
 from core.permissions import IsAdminOrTourManagerOrReadOnly, TenantScopedMixin
-
 from trips.models import Trip, TripBus
 from trips.serializers import TripBusSerializer, TripSerializer
 
@@ -70,15 +68,16 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Trips"],
     )
     def put(self, request, *args, **kwargs):
-        from core.permissions import get_role_name
         from rest_framework.exceptions import PermissionDenied
+
+        from core.permissions import get_role_name
         role = get_role_name(request.user)
         if role == "fleet_lead":
             raise PermissionDenied("Trưởng xe không có quyền cập nhật toàn bộ chuyến đi.")
-            
+
         if request.data.get("status") == "doing" and role not in ["tour_manager", "admin"]:
             raise PermissionDenied("Chỉ Quản lý chuyến đi mới có quyền khởi hành chuyến đi.")
-            
+
         return super().put(request, *args, **kwargs)
 
     @extend_schema(
@@ -89,16 +88,17 @@ class TripDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView):
         tags=["Trips"],
     )
     def patch(self, request, *args, **kwargs):
-        from core.permissions import get_role_name
         from rest_framework.exceptions import PermissionDenied
+
+        from core.permissions import get_role_name
         role = get_role_name(request.user)
-        
+
         # If user is fleet_lead, they can ONLY update 'status'
         if role == "fleet_lead":
             allowed_keys = {"status"}
             if set(request.data.keys()) - allowed_keys:
                 raise PermissionDenied("Trưởng xe chỉ có quyền cập nhật trạng thái chuyến đi.")
-                
+
         # If trying to start the trip, ONLY fleet_lead is allowed
         if request.data.get("status") == "doing" and role not in ["tour_manager", "admin"]:
             raise PermissionDenied("Chỉ Quản lý chuyến đi mới có quyền khởi hành chuyến đi.")
@@ -150,8 +150,9 @@ class TripBusListCreateView(TenantScopedMixin, generics.ListCreateAPIView):
     def post(self, request, *args, **kwargs):
         trip_id = request.data.get("trip")
         if trip_id:
-            from trips.models import Trip
             from rest_framework.exceptions import PermissionDenied
+
+            from trips.models import Trip
             try:
                 trip = Trip.objects.get(id=trip_id)
                 if trip.status != "planned":
@@ -219,9 +220,10 @@ class TripBusDetailView(TenantScopedMixin, generics.RetrieveUpdateDestroyAPIView
             raise PermissionDenied("Không thể xóa xe khi chuyến đi đã khởi hành.")
         return super().delete(request, *args, **kwargs)
 
+
 class TripBusBulkDeleteView(TripBusListCreateView):
-    from rest_framework import serializers
     from drf_spectacular.utils import inline_serializer
+    from rest_framework import serializers
 
     @extend_schema(
         summary="Bulk delete trip buses",
@@ -229,9 +231,9 @@ class TripBusBulkDeleteView(TripBusListCreateView):
         request=inline_serializer("TripBusBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
         responses={
             200: inline_serializer(
-                "TripBusBulkDeleteResponse", 
+                "TripBusBulkDeleteResponse",
                 fields={
-                    "success": serializers.BooleanField(), 
+                    "success": serializers.BooleanField(),
                     "data": inline_serializer("TripBusBulkDeleteData", fields={"deleted": serializers.IntegerField()})
                 }
             )
@@ -244,16 +246,18 @@ class TripBusBulkDeleteView(TripBusListCreateView):
         if not ids:
             return BaseAPIView().error("No ids provided")
         qs = self.get_queryset().filter(id__in=ids)
-        
+
         for trip_bus in qs:
             if trip_bus.trip.status != "planned":
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied("Không thể xóa xe khi chuyến đi đã khởi hành.")
-                
+
         deleted, _ = qs.delete()
         return BaseAPIView().success({"deleted": deleted})
 
+
 TRIPBUS_COLUMNS = ["STT", "Biển số", "Mã xe", "Sức chứa", "Mô tả"]
+
 
 class TripBusImportView(TenantScopedMixin, APIView):
     """POST /api/v1/trip-buses/import/?trip=<id>"""
@@ -269,22 +273,22 @@ class TripBusImportView(TenantScopedMixin, APIView):
     def post(self, request, *args, **kwargs):
         trip_id = request.query_params.get("trip")
         if not trip_id:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "trip parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             import openpyxl
             wb = openpyxl.load_workbook(uploaded_file, read_only=True, data_only=True)
         except Exception as exc:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": f"Cannot read Excel file: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
 
         ws = wb.active
@@ -293,21 +297,22 @@ class TripBusImportView(TenantScopedMixin, APIView):
 
         imported_count = 0
         from django.db import transaction
+
         from fleet.models import Bus
         from trips.models import Trip, TripBus
-        
+
         try:
             trip = Trip.objects.get(id=trip_id)
         except Trip.DoesNotExist:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "Trip not found."}, status=status.HTTP_404_NOT_FOUND)
 
         with transaction.atomic():
             for row in data_rows:
                 if not row or len(row) < 4:
                     continue
-                
+
                 registration_number = str(row[1]).strip() if row[1] else ""
                 bus_code = str(row[2]).strip() if row[2] else ""
                 capacity = str(row[3]).strip() if row[3] else ""
@@ -317,7 +322,7 @@ class TripBusImportView(TenantScopedMixin, APIView):
                     continue
 
                 tenant_id = self.get_user_tenant()
-                
+
                 # First get or create the global bus
                 bus, _ = Bus.objects.update_or_create(
                     registration_number=registration_number,
@@ -328,7 +333,7 @@ class TripBusImportView(TenantScopedMixin, APIView):
                         "tenant_id": tenant_id
                     }
                 )
-                
+
                 # Then get or create the TripBus
                 TripBus.objects.update_or_create(
                     trip=trip,
@@ -337,12 +342,13 @@ class TripBusImportView(TenantScopedMixin, APIView):
                         "description": description,
                     }
                 )
-                
+
                 imported_count += 1
-                
-        from rest_framework.response import Response
+
         from rest_framework import status
+        from rest_framework.response import Response
         return Response({"detail": f"Imported {imported_count} buses successfully."}, status=status.HTTP_201_CREATED)
+
 
 class TripBusExportView(TenantScopedMixin, APIView):
     """GET /api/v1/trip-buses/export/?trip=<id>"""
@@ -356,13 +362,15 @@ class TripBusExportView(TenantScopedMixin, APIView):
     def get(self, request, *args, **kwargs):
         trip_id = request.query_params.get("trip")
         if not trip_id:
-            from rest_framework.response import Response
             from rest_framework import status
+            from rest_framework.response import Response
             return Response({"detail": "trip parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         import io
+
         import openpyxl
         from django.http import HttpResponse
+
         from trips.models import TripBus
 
         wb = openpyxl.Workbook()
@@ -371,10 +379,10 @@ class TripBusExportView(TenantScopedMixin, APIView):
         ws.append(TRIPBUS_COLUMNS)
 
         qs = TripBus.objects.filter(trip_id=trip_id).select_related("bus").order_by("bus__registration_number")
-        # Apply tenant filter implicitly via trip? 
+        # Apply tenant filter implicitly via trip?
         # Actually TripBus doesn't have tenant_id directly, but Trip does.
         # It's fine to just filter by trip_id, assuming user has access to this trip.
-        
+
         for idx, trip_bus in enumerate(qs, start=1):
             bus = trip_bus.bus
             ws.append([
@@ -396,6 +404,7 @@ class TripBusExportView(TenantScopedMixin, APIView):
         response["Content-Disposition"] = 'attachment; filename="trip_buses.xlsx"'
         return response
 
+
 class TripBusTemplateDownloadView(APIView):
     """GET /api/v1/trip-buses/import/template/"""
     permission_classes = [permissions.IsAuthenticated]
@@ -407,6 +416,7 @@ class TripBusTemplateDownloadView(APIView):
     )
     def get(self, request, *args, **kwargs):
         import io
+
         import openpyxl
         from django.http import HttpResponse
 

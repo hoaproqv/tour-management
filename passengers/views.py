@@ -9,17 +9,21 @@ from django.db.models import Prefetch
 from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
-
-from core.permissions import (
-    IsAdminOrTourManagerOrReadOnly,
-    IsAdminOrTourManagerOrFleetLeadOrReadOnly,
-    TenantScopedMixin,
-)
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from passengers.models import ImportedBus, Passenger, PassengerBusAssignment, PassengerTransfer
+from core.permissions import (
+    IsAdminOrTourManagerOrFleetLeadOrReadOnly,
+    IsAdminOrTourManagerOrReadOnly,
+    TenantScopedMixin,
+)
+from passengers.models import (
+    ImportedBus,
+    Passenger,
+    PassengerBusAssignment,
+    PassengerTransfer,
+)
 from passengers.serializers import (
     ImportedBusSerializer,
     PassengerAssignmentSerializer,
@@ -398,11 +402,11 @@ class PassengerImportCheckView(TenantScopedMixin, APIView):
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         tenant_id = self.get_user_tenant()
         if not tenant_id:
             return Response({"detail": "Cần có tenant để check."}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             import openpyxl
             wb = openpyxl.load_workbook(uploaded_file, read_only=True, data_only=True)
@@ -411,24 +415,26 @@ class PassengerImportCheckView(TenantScopedMixin, APIView):
 
         valid_passengers = []
         conflicts = []
-        
+
         for sheet_name in wb.sheetnames:
             if sheet_name == "Quản lý xe":
                 continue
-            
+
             ws = wb[sheet_name]
             rows = list(ws.iter_rows(values_only=True))
             data_rows = rows[1:] if rows else []
-            
+
             for row in data_rows:
-                if not row or not any(row): continue
+                if not row or not any(row):
+                    continue
                 name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
                 phone = str(row[2]).strip() if len(row) > 2 and row[2] else ""
                 extra_info = str(row[3]).strip() if len(row) > 3 and row[3] else ""
                 note = str(row[4]).strip() if len(row) > 4 and row[4] else ""
-                
-                if not name: continue
-                
+
+                if not name:
+                    continue
+
                 row_data = {
                     "name": name,
                     "phone": phone if phone.lower() != 'none' else "",
@@ -436,11 +442,11 @@ class PassengerImportCheckView(TenantScopedMixin, APIView):
                     "note": note if note.lower() != 'none' else "",
                     "sheet_name": sheet_name
                 }
-                
+
                 conflict_passenger = None
                 if row_data["phone"]:
                     conflict_passenger = Passenger.objects.filter(tenant_id=tenant_id, phone=row_data["phone"]).first()
-                
+
                 if conflict_passenger and conflict_passenger.name != name:
                     conflicts.append({
                         "imported": row_data,
@@ -481,8 +487,6 @@ class PassengerImportView(TenantScopedMixin, APIView):
         tags=["Passengers"],
     )
     def post(self, request, *args, **kwargs):
-        user = request.user
-
         uploaded_file = request.FILES.get("file")
         if not uploaded_file:
             return Response({"detail": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
@@ -548,7 +552,7 @@ class PassengerImportView(TenantScopedMixin, APIView):
             for seq, sheet_name in enumerate(wb.sheetnames, start=1):
                 if sheet_name == "Quản lý xe":
                     continue
-                    
+
                 ws = wb[sheet_name]
                 rows = list(ws.iter_rows(values_only=True))
 
@@ -599,7 +603,7 @@ class PassengerImportView(TenantScopedMixin, APIView):
                         passenger = Passenger.objects.filter(
                             tenant_id=tenant_id, name=name, bus_assignments__trip=trip
                         ).first()
-                        
+
                     if not passenger:
                         passenger = Passenger.objects.create(
                             tenant_id=tenant_id,
@@ -614,7 +618,7 @@ class PassengerImportView(TenantScopedMixin, APIView):
                         if res == "update" and passenger.name != name:
                             passenger.name = name
                             passenger.save(update_fields=["name"])
-                            
+
                         # Update note/extra_info if provided and previously blank
                         fields_to_update = []
                         if note and not passenger.note:
@@ -623,7 +627,7 @@ class PassengerImportView(TenantScopedMixin, APIView):
                         if extra_info and not passenger.extra_info:
                             passenger.extra_info = extra_info
                             fields_to_update.append("extra_info")
-                            
+
                         if fields_to_update:
                             passenger.save(update_fields=fields_to_update)
 
@@ -668,8 +672,6 @@ class PassengerExportView(TenantScopedMixin, APIView):
     )
     def get(self, request, *args, **kwargs):
         trip_id = request.query_params.get("trip")
-        user = request.user
-        tenant = getattr(user, "tenant", None)
 
         if not trip_id:
             return Response({"detail": "trip query param required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -778,17 +780,18 @@ class PassengerTemplateDownloadView(APIView):
     )
     def get(self, request, *args, **kwargs):
         import io
+
         import openpyxl
 
         wb = openpyxl.Workbook()
-        
+
         ws_xe1 = wb.active
         ws_xe1.title = "Xe 1"
         ws_xe1.append(PASSENGER_COLUMNS)
         ws_xe1.column_dimensions['C'].number_format = '@'
         for row in range(2, 500):
             ws_xe1.cell(row=row, column=3).number_format = '@'
-        
+
         ws_xe2 = wb.create_sheet(title="Xe 2")
         ws_xe2.append(PASSENGER_COLUMNS)
         ws_xe2.column_dimensions['C'].number_format = '@'
@@ -883,9 +886,11 @@ class ImportedBusMapView(TenantScopedMixin, APIView):
         serializer = ImportedBusSerializer(imported_bus)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 class PassengerBulkDeleteView(PassengerListCreateView):
-    from rest_framework import serializers
     from drf_spectacular.utils import inline_serializer
+    from rest_framework import serializers
+
     from common.views import BaseAPIView
 
     @extend_schema(
@@ -894,9 +899,9 @@ class PassengerBulkDeleteView(PassengerListCreateView):
         request=inline_serializer("PassengerBulkDelete", fields={"ids": serializers.ListField(child=serializers.IntegerField())}),
         responses={
             200: inline_serializer(
-                "PassengerBulkDeleteResponse", 
+                "PassengerBulkDeleteResponse",
                 fields={
-                    "success": serializers.BooleanField(), 
+                    "success": serializers.BooleanField(),
                     "data": inline_serializer("PassengerBulkDeleteData", fields={"deleted": serializers.IntegerField()})
                 }
             )

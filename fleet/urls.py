@@ -1,12 +1,12 @@
 from django.urls import path
 
 from fleet.views import (
+    BusBulkDeleteView,
     BusDetailView,
     BusExportView,
     BusImportView,
     BusListCreateView,
     BusTemplateDownloadView,
-    BusBulkDeleteView,
 )
 
 urlpatterns = [

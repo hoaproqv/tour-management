@@ -1,7 +1,10 @@
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from .models import Passenger, PassengerTransfer, PassengerBusAssignment
+
 from notifications.models import Notification
+
+from .models import PassengerTransfer
+
 
 @receiver(pre_save, sender=PassengerTransfer)
 def passenger_transfer_pre_save(sender, instance, **kwargs):
@@ -17,13 +20,14 @@ def passenger_transfer_pre_save(sender, instance, **kwargs):
         instance._old_to_trip_bus_id = None
         instance._old_from_trip_bus_id = None
 
+
 @receiver(post_save, sender=PassengerTransfer)
 def passenger_transfer_post_save(sender, instance, created, **kwargs):
     if instance.trip.status == 'doing':
         old_to_trip_bus_id = getattr(instance, '_old_to_trip_bus_id', None)
-        
+
         passenger_name = instance.passenger.name
-        
+
         # If to_trip_bus changed, or it was just created
         if created or old_to_trip_bus_id != instance.to_trip_bus_id:
             if instance.to_trip_bus:
@@ -47,7 +51,7 @@ def passenger_transfer_post_save(sender, instance, created, **kwargs):
                         reference_type='PASSENGER',
                         reference_id=str(instance.passenger.id)
                     )
-                    
+
             if instance.from_trip_bus:
                 manager = instance.from_trip_bus.manager
                 driver = instance.from_trip_bus.driver

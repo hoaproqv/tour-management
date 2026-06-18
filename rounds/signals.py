@@ -1,5 +1,8 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+
+from notifications.services import notify_users_by_role
+
 
 @receiver(post_save, sender="rounds.Round")
 def create_round_buses_for_round(sender, instance, created, **kwargs):
@@ -17,13 +20,12 @@ def create_round_buses_for_round(sender, instance, created, **kwargs):
             round=instance,
         )
 
+
 @receiver(post_save, sender="trips.Trip")
 def create_initial_round_for_trip(sender, instance, created, **kwargs):
     """(Removed) We no longer auto-create rounds in DB when a trip is created. UI handles this."""
     pass
 
-from django.db.models.signals import pre_save
-from notifications.services import notify_users_by_role
 
 @receiver(pre_save, sender="rounds.RoundBus")
 def round_bus_pre_save(sender, instance, **kwargs):
@@ -39,6 +41,7 @@ def round_bus_pre_save(sender, instance, **kwargs):
     else:
         instance._old_finalized_at = None
         instance._old_checkout_finalized_at = None
+
 
 @receiver(post_save, sender="rounds.RoundBus")
 def round_bus_post_save(sender, instance, created, **kwargs):

@@ -40,7 +40,7 @@ class RoundSerializer(serializers.ModelSerializer):
         trip = attrs.get("trip") or getattr(self.instance, "trip", None)
         sequence = attrs.get("sequence") or getattr(self.instance, "sequence", None)
         round_date = attrs.get("round_date") or getattr(self.instance, "round_date", None)
-        
+
         if trip and sequence is not None:
             qs = Round.objects.filter(trip=trip, sequence=sequence, round_date=round_date)
             if self.instance:
