@@ -39,7 +39,6 @@ import { useGlobalTripFilter } from "../../hooks/useGlobalTripFilter";
 import { canManageCatalog } from "../../utils/helper";
 
 import BusFormModal, { type BusFormValues } from "./components/BusFormModal";
-import ImportBusModal from "./components/ImportBusModal";
 
 import type { IUser } from "../../utils/types";
 
@@ -51,7 +50,6 @@ export default function BusManagement() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showCreate, setShowCreate] = useState(false);
-  const [showImport, setShowImport] = useState(false);
   const [editingBus, setEditingBus] = useState<TripBus | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -576,16 +574,6 @@ export default function BusManagement() {
         fleetLeads={fleetLeads}
         activeTripId={activeTripId}
         trips={trips}
-        onOpenImport={() => {
-          setShowCreate(false);
-          setShowImport(true);
-        }}
-      />
-
-      <ImportBusModal
-        open={showImport}
-        onCancel={() => setShowImport(false)}
-        activeTripId={activeTripId}
       />
     </div>
   );

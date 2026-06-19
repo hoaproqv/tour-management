@@ -1,29 +1,27 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 
-import { UploadOutlined, DownloadOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import {
   Form,
   Input,
   Modal,
-  Typography,
   Select,
-  Button,
   Row,
   Col,
   InputNumber,
-  message,
+  Tabs,
 } from "antd";
 
 import {
   getTripBuses,
-  downloadTripBusTemplate,
   type TripBus,
   type Trip,
 } from "../../../api/trips";
 
 import type { IUser } from "../../../utils/types";
 import type { FormInstance } from "antd";
+
+import ImportBusTab from "./ImportBusModal";
 
 export interface BusFormValues {
   trip: string;
@@ -60,8 +58,15 @@ export default function BusFormModal({
   fleetLeads,
   activeTripId,
   trips,
-  onOpenImport,
 }: BusFormModalProps) {
+  const [activeTab, setActiveTab] = useState("manual");
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab("manual");
+    }
+  }, [open]);
+
   const selectedTripId = Form.useWatch("trip", form);
 
   const { data: tripBusesResponse } = useQuery({
@@ -108,166 +113,154 @@ export default function BusFormModal({
     }));
   }, [fleetLeads, usedManagers]);
 
-  const handleDownloadTemplate = async () => {
-    try {
-      const blob = await downloadTripBusTemplate();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "xe_khach_import_template.xlsx";
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      message.error("Lỗi khi tải template");
-    }
-  };
+  const manualForm = (
+    <Form
+      layout="vertical"
+      form={form}
+      initialValues={{ trip: activeTripId || undefined }}
+    >
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item
+            label="Chuyến đi"
+            name="trip"
+            rules={[{ required: true, message: "Vui lòng chọn chuyến đi" }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Chọn chuyến đi"
+              notFoundContent="Không có chuyến đi"
+              options={trips.map((t) => ({
+                value: String(t.id),
+                label: t.name,
+              }))}
+              disabled={!!editingBus || !!activeTripId}
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item
+            label="Biển số"
+            name="registration_number"
+            rules={[{ required: true, message: "Nhập biển số" }]}
+          >
+            <Input placeholder="51B-12345" />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item
+            label="Mã xe"
+            name="bus_code"
+            rules={[{ required: true, message: "Nhập mã xe" }]}
+          >
+            <Input placeholder="Xe 1" />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item
+            label="Sức chứa"
+            name="capacity"
+            rules={[
+              { required: true, message: "Nhập sức chứa" },
+              {
+                type: "number",
+                min: 1,
+                max: 100,
+                message: "Sức chứa từ 1 đến 100",
+              },
+            ]}
+          >
+            <InputNumber
+              placeholder="45"
+              min={1}
+              max={100}
+              precision={0}
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <Form.Item
+            label="Trưởng xe"
+            name="manager"
+            rules={[{ required: true, message: "Vui lòng chọn trưởng xe" }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Chọn trưởng xe"
+              options={managerOptions}
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item
+            label="Lái xe"
+            name="driver"
+            rules={[{ required: true, message: "Vui lòng chọn lái xe" }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Chọn lái xe"
+              options={driverOptions}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item label="Ghi chú" name="description">
+        <Input.TextArea rows={2} placeholder="Thông tin thêm..." />
+      </Form.Item>
+    </Form>
+  );
 
   return (
     <Modal
       open={open}
       onCancel={onCancel}
-      onOk={onSubmit}
+      onOk={activeTab === "manual" ? onSubmit : undefined}
       confirmLoading={confirmLoading}
       title={editingBus ? "Sửa xe trong chuyến đi" : "Thêm xe vào chuyến đi"}
       okText={editingBus ? "Cập nhật" : "Thêm"}
       cancelText="Hủy"
-      width={700}
+      width={activeTab === "import" && !editingBus ? 740 : 700}
+      footer={activeTab === "import" && !editingBus ? null : undefined}
       destroyOnClose
     >
-      <Form
-        layout="vertical"
-        form={form}
-        initialValues={{ trip: activeTripId || undefined }}
-      >
-        {!editingBus && onOpenImport && (
-          <div className="mb-5 p-4 bg-blue-50/50 rounded-xl border border-blue-100 flex flex-col items-center justify-center gap-3">
-            <Typography.Text className="text-slate-600 text-sm">
-              Bạn có thể thêm nhiều xe cùng lúc bằng cách import file Excel.
-            </Typography.Text>
-            <div className="flex items-center gap-2">
-              <Button
-                icon={<UploadOutlined />}
-                size="small"
-                className="border-blue-300 text-blue-600 hover:bg-blue-100"
-                onClick={onOpenImport}
-              >
-                Import từ Excel
-              </Button>
-              <span className="text-slate-400 text-xs px-1">hoặc</span>
-              <Button
-                icon={<DownloadOutlined />}
-                size="small"
-                type="text"
-                className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                onClick={handleDownloadTemplate}
-              >
-                Tải template
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Chuyến đi"
-              name="trip"
-              rules={[{ required: true, message: "Vui lòng chọn chuyến đi" }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chọn chuyến đi"
-                notFoundContent="Không có chuyến đi"
-                options={trips.map((t) => ({
-                  value: String(t.id),
-                  label: t.name,
-                }))}
-                disabled={!!editingBus || !!activeTripId}
-              />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Biển số"
-              name="registration_number"
-              rules={[{ required: true, message: "Nhập biển số" }]}
-            >
-              <Input placeholder="51B-12345" />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Mã xe"
-              name="bus_code"
-              rules={[{ required: true, message: "Nhập mã xe" }]}
-            >
-              <Input placeholder="Xe 1" />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Sức chứa"
-              name="capacity"
-              rules={[
-                { required: true, message: "Nhập sức chứa" },
-                {
-                  type: "number",
-                  min: 1,
-                  max: 100,
-                  message: "Sức chứa từ 1 đến 100",
-                },
-              ]}
-            >
-              <InputNumber
-                placeholder="45"
-                min={1}
-                max={100}
-                precision={0}
-                style={{ width: "100%" }}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Trưởng xe"
-              name="manager"
-              rules={[{ required: true, message: "Vui lòng chọn trưởng xe" }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chọn trưởng xe"
-                options={managerOptions}
-              />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
-            <Form.Item
-              label="Lái xe"
-              name="driver"
-              rules={[{ required: true, message: "Vui lòng chọn lái xe" }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Chọn lái xe"
-                options={driverOptions}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Form.Item label="Ghi chú" name="description">
-          <Input.TextArea rows={2} placeholder="Thông tin thêm..." />
-        </Form.Item>
-      </Form>
+      {editingBus ? (
+        <div className="pt-4">{manualForm}</div>
+      ) : (
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: "manual",
+              label: "Thêm thủ công",
+              children: <div className="pt-2">{manualForm}</div>,
+            },
+            {
+              key: "import",
+              label: "Import từ Excel",
+              children: (
+                <ImportBusTab
+                  activeTripId={activeTripId}
+                  onCancel={onCancel}
+                  onSuccess={onCancel}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
     </Modal>
   );
 }

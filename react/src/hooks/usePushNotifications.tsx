@@ -17,6 +17,8 @@ export function usePushNotifications() {
             "/firebase-messaging-sw.js",
           );
 
+          await navigator.serviceWorker.ready;
+
           const currentToken = await getToken(messaging, {
             vapidKey: process.env.VITE_FIREBASE_VAPID_KEY,
             serviceWorkerRegistration: registration,
